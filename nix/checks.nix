@@ -123,6 +123,7 @@ in
     assert nixos.programs.gpu-screen-recorder.package == nixos.programs.pangu.package.recorderPackage;
     assert nixos.programs.ydotool.enable && nixos.services.power-profiles-daemon.enable;
     assert nixos.hardware.i2c.enable;
+    assert builtins.elem pkgs.brightnessctl nixos.services.udev.packages;
     assert builtins.elem "i2c" nixos.users.users.pangu-test.extraGroups;
     assert builtins.elem nixos.programs.ydotool.group nixos.users.users.pangu-test.extraGroups;
     assert !nixosDisabled.programs.gpu-screen-recorder.enable;
@@ -132,6 +133,17 @@ in
   hyprland = pkgs.runCommand "pangu-hyprland-check" { nativeBuildInputs = [ pkgs.lua ]; } ''
     lua ${../tests/hyprland.lua} ${../hyprland/pangu}
     lua ${../tests/integration.lua} ${../hyprland/pangu}
+    touch "$out"
+  '';
+
+  development = pkgs.runCommand "pangu-development-check" { } ''
+    if ${
+      self.apps.${pkgs.stdenv.hostPlatform.system}.dev.program
+    } /pangu-missing-checkout >runner.log 2>&1; then
+      echo "Development runner accepted a missing checkout" >&2
+      exit 1
+    fi
+    grep -F "run from the Pangu checkout" runner.log
     touch "$out"
   '';
 

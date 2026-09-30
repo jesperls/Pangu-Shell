@@ -35,7 +35,8 @@ nix flake check --print-build-logs
 The package runs JavaScript and Python tests, shell syntax checks, QML syntax
 checks and shader compilation/validation. Flake checks also exercise the public
 modules without any private NixOS configuration, mutable-settings merges,
-standalone and preset Lua hooks, generated settings and runtime commands.
+standalone and preset Lua hooks, generated settings, runtime commands and
+development-runner validation.
 CI runs formatting and all checks. Only `x86_64-linux` is currently advertised
 and tested; add another platform only after verifying its dependencies.
 

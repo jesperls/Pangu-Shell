@@ -96,6 +96,8 @@ from the first login. The lockscreen's PAM configuration is packaged with QML.
 
 ## NixOS prerequisites
 
+The brightness integration installs backlight udev rules as well as I2C access.
+
 The NixOS module has independent `fonts.enable`, `recording.enable`,
 `inputAutomation.enable`, `powerProfiles.enable` and `brightness.enable`
 switches. They default to true when `programs.pangu.enable` is enabled. Set a

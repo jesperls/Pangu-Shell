@@ -43,7 +43,10 @@ in
       })
       (lib.mkIf cfg.inputAutomation.enable { programs.ydotool.enable = true; })
       (lib.mkIf cfg.powerProfiles.enable { services.power-profiles-daemon.enable = true; })
-      (lib.mkIf cfg.brightness.enable { hardware.i2c.enable = true; })
+      (lib.mkIf cfg.brightness.enable {
+        hardware.i2c.enable = true;
+        services.udev.packages = [ pkgs.brightnessctl ];
+      })
       {
         users.users = lib.genAttrs cfg.users (_: {
           extraGroups = [

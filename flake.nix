@@ -62,7 +62,7 @@
           pangu = self.packages.${system}.pangu;
           runner = pkgs.writeShellApplication {
             name = "pangu-dev";
-            runtimeInputs = [
+            runtimeInputs = pangu.runtimeInputs ++ [
               pangu
               pkgs.qt6.qtshadertools
             ];
