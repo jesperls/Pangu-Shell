@@ -1,0 +1,6 @@
+result
+result-*
+*.qsb
+__pycache__/
+*.pyc
+.direnv/
