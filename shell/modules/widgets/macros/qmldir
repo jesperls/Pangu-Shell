@@ -1,0 +1,11 @@
+module qs.modules.widgets.macros
+singleton MacroKeys 1.0 MacroKeys.qml
+MacroTextField 1.0 MacroTextField.qml
+MacroAppPicker 1.0 MacroAppPicker.qml
+MacroSoundField 1.0 MacroSoundField.qml
+KeyCaptureField 1.0 KeyCaptureField.qml
+MacroButton 1.0 MacroButton.qml
+MacroIconButton 1.0 MacroIconButton.qml
+MacroStepRow 1.0 MacroStepRow.qml
+MacrosWindow 1.0 MacrosWindow.qml
+MousePickOverlay 1.0 MousePickOverlay.qml

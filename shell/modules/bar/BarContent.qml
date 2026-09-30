@@ -1,0 +1,782 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Widgets
+import Quickshell.Wayland
+import qs.modules.bar.workspaces
+import qs.modules.theme
+import qs.modules.bar.clock
+import qs.modules.bar.systray
+import qs.modules.widgets.overview
+import qs.modules.widgets.dashboard
+import qs.modules.widgets.powermenu
+import qs.modules.corners
+import qs.modules.components
+import qs.modules.services
+import qs.modules.globals
+import qs.modules.bar
+import qs.config
+import "." as Bar
+
+Item {
+    id: root
+
+    required property ShellScreen screen
+    readonly property string screenName: screen?.name ?? ""
+
+    property string barPosition: (Config.bar && Config.bar.position !== undefined && ["top", "bottom", "left", "right"].includes(Config.bar.position) ? Config.bar.position : "top")
+    property string orientation: barPosition === "left" || barPosition === "right" ? "vertical" : "horizontal"
+
+    readonly property bool flatButtons: (Config.bar && Config.bar.flatButtons !== undefined ? Config.bar.flatButtons : false)
+    readonly property string clockPosition: (Config.bar && Config.bar.clockPosition === "center" ? "center" : "right")
+    readonly property bool showWorkspaces: (Config.bar && Config.bar.showWorkspaces !== undefined ? Config.bar.showWorkspaces : true)
+    readonly property string launcherPosition: (Config.bar && Config.bar.launcherPosition === "end" ? "end" : "start")
+
+    onPinnedChanged: {
+        if (Config.bar && Config.bar.pinnedOnStartup !== pinned) {
+            Config.bar.pinnedOnStartup = pinned;
+        }
+    }
+
+    property bool pinned: (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true)
+
+    readonly property var compositorMonitor: Compositor.monitorFor(screen)
+    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace.id === compositorMonitor.activeWorkspace.id)
+
+    readonly property bool activeWindowFullscreen: Compositor.hasFullscreenWindow(screen)
+
+
+    readonly property bool shouldAutoHide: !pinned || activeWindowFullscreen
+
+    onShouldAutoHideChanged: {
+        if (!shouldAutoHide) {
+            hoverActive = false;
+            hideDelayTimer.stop();
+        }
+    }
+
+    property bool hoverActive: false
+
+    readonly property bool isMouseOverBar: barMouseArea.containsMouse
+
+    readonly property var notchPanelRef: Visibilities.notchPanels[screenName]
+    readonly property string notchPosition: (Config.notchPosition !== undefined ? Config.notchPosition : "top")
+    readonly property bool notchHoverActive: {
+        if (barPosition !== notchPosition)
+            return false;
+        
+        if (notchPanelRef) {
+            if (typeof notchPanelRef.notchHoverActive !== 'undefined') {
+                return notchPanelRef.notchHoverActive;
+            }
+            if (typeof notchPanelRef.hoverActive !== 'undefined') {
+                return notchPanelRef.hoverActive;
+            }
+        }
+        return false;
+    }
+
+    readonly property var screenVisibilities: Visibilities.getForScreen(screenName)
+    readonly property bool notchOpen: Visibilities.isNotchOpen(screenVisibilities)
+
+    readonly property real outerRadius: Styling.radius(0)
+    readonly property real innerRadius: (Config.bar && Config.bar.pillStyle === "squished") ? Styling.radius(0) / 2 : Styling.radius(0)
+
+    readonly property bool reveal: {
+        if (!shouldAutoHide)
+            return true;
+
+        if (activeWindowFullscreen && !(Config.bar && Config.bar.availableOnFullscreen !== undefined ? Config.bar.availableOnFullscreen : false)) {
+            return false;
+        }
+
+        const hoverReveal = (Config.bar && Config.bar.hoverToReveal !== undefined ? Config.bar.hoverToReveal : true);
+        if (hoverReveal && (isMouseOverBar || hoverActive || notchHoverActive))
+            return true;
+
+        return notchOpen;
+    }
+
+    Timer {
+        id: hideDelayTimer
+        interval: (Config.bar && Config.bar.hideDelay !== undefined ? Config.bar.hideDelay : 1000)
+        repeat: false
+        onTriggered: {
+            if (!root.isMouseOverBar) {
+                root.hoverActive = false;
+            }
+        }
+    }
+
+    onIsMouseOverBarChanged: {
+        if (isMouseOverBar) {
+            hideDelayTimer.stop();
+            hoverActive = true;
+        } else {
+            if (shouldAutoHide) {
+                hideDelayTimer.restart();
+            } else {
+                hoverActive = false;
+            }
+        }
+    }
+
+    readonly property bool integratedDockEnabled: Config.integratedDockEnabled
+    readonly property string integratedDockPosition: {
+        const pos = (Config.dock && Config.dock.position !== undefined ? Config.dock.position : "center");
+
+        if (root.orientation === "horizontal") {
+            if (pos === "left" || pos === "start")
+                return "start";
+            if (pos === "right" || pos === "end")
+                return "end";
+            return "center";
+        }
+        
+        return "center";
+    }
+
+    readonly property bool dockAtStart: integratedDockEnabled && integratedDockPosition === "start"
+    readonly property bool dockAtEnd: integratedDockEnabled && integratedDockPosition === "end"
+
+    readonly property int frameOffset: (Config.bar && Config.bar.frameEnabled !== undefined ? Config.bar.frameEnabled : false) ? (Config.bar && Config.bar.frameThickness !== undefined ? Config.bar.frameThickness : 6) : 0
+
+    readonly property int barPadding: barBg.padding
+    readonly property int barSpacing: (Config.bar && Config.bar.spacing !== undefined) ? Config.bar.spacing : 4
+    readonly property int topOuterMargin: (orientation === "vertical" || barPosition === "top") ? barBg.outerMargin : 0
+    readonly property int bottomOuterMargin: (orientation === "vertical" || barPosition === "bottom") ? barBg.outerMargin : 0
+    readonly property int leftOuterMargin: (orientation === "horizontal" || barPosition === "left") ? barBg.outerMargin : 0
+    readonly property int rightOuterMargin: (orientation === "horizontal" || barPosition === "right") ? barBg.outerMargin : 0
+
+    readonly property int contentImplicitWidth: orientation === "horizontal" ? (horizontalLoader.item && horizontalLoader.item.implicitWidth !== undefined ? horizontalLoader.item.implicitWidth : 0) : (verticalLoader.item && verticalLoader.item.implicitWidth !== undefined ? verticalLoader.item.implicitWidth : 0)
+    readonly property int contentImplicitHeight: orientation === "horizontal" ? (horizontalLoader.item && horizontalLoader.item.implicitHeight !== undefined ? horizontalLoader.item.implicitHeight : 0) : (verticalLoader.item && verticalLoader.item.implicitHeight !== undefined ? verticalLoader.item.implicitHeight : 0)
+    
+    readonly property int configBarSize: (Config.bar && Config.bar.height !== undefined ? Config.bar.height : 0)
+    readonly property int barTargetWidth: orientation === "vertical" ? (configBarSize > 0 ? configBarSize : contentImplicitWidth + 2 * barPadding) : 0
+    readonly property int barTargetHeight: orientation === "horizontal" ? (configBarSize > 0 ? configBarSize : contentImplicitHeight + 2 * barPadding) : 0
+
+    readonly property bool actualContainBar: (Config.bar && Config.bar.containBar !== undefined ? Config.bar.containBar : false) && (Config.bar && Config.bar.frameEnabled !== undefined ? Config.bar.frameEnabled : false)
+    readonly property int totalBarWidth: barTargetWidth + 
+        ((root.barPosition === "left" || root.orientation === "horizontal") ? (root.frameOffset + root.leftOuterMargin) : 0) +
+        ((root.barPosition === "right" || root.orientation === "horizontal") ? (root.frameOffset + root.rightOuterMargin) : 0)
+
+    readonly property int totalBarHeight: barTargetHeight + 
+        ((root.barPosition === "top" || root.orientation === "vertical") ? (root.frameOffset + root.topOuterMargin) : 0) +
+        ((root.barPosition === "bottom" || root.orientation === "vertical") ? (root.frameOffset + root.bottomOuterMargin) : 0)
+
+    readonly property int baseOuterMargin: barBg.outerMargin
+
+    readonly property bool shadowsEnabled: Config.showBackground && (!actualContainBar || (Config.bar && Config.bar.keepBarShadow !== undefined ? Config.bar.keepBarShadow : false))
+
+    readonly property var centerGap: (Config.bar && Config.bar.splitOnCenteredLayout !== undefined ? Config.bar.splitOnCenteredLayout : true) ? Compositor.gapFor(screenName) : null
+    readonly property bool splitActive: orientation === "horizontal" && centerGap !== null && width > 0
+    readonly property int splitGapPadding: (centerGap && centerGap.square) ? 0 : (Config.bar && Config.bar.splitGapPadding !== undefined ? Config.bar.splitGapPadding : 4)
+    readonly property real splitStart: splitActive ? Math.max(0, centerGap.x - splitGapPadding) : 0
+    readonly property real splitEnd: splitActive ? Math.min(width, centerGap.x + centerGap.width + splitGapPadding) : 0
+
+    property alias barHitbox: barHitboxLeft
+    property alias barHitboxRight: barHitboxRightItem
+
+    Item {
+        id: barHitboxLeft
+        x: barMouseArea.x
+        y: barMouseArea.y
+        width: root.splitActive ? Math.min(root.splitStart, barMouseArea.width) : barMouseArea.width
+        height: barMouseArea.height
+    }
+
+    Item {
+        id: barHitboxRightItem
+        visible: root.splitActive
+        x: root.splitEnd
+        y: barMouseArea.y
+        width: root.splitActive ? Math.max(0, root.width - root.splitEnd) : 0
+        height: barMouseArea.height
+    }
+
+    MouseArea {
+        id: barMouseArea
+        hoverEnabled: true
+
+        width: root.orientation === "horizontal" ? root.width : (root.reveal ? root.totalBarWidth : Math.max((Config.bar && Config.bar.hoverRegionHeight !== undefined ? Config.bar.hoverRegionHeight : 8), 4) + root.frameOffset)
+        height: root.orientation === "vertical" ? root.height : (root.reveal ? root.totalBarHeight : Math.max((Config.bar && Config.bar.hoverRegionHeight !== undefined ? Config.bar.hoverRegionHeight : 8), 4) + root.frameOffset)
+
+
+        x: {
+            if (root.barPosition === "right") return parent.width - width;
+            return 0;
+        }
+        y: {
+            if (root.barPosition === "bottom") return parent.height - height;
+            return 0;
+        }
+
+        Behavior on x {
+            enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0 && root.orientation === "vertical"
+            NumberAnimation {
+                duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 4
+                easing.type: Easing.OutCubic
+            }
+        }
+        Behavior on y {
+            enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0 && root.orientation === "horizontal"
+            NumberAnimation {
+                duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 4
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Behavior on width {
+            enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0 && root.orientation === "vertical"
+            NumberAnimation {
+                duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 4
+                easing.type: Easing.OutCubic
+            }
+        }
+        Behavior on height {
+            enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0 && root.orientation === "horizontal"
+            NumberAnimation {
+                duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 4
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Item {
+            id: bar
+
+            anchors {
+                top: (root.barPosition === "top" || root.orientation === "vertical") ? parent.top : undefined
+                bottom: (root.barPosition === "bottom" || root.orientation === "vertical") ? parent.bottom : undefined
+                left: (root.barPosition === "left" || root.orientation === "horizontal") ? parent.left : undefined
+                right: (root.barPosition === "right" || root.orientation === "horizontal") ? parent.right : undefined
+
+                topMargin: (root.barPosition === "top" || root.orientation === "vertical") ? (root.frameOffset + root.topOuterMargin) : 0
+                bottomMargin: (root.barPosition === "bottom" || root.orientation === "vertical") ? (root.frameOffset + root.bottomOuterMargin) : 0
+                leftMargin: (root.barPosition === "left" || root.orientation === "horizontal") ? (root.frameOffset + root.leftOuterMargin) : 0
+                rightMargin: (root.barPosition === "right" || root.orientation === "horizontal") ? (root.frameOffset + root.rightOuterMargin) : 0
+            }
+
+
+            opacity: root.reveal ? 1 : 0
+            Behavior on opacity {
+                enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                NumberAnimation {
+                    duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            transform: Translate {
+                x: {
+                    if (!root.shouldAutoHide)
+                        return 0;
+                    if (root.barPosition === "left")
+                        return root.reveal ? 0 : -bar.width - (root.frameOffset + root.leftOuterMargin);
+                    if (root.barPosition === "right")
+                        return root.reveal ? 0 : bar.width + (root.frameOffset + root.rightOuterMargin);
+                    return 0;
+                }
+                y: {
+                    if (!root.shouldAutoHide)
+                        return 0;
+                    if (root.barPosition === "top")
+                        return root.reveal ? 0 : -bar.height - (root.frameOffset + root.topOuterMargin);
+                    if (root.barPosition === "bottom")
+                        return root.reveal ? 0 : bar.height + (root.frameOffset + root.bottomOuterMargin);
+                    return 0;
+                }
+                Behavior on x {
+                    enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                    NumberAnimation {
+                        duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on y {
+                    enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                    NumberAnimation {
+                        duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+
+            states: [
+                State {
+                    name: "top"
+                    when: root.barPosition === "top"
+                    PropertyChanges {
+                        target: bar
+                        height: root.barTargetHeight
+                    }
+                },
+                State {
+                    name: "bottom"
+                    when: root.barPosition === "bottom"
+                    PropertyChanges {
+                        target: bar
+                        height: root.barTargetHeight
+                    }
+                },
+                State {
+                    name: "left"
+                    when: root.barPosition === "left"
+                    PropertyChanges {
+                        target: bar
+                        width: root.barTargetWidth
+                    }
+                },
+                State {
+                    name: "right"
+                    when: root.barPosition === "right"
+                    PropertyChanges {
+                        target: bar
+                        width: root.barTargetWidth
+                    }
+                }
+            ]
+
+            BarBg {
+                id: barBg
+                anchors.fill: parent
+                position: root.barPosition
+                splitStart: root.splitActive ? root.splitStart - (root.frameOffset + root.leftOuterMargin) : -1
+                splitEnd: root.splitActive ? root.splitEnd - (root.frameOffset + root.leftOuterMargin) : -1
+
+                Loader {
+                    id: horizontalLoader
+                    active: root.orientation === "horizontal"
+                    anchors.fill: parent
+                    sourceComponent: RowLayout {
+                        spacing: root.barSpacing
+
+                        readonly property var notchContainer: Visibilities.getNotchForScreen(root.screenName)
+
+                        LauncherButton {
+                            id: launcherButton
+                            visible: root.launcherPosition !== "end"
+                            startRadius: root.outerRadius
+                            endRadius: root.innerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        Workspaces {
+                            visible: root.showWorkspaces
+                            orientation: root.orientation
+                            bar: QtObject {
+                                property var screen: root.screen
+                            }
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Loader {
+                            active: (Config.bar && Config.bar.showPinButton !== undefined ? Config.bar.showPinButton : true)
+                            visible: active
+                            Layout.alignment: Qt.AlignVCenter
+
+                            sourceComponent: Button {
+                                id: pinButton
+                                implicitWidth: 36
+                                implicitHeight: 36
+
+                                background: StyledRect {
+                                    id: pinButtonBg
+                                    variant: root.pinned ? "primary" : "bg"
+                                    enableShadow: root.shadowsEnabled
+                                    
+                                    property real startRadius: root.innerRadius
+                                    property real endRadius: root.dockAtStart ? root.innerRadius : root.outerRadius
+                                    
+                                    topLeftRadius: startRadius
+                                    bottomLeftRadius: startRadius
+                                    topRightRadius: endRadius
+                                    bottomRightRadius: endRadius
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: Styling.srItem("overprimary")
+                                        opacity: root.pinned ? 0 : (pinButton.pressed ? 0.5 : (pinButton.hovered ? 0.25 : 0))
+                                        radius: (parent.radius !== undefined ? parent.radius : 0)
+
+                                        Behavior on opacity {
+                                            enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                            NumberAnimation {
+                                                duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                            }
+                                        }
+                                    }
+                                }
+
+                                contentItem: Text {
+                                    text: Icons.pin
+                                    font.family: Icons.font
+                                    font.pixelSize: 18
+                                    color: root.pinned ? pinButtonBg.item : (pinButton.pressed ? Colors.background : (Styling.srItem("overprimary") || Colors.overBackground))
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+
+                                    rotation: root.pinned ? 0 : 45
+                                    Behavior on rotation {
+                                        enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                        NumberAnimation {
+                                            duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                        }
+                                    }
+
+                                    Behavior on color {
+                                        enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                        ColorAnimation {
+                                            duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                        }
+                                    }
+                                }
+
+                                onClicked: root.pinned = !root.pinned
+
+                                StyledToolTip {
+                                    show: pinButton.hovered
+                                    tooltipText: root.pinned ? "Unpin bar" : "Pin bar"
+                                }
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            visible: root.orientation === "horizontal" && integratedDockEnabled
+
+                            Bar.IntegratedDock {
+                                bar: root
+                                orientation: root.orientation
+                                anchors.verticalCenter: parent.verticalCenter
+                                enableShadow: root.shadowsEnabled
+
+                                startRadius: root.dockAtStart ? root.innerRadius : root.outerRadius
+                                endRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
+
+                                property real targetX: {
+                                    if (integratedDockPosition === "start")
+                                        return 0;
+                                    if (integratedDockPosition === "end")
+                                        return parent.width - width;
+
+                                    if (root.splitActive) {
+                                        const segEnd = root.splitStart - (root.frameOffset + root.leftOuterMargin);
+                                        return (segEnd - width) / 2 - (parent.x + root.barSpacing);
+                                    }
+
+                                    return (bar.width - width) / 2 - (parent.x + root.barSpacing);
+                                }
+
+                                x: Math.max(0, Math.min(parent.width - width, targetX))
+
+                                width: Math.min(implicitWidth, parent.width)
+                                height: implicitHeight
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            visible: !(root.orientation === "horizontal" && integratedDockEnabled)
+                        }
+
+                        ToolsButton {
+                            id: toolsButton
+                            startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
+                            endRadius: root.innerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        SysTray {
+                            bar: root
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        RecordingIndicator {
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        ControlsButton {
+                            id: controlsButton
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Bar.BatteryIndicator {
+                            id: batteryIndicator
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Clock {
+                            id: clockComponent
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            visible: root.clockPosition !== "center"
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        PowerButton {
+                            id: powerButton
+                            startRadius: root.innerRadius
+                            endRadius: root.outerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        LauncherButton {
+                            id: launcherButtonEnd
+                            visible: root.launcherPosition === "end"
+                            startRadius: root.innerRadius
+                            endRadius: root.outerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+                    }
+                }
+
+                Loader {
+                    id: verticalLoader
+                    active: root.orientation === "vertical"
+                    anchors.fill: parent
+                    sourceComponent: ColumnLayout {
+                        spacing: root.barSpacing
+
+                        LauncherButton {
+                            id: launcherButtonVert
+                            visible: root.launcherPosition !== "end"
+                            Layout.preferredHeight: 36
+                            startRadius: root.outerRadius
+                            endRadius: root.innerRadius
+                            vertical: true
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        SysTray {
+                            bar: root
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        RecordingIndicator {
+                            vertical: true
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        ToolsButton {
+                            id: toolsButtonVert
+                            startRadius: root.innerRadius
+                            endRadius: root.outerRadius
+                            vertical: true
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        Item {
+                            Layout.fillHeight: true
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.horizontalCenter: parent.horizontalCenter
+
+                                property real targetY: {
+                                    if (!parent || !bar)
+                                        return 0;
+
+                                    var _trigger = parent.y;
+
+                                    var parentPos = parent.mapToItem(bar, 0, 0);
+                                    return (bar.height - height) / 2 - parentPos.y;
+                                }
+
+                                y: Math.max(0, Math.min(parent.height - height, targetY))
+
+                                height: Math.min(parent.height, implicitHeight)
+                                width: parent.width
+                                spacing: root.barSpacing
+
+                                Workspaces {
+                                    id: workspacesVert
+                                    visible: root.showWorkspaces
+                                    orientation: root.orientation
+                                    bar: QtObject {
+                                        property var screen: root.screen
+                                    }
+                                    Layout.alignment: Qt.AlignHCenter
+                                    startRadius: root.innerRadius
+                                    endRadius: root.innerRadius
+                                }
+
+                                Loader {
+                                    active: (Config.bar && Config.bar.showPinButton !== undefined ? Config.bar.showPinButton : true)
+                                    visible: active
+                                    Layout.alignment: Qt.AlignHCenter
+                            
+                                    sourceComponent: Button {
+                                        id: pinButtonV
+                                        implicitWidth: 36
+                                        implicitHeight: 36
+                            
+                                        background: StyledRect {
+                                            id: pinButtonVBg
+                                            variant: root.pinned ? "primary" : "bg"
+                                            enableShadow: root.shadowsEnabled
+                                        
+                                            property real startRadius: root.innerRadius
+                                            property real endRadius: root.integratedDockEnabled ? root.innerRadius : root.outerRadius
+                                        
+                                            topLeftRadius: startRadius
+                                            topRightRadius: startRadius
+                                            bottomLeftRadius: endRadius
+                                            bottomRightRadius: endRadius
+
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                color: Styling.srItem("overprimary")
+                                                opacity: root.pinned ? 0 : (pinButtonV.pressed ? 0.5 : (pinButtonV.hovered ? 0.25 : 0))
+                                                radius: (parent.radius !== undefined ? parent.radius : 0)
+
+                                                Behavior on opacity {
+                                                    enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                                    NumberAnimation {
+                                                        duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        contentItem: Text {
+                                            text: Icons.pin
+                                            font.family: Icons.font
+                                            font.pixelSize: 18
+                                            color: root.pinned ? pinButtonVBg.item : (pinButtonV.pressed ? Colors.background : (Styling.srItem("overprimary") || Colors.overBackground))
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+
+                                            rotation: root.pinned ? 0 : 45
+                                            Behavior on rotation {
+                                                enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                                NumberAnimation {
+                                                    duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                                }
+                                            }
+
+                                            Behavior on color {
+                                                enabled: (Styling.animDuration !== undefined ? Styling.animDuration : 0) > 0
+                                                ColorAnimation {
+                                                    duration: (Styling.animDuration !== undefined ? Styling.animDuration : 0) / 2
+                                                }
+                                            }
+                                        }
+
+                                        onClicked: root.pinned = !root.pinned
+
+                                        StyledToolTip {
+                                            show: pinButtonV.hovered
+                                            tooltipText: root.pinned ? "Unpin bar" : "Pin bar"
+                                        }
+                                    }
+                                }
+                            }
+
+                            Bar.IntegratedDock {
+                                bar: root
+                                orientation: root.orientation
+                                visible: integratedDockEnabled
+                                Layout.fillHeight: true
+                                Layout.fillWidth: true
+                                enableShadow: root.shadowsEnabled
+                                
+                                startRadius: root.innerRadius
+                                endRadius: root.outerRadius
+                            }
+                        }
+
+                        ControlsButton {
+                            id: controlsButtonVert
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.outerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Bar.BatteryIndicator {
+                            id: batteryIndicatorVert
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Clock {
+                            id: clockComponentVert
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        PowerButton {
+                            id: powerButtonVert
+                            Layout.preferredHeight: 36
+                            startRadius: root.innerRadius
+                            endRadius: root.outerRadius
+                            vertical: true
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        LauncherButton {
+                            id: launcherButtonVertEnd
+                            visible: root.launcherPosition === "end"
+                            Layout.preferredHeight: 36
+                            startRadius: root.innerRadius
+                            endRadius: root.outerRadius
+                            vertical: true
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+                    }
+                }
+            }
+
+            Clock {
+                id: clockComponentCenter
+                visible: root.orientation === "horizontal" && root.clockPosition === "center"
+                bar: root
+                flatStyle: root.flatButtons
+                layerEnabled: root.shadowsEnabled
+                anchors.centerIn: parent
+                startRadius: root.innerRadius
+                endRadius: root.innerRadius
+            }
+        }
+    }
+}

@@ -1,0 +1,167 @@
+pragma Singleton
+pragma ComponentBehavior: Bound
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import qs.config
+import qs.modules.globals
+
+Singleton {
+    id: root
+
+    property real cpuUsage: 0.0
+    property string cpuModel: ""
+    property int cpuTemp: -1
+
+    property real ramUsage: 0.0
+    property real ramTotal: 0
+    property real ramUsed: 0
+    property real ramAvailable: 0
+
+    property var gpuUsages: []
+    property var gpuVendors: []
+    property var gpuNames: []
+    property int gpuCount: 0
+    property bool gpuDetected: false
+    property var gpuTemps: []
+    
+
+    property var diskUsage: ({})
+    property var diskTypes: ({})
+    property var validDisks: []
+
+    property var cpuHistory: []
+    property var ramHistory: []
+    property var gpuHistories: []
+    property var cpuTempHistory: []
+    property var gpuTempHistories: []
+    property int maxHistoryPoints: 50
+    property int totalDataPoints: 0
+
+    property int updateInterval: 2000
+    property bool restarting: false
+    readonly property bool monitorWanted: GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2
+        && Config.dashboard.showMetrics !== false && root.validDisks.length > 0
+        && !SuspendManager.isSuspending && SuspendManager.wakeReady
+
+    property Process monitorProcess: Process {
+        id: monitorProcess
+        running: root.monitorWanted && !root.restarting
+        
+        command: {
+            let cmd = ["python3", Paths.script("system_monitor.py"), root.updateInterval.toString()];
+            return cmd.concat(root.validDisks);
+        }
+
+        onExited: if (root.monitorWanted) root.restartMonitor()
+        
+        stdout: SplitParser {
+            onRead: data => {
+                try {
+                    const stats = JSON.parse(data);
+                    
+                    if (stats.static) {
+                        root.cpuModel = stats.static.cpu_model || root.cpuModel;
+                        root.gpuNames = stats.static.gpu_names || [];
+                        root.gpuVendors = stats.static.gpu_vendors || [];
+                        root.gpuCount = stats.static.gpu_count || 0;
+                        root.gpuDetected = root.gpuCount > 0;
+                        root.diskTypes = stats.static.disk_types || {};
+                        return;
+                    }
+
+                    if (stats.cpu) {
+                        root.cpuUsage = stats.cpu.usage;
+                        root.cpuTemp = stats.cpu.temp;
+                    }
+                    
+                    if (stats.ram) {
+                        root.ramUsage = stats.ram.usage;
+                        root.ramTotal = stats.ram.total;
+                        root.ramUsed = stats.ram.used;
+                        root.ramAvailable = stats.ram.available;
+                    }
+                    
+                    if (stats.disk) root.diskUsage = stats.disk.usage;
+                    
+                    if (stats.gpu) {
+                        root.gpuUsages = stats.gpu.usages;
+                        root.gpuTemps = stats.gpu.temps;
+                    }
+                    
+                    root.updateHistory();
+                } catch (e) {
+                    console.warn("SystemResources: Failed to parse monitor data: " + e);
+                }
+            }
+        }
+    }
+
+    Component.onCompleted: validateDisks()
+
+    Connections {
+        target: Config.system
+        function onDisksChanged() { root.validateDisks(); }
+    }
+
+    property bool configReady: Config.initialLoadComplete
+    onConfigReadyChanged: if (configReady) validateDisks()
+
+    onValidDisksChanged: if (monitorProcess.running) restartMonitor()
+    onUpdateIntervalChanged: if (monitorProcess.running) restartMonitor()
+
+    function restartMonitor() {
+        root.restarting = true;
+        restartTimer.restart();
+    }
+
+    Timer {
+        id: restartTimer
+        interval: 1000
+        onTriggered: root.restarting = false
+    }
+
+    function validateDisks() {
+        const configuredDisks = Config.system.disks || ["/"];
+        let newValidDisks = [];
+        for (let i = 0; i < configuredDisks.length; i++) {
+            const disk = configuredDisks[i];
+            if (disk && typeof disk === 'string' && disk.trim() !== '') {
+                newValidDisks.push(disk.trim());
+            }
+        }
+        if (newValidDisks.length === 0) newValidDisks = ["/"];
+        validDisks = newValidDisks;
+    }
+
+    function updateHistory() {
+        totalDataPoints++;
+        
+        const pushHistory = (arr, val) => {
+            let next = arr.slice();
+            next.push(val);
+            if (next.length > maxHistoryPoints) next.shift();
+            return next;
+        };
+
+        cpuHistory = pushHistory(cpuHistory, cpuUsage / 100);
+        cpuTempHistory = pushHistory(cpuTempHistory, cpuTemp);
+        ramHistory = pushHistory(ramHistory, ramUsage / 100);
+
+        if (gpuDetected && gpuCount > 0) {
+            let newGpuHistories = gpuHistories.slice();
+            let newGpuTempHistories = gpuTempHistories.slice();
+            
+            while (newGpuHistories.length < gpuCount) newGpuHistories.push([]);
+            while (newGpuTempHistories.length < gpuCount) newGpuTempHistories.push([]);
+            
+            for (let i = 0; i < gpuCount; i++) {
+                newGpuHistories[i] = pushHistory(newGpuHistories[i], (gpuUsages[i] || 0) / 100);
+                newGpuTempHistories[i] = pushHistory(newGpuTempHistories[i], (gpuTemps[i] ?? -1));
+            }
+            
+            gpuHistories = newGpuHistories;
+            gpuTempHistories = newGpuTempHistories;
+        }
+    }
+}
