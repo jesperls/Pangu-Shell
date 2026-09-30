@@ -44,13 +44,9 @@ QtObject {
             case "tools": toggleSimpleModule("tools"); break;
             case "config": toggleSettings(); break;
             case "settings": toggleSettings(); break;
-            case "screenshot": Screenshot.initialize(); GlobalStates.screenshotToolVisible = true; break;
+            case "screenshot": Screenshot.startCapture(); break;
             case "screenrecord": ScreenRecorder.initialize(); GlobalStates.screenRecordReplayMode = false; GlobalStates.screenRecordToolVisible = true; break;
-            case "lens": 
-                Screenshot.initialize();
-                Screenshot.captureMode = "lens";
-                GlobalStates.screenshotToolVisible = true;
-                break;
+            case "lens": Screenshot.startCapture("lens"); break;
             case "mirror": GlobalStates.mirrorWindowVisible = !GlobalStates.mirrorWindowVisible; break;
             case "cheatsheet": GlobalStates.cheatsheetVisible = !GlobalStates.cheatsheetVisible; break;
             case "macros": toggleMacros(); break;

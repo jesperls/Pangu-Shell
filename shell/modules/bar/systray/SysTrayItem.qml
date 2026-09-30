@@ -7,32 +7,52 @@ import Quickshell.Widgets
 import qs.modules.theme
 import qs.modules.services
 import qs.modules.components
+import qs.config
 
 MouseArea {
     id: root
 
     required property var bar
     required property SystemTrayItem item
-    property int trayItemSize: 20
+    objectName: "trayItem-" + (item?.id ?? "")
+    property int trayItemSize: Math.max(16, Math.min(32, Config.bar.trayIconSize ?? 20))
+    property string popupGroup: "bar"
+    property var ownerPopup: null
+    signal activated()
     property bool isHovered: false
 
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
+    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
     Layout.fillHeight: bar.orientation === "horizontal"
     Layout.fillWidth: bar.orientation === "vertical"
     implicitWidth: trayItemSize
     implicitHeight: trayItemSize
 
     onClicked: event => {
+        if (event.button === Qt.LeftButton && (event.modifiers & Qt.ShiftModifier)) {
+            TrayService.setHidden(item, !TrayService.isHidden(item));
+            event.accepted = true;
+            return;
+        }
         switch (event.button) {
         case Qt.LeftButton:
-            item.activate();
+            if (item.onlyMenu && item.hasMenu) systrayPopup.toggle();
+            else { item.activate(); root.activated(); }
             break;
         case Qt.RightButton:
             if (item.hasMenu) {
                 systrayPopup.toggle();
             }
             break;
+        case Qt.MiddleButton:
+            item.secondaryActivate();
+            break;
         }
+        event.accepted = true;
+    }
+
+    onWheel: event => {
+        const horizontal = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y);
+        item.scroll(horizontal ? event.angleDelta.x : event.angleDelta.y, horizontal);
         event.accepted = true;
     }
 
@@ -40,6 +60,8 @@ MouseArea {
         id: systrayPopup
         anchorItem: root
         bar: root.bar
+        groupId: root.popupGroup
+        parentPopup: root.ownerPopup
 
         contentWidth: 220
         contentHeight: Math.min(itemsColumn.implicitHeight + 16, 400)
@@ -144,30 +166,16 @@ MouseArea {
         }
     }
 
-    IconImage {
-        id: trayIcon
-        source: {
-            const iconPath = root.item.icon.toString();
-            if (iconPath.includes("spotify")) {
-                return Quickshell.iconPath("spotify-client");
-            }
-            return root.item.icon;
-        }
+    TrayIcon {
+        item: root.item
         anchors.centerIn: parent
-        width: parent.width
-        height: parent.height
-        smooth: true
-    }
-
-    Tinted {
-        sourceItem: trayIcon
-        anchors.fill: trayIcon
     }
 
     StyledToolTip {
-        show: root.isHovered
+        show: root.isHovered && !systrayPopup.isOpen
         tooltipText: root.item.tooltipTitle || root.item.title
-        description: root.item.tooltipDescription || ""
+        description: (root.item.tooltipDescription ? root.item.tooltipDescription + "\n" : "")
+            + (TrayService.isHidden(root.item) ? "Shift-click to show in the bar" : "Shift-click to move to overflow")
     }
 
     HoverHandler {

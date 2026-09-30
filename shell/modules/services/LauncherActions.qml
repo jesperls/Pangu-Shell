@@ -76,10 +76,7 @@ Singleton {
                 icon: Icons.regionScreenshot,
                 comment: "Capture a region, window or screen",
                 keywords: ["capture", "grab", "print"],
-                run: () => {
-                    Screenshot.initialize();
-                    GlobalStates.screenshotToolVisible = true;
-                }
+                run: () => Screenshot.startCapture()
             },
             {
                 name: ScreenRecorder.isRecording ? "Stop Recording" : "Screen Recorder",
@@ -130,25 +127,21 @@ Singleton {
                 icon: Icons.textT,
                 comment: "Copy text from a screen region",
                 keywords: ["text", "tesseract", "read"],
-                run: () => ApplicationLauncher.launchCommand(["bash", Paths.script("ocr.sh"), root.ocrLangString()])
+                run: () => Screenshot.startCapture("ocr")
             },
             {
                 name: "Scan QR Code",
                 icon: Icons.qrCode,
                 comment: "Decode a QR code from the screen",
                 keywords: ["qr", "barcode", "scan"],
-                run: () => ApplicationLauncher.launchCommand(["bash", Paths.script("qr_scan.sh")])
+                run: () => Screenshot.startCapture("qr")
             },
             {
                 name: "Google Lens",
                 icon: Icons.google,
                 comment: "Search a screen region with Lens",
                 keywords: ["lens", "image search"],
-                run: () => {
-                    Screenshot.initialize();
-                    Screenshot.captureMode = "lens";
-                    GlobalStates.screenshotToolVisible = true;
-                }
+                run: () => Screenshot.startCapture("lens")
             },
             {
                 name: GlobalStates.mirrorWindowVisible ? "Close Mirror" : "Camera Mirror",

@@ -64,7 +64,7 @@ Item {
 
     property real animatedProgress: progressRatio
     Behavior on animatedProgress {
-        enabled: root.smoothDrag && Styling.animDuration > 0
+        enabled: root.smoothDrag && !root.isDragging && Styling.animDuration > 0
         NumberAnimation {
             duration: Styling.animDuration
             easing.type: Easing.OutQuart

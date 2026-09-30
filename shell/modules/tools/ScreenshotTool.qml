@@ -99,6 +99,7 @@ PanelWindow {
     function close() {
         screenshotPopup.state = "idle";
         GlobalStates.screenshotToolVisible = false;
+        Screenshot.cancelCapture();
     }
 
     function executeCapture() {

@@ -242,6 +242,7 @@ writeShellApplication {
     shellSource = src;
     hyprlandSource = ../../hyprland/pangu;
     recorderPackage = gpu-screen-recorder;
+    wallpaperEnginePackage = linux-wallpaperengine;
     configFiles = builtins.concatLists (
       builtins.filter builtins.isList (
         builtins.split "ConfigFile[^}]*name: \"([a-z]+)\"" (builtins.readFile ../../shell/config/Config.qml)

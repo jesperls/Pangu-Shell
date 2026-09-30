@@ -13,6 +13,366 @@ SHELL = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which("qs"), "Quickshell is required")
 class GuiBindingsTest(unittest.TestCase):
+    def test_tray_restores_hidden_apps_without_losing_early_edits(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-tray-") as directory:
+            root = Path(directory)
+            services = root / "modules/services"
+            backend = root / "testtray"
+            services.mkdir(parents=True)
+            backend.mkdir()
+            source = (SHELL / "modules/services/TrayService.qml").read_text()
+            (services / "TrayService.qml").write_text(source.replace("import Quickshell.Services.SystemTray", "import qs.testtray"))
+            (services / "qmldir").write_text("singleton TrayService 1.0 TrayService.qml\nsingleton StateService 1.0 StateService.qml\n")
+            (services / "StateService.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property bool initialized: false
+    property var saved: ["chat", "music", "chat", null, 42, ""]
+    property int writes: 0
+    signal stateLoaded
+    function get(key, fallback) { return saved; }
+    function set(key, value) { saved = value; writes++; }
+}
+''')
+            (backend / "qmldir").write_text("singleton SystemTray 1.0 SystemTray.qml\n")
+            (backend / "SystemTray.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { property var items: ({values: [{id: "chat"}, {id: "music"}, {id: "mail"}]}) }
+''')
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.modules.services
+import qs.testtray
+ShellRoot {
+    Component.onCompleted: {
+        TrayService.setHidden({id: "mail"}, true);
+        TrayService.setHidden({id: "chat"}, false);
+        if (StateService.writes !== 0) console.log("CHECK_FAILED premature save");
+        StateService.initialized = true;
+        StateService.stateLoaded();
+        if (TrayService.hiddenIds.join(",") !== "music,mail" || StateService.writes !== 1)
+            console.log("CHECK_FAILED restore");
+    }
+    Timer {
+        interval: 100; running: true
+        onTriggered: {
+            if (TrayService.visibleItems.length !== 1 || TrayService.visibleItems[0].id !== "chat")
+                console.log("CHECK_FAILED visible items");
+            SystemTray.items = {values: [{id: "mail"}, {id: "new"}]};
+            if (TrayService.hiddenItems.length !== 1 || TrayService.visibleItems.length !== 1)
+                console.log("CHECK_FAILED reconnect");
+            TrayService.setHidden({id: "mail"}, false);
+            if (TrayService.hiddenItems.length || StateService.saved.join(",") !== "music")
+                console.log("CHECK_FAILED unhide");
+            StateService.stateLoaded();
+            if (StateService.writes !== 2) console.log("CHECK_FAILED duplicate restore");
+            console.log("CHECK_PASSED"); Qt.quit();
+        }
+    }
+}
+''')
+
+    def test_tray_overflow_builds_management_and_hidden_icon_layouts(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-tray-ui-") as directory:
+            root = Path(directory)
+            for name in ("config", "modules/theme", "modules/components", "modules/services", "tray"):
+                (root / name).mkdir(parents=True)
+            for name in ("SysTray.qml", "SysTrayItem.qml", "TrayIcon.qml", "SystrayMenuItem.qml"):
+                source = (SHELL / "modules/bar/systray" / name).read_text()
+                (root / "tray" / name).write_text(source.replace("required property SystemTrayItem", "required property var"))
+            (root / "modules/services/qmldir").write_text("singleton TrayService 1.0 TrayService.qml\n")
+            (root / "modules/services/TrayService.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property var items: [{id: "mail", title: "Mail", icon: "", menu: null}, {id: "music", title: "Music", icon: "", menu: null}]
+    property var hiddenIds: []
+    readonly property var visibleItems: items.filter(item => !isHidden(item))
+    readonly property var hiddenItems: items.filter(item => isHidden(item))
+    function isHidden(item) { return hiddenIds.includes(item.id); }
+    function setHidden(item, hidden) { hiddenIds = hidden ? [item.id] : []; }
+}
+''')
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
+            (root / "config/Config.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property var bar: ({trayIconSize: 20, traySpacing: 8, trayIconStyle: "original"})
+    property var theme: ({font: "Sans", fontSize: 12})
+    property bool tintIcons: false
+}
+''')
+            theme = root / "modules/theme"
+            (theme / "qmldir").write_text("singleton Styling 1.0 Styling.qml\nsingleton Colors 1.0 Colors.qml\nsingleton Icons 1.0 Icons.qml\n")
+            (theme / "Styling.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property int animDuration: 0; function radius(n) { return 8; } function fontSize(n) { return 12 + n; } function srItem(n) { return "white"; } }\n')
+            (theme / "Colors.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property color overBackground: "white"; property color overSurfaceVariant: "gray"; property color primary: "orange" }\n')
+            shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
+            components = root / "modules/components"
+            (components / "qmldir").write_text("StyledRect 1.0 StyledRect.qml\nStyledToolTip 1.0 StyledToolTip.qml\nTinted 1.0 Tinted.qml\nBarPopup 1.0 BarPopup.qml\nControlChip 1.0 ControlChip.qml\n")
+            (components / "StyledRect.qml").write_text('import QtQuick\nItem { property real radius; property color color; property string variant: "common"; property color item: "white"; property real topLeftRadius; property real topRightRadius; property real bottomLeftRadius; property real bottomRightRadius; default property alias contentData: bodyContent.data; property Item body: Item { id: bodyContent; parent: root; anchors.fill: parent }; id: root }\n')
+            shutil.copy(SHELL / "modules/components/StyledToolTip.qml", components / "StyledToolTip.qml")
+            shutil.copy(SHELL / "modules/components/ControlChip.qml", components / "ControlChip.qml")
+            (components / "Tinted.qml").write_text('import QtQuick\nItem { property var sourceItem; property bool active; property bool fullTint }\n')
+            (components / "BarPopup.qml").write_text('''import QtQuick
+Item {
+    property var bar; property var anchorItem; property var parentPopup
+    property string groupId; property int popupPadding; property int visualMargin
+    property int contentWidth; property int contentHeight
+    property bool isOpen: false
+    visible: isOpen
+    width: contentWidth; height: contentHeight
+    function open() { isOpen = true; }
+    function close() { isOpen = false; }
+    function toggle() { isOpen = !isOpen; }
+}
+''')
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.modules.services
+import qs.modules.components
+import "tray"
+ShellRoot {
+    QtObject { id: bar; property string orientation: "horizontal"; property string barPosition: "top"; property string screenName: "test" }
+    FloatingWindow {
+        visible: true; implicitHeight: 200; implicitWidth: 400
+        SysTray { id: tray; bar: bar }
+        ControlChip { text: "Wallpaper tint"; checked: true }
+    }
+    function find(item, name) {
+        if (item.objectName === name) return item;
+        for (const child of item.children || []) { const match = find(child, name); if (match) return match; }
+        return null;
+    }
+    property int step: 0
+    Timer {
+        interval: 100; repeat: true; running: true
+        onTriggered: {
+            if (step === 0) find(tray, "trayOverflow").clicked();
+            else if (step === 1) {
+                if (!tray.managing || !find(tray, "trayManagement")) console.log("CHECK_FAILED management");
+                TrayService.setHidden(TrayService.items[0], true);
+                find(tray, "trayOverflow").clicked();
+                find(tray, "trayOverflow").clicked();
+            } else if (step === 2) {
+                if (tray.managing || TrayService.hiddenItems.length !== 1) console.log("CHECK_FAILED overflow");
+                const hiddenIcon = find(tray, "trayItem-mail");
+                if (!hiddenIcon || hiddenIcon.item.id !== "mail" || !hiddenIcon.ownerPopup.isOpen)
+                    console.log("CHECK_FAILED hidden icon ownership");
+                bar.orientation = "vertical";
+                bar.barPosition = "left";
+            } else if (step === 3) {
+                if (!tray.vertical || tray.implicitHeight <= tray.implicitWidth) console.log("CHECK_FAILED orientation", tray.vertical, tray.implicitWidth, tray.implicitHeight);
+                console.log("CHECK_PASSED"); Qt.quit();
+            }
+            step++;
+        }
+    }
+}
+''')
+
+    def test_wallpaper_gallery_keeps_selection_and_adapts_to_density(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-gallery-") as directory:
+            root = Path(directory)
+            self.prepare_settings(root)
+            gallery = root / "gallery"
+            gallery.mkdir()
+            shutil.copy(SHELL / "modules/widgets/dashboard/wallpapers/WallpapersTab.qml", gallery / "WallpapersTab.qml")
+            config = root / "config/Config.qml"
+            source = config.read_text().replace('property QtObject theme:', 'property var dashboard: ({wallpaperCardWidth: 160, wallpaperShowNames: true})\n    property QtObject theme:')
+            source = source.replace('property int fontSize: 11', 'property bool oledMode: false\n        property bool lightMode: false\n        property int fontSize: 11')
+            config.write_text(source)
+            theme = root / "modules/theme"
+            with (theme / "qmldir").open("a") as stream:
+                stream.write("singleton Icons 1.0 Icons.qml\n")
+            shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
+            colors = theme / "Colors.qml"
+            colors.write_text(colors.read_text().replace('readonly property color error:', 'readonly property color primary: "orange"\n    readonly property color outline: "gray"\n    readonly property color surface: "black"\n    readonly property color error:'))
+            components = root / "modules/components"
+            (components / "qmldir").write_text("StyledRect 1.0 StyledRect.qml\nStyledToolTip 1.0 StyledToolTip.qml\nControlChip 1.0 ControlChip.qml\n")
+            (components / "StyledRect.qml").write_text('''import QtQuick
+Item {
+    id: root
+    property string variant; property real radius; property color item: "white"
+    default property alias contentData: body.data
+    property Item content: Item { id: body; parent: root; anchors.fill: parent }
+}
+''')
+            for name in ("ControlChip.qml", "StyledToolTip.qml"):
+                shutil.copy(SHELL / "modules/components" / name, components / name)
+            (gallery / "SearchInput.qml").write_text('''import QtQuick
+Item {
+    height: 48
+    property string text; property string placeholderText; property string iconText
+    property bool clearOnEscape; property bool handleTabNavigation; property bool disableCursorNavigation
+    property real radius
+    signal searchTextChanged(string text)
+    signal escapePressed; signal tabPressed; signal shiftTabPressed
+    signal downPressed; signal upPressed; signal leftPressed; signal rightPressed; signal accepted
+    function focusInput() {}
+}
+''')
+            (gallery / "SchemeSelector.qml").write_text('import QtQuick\nItem { signal schemeSelectorClosed; signal escapePressedOnScheme; signal tabPressed; signal shiftTabPressed; function openAndFocus() {} }\n')
+            (gallery / "FilterBar.qml").write_text('import QtQuick\nItem { height: 24; implicitWidth: 400; property var activeFilters: []; signal escapePressedOnFilters; signal tabPressed; signal shiftTabPressed; function focusFilters() {} }\n')
+            globals_dir = root / "modules/globals"
+            globals_dir.mkdir()
+            (globals_dir / "qmldir").write_text("singleton GlobalStates 1.0 GlobalStates.qml\n")
+            (globals_dir / "GlobalStates.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property int wallpaperSelectedIndex: -1
+    property bool dashboardOpen: false
+    property QtObject wallpaperManager: QtObject {
+        property var wallpaperPaths: ["/first.png", "/second.png", "/third.png"]
+        property var perScreenWallpapers: ({})
+        property string currentWallpaper: "/second.png"
+        property bool tintEnabled: false
+        function scanSubfolders() {}
+        function getDisplayName(path) { return path.split("/").pop(); }
+        function getFileType(path) { return "image"; }
+        function getSubfolderFromPath(path) { return ""; }
+    }
+}
+''')
+            services = root / "modules/services"
+            with (services / "qmldir").open("a") as stream:
+                stream.write("singleton Compositor 1.0 Compositor.qml\nsingleton Visibilities 1.0 Visibilities.qml\n")
+            (services / "Compositor.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property var focusedMonitor: ({name: "test"}) }\n')
+            (services / "Visibilities.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { function setActiveModule(name) {} }\n')
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.config
+import qs.modules.globals
+import "gallery"
+ShellRoot {
+    FloatingWindow {
+        visible: true; implicitWidth: 800; implicitHeight: 430
+        WallpapersTab { id: gallery; anchors.fill: parent }
+    }
+    property int step: 0
+    Timer {
+        interval: 100; repeat: true; running: true
+        onTriggered: {
+            if (step === 0) {
+                if (gallery.selectedPath !== "/second.png" || gallery.gridColumns !== 4) console.log("CHECK_FAILED initial selection");
+                GlobalStates.wallpaperManager.wallpaperPaths = ["/third.png", "/first.png", "/second.png"];
+            } else if (step === 1) {
+                if (gallery.selectedIndex !== 2 || gallery.selectedPath !== "/second.png") console.log("CHECK_FAILED reordered selection");
+                gallery.searchText = "missing";
+            } else if (step === 2) {
+                if (gallery.selectedIndex !== -1 || gallery.filteredWallpapers.length) console.log("CHECK_FAILED empty search");
+                gallery.searchText = "";
+                Config.dashboard = {wallpaperCardWidth: 240, wallpaperShowNames: false};
+            } else if (step === 3) {
+                if (gallery.selectedPath !== "/second.png" || gallery.gridColumns !== 3 || gallery.showNames) console.log("CHECK_FAILED density");
+                console.log("CHECK_PASSED"); Qt.quit();
+            }
+            step++;
+        }
+    }
+}
+''')
+
+    def test_frozen_capture_routes_ocr_qr_and_cleans_temporary_images(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-capture-") as directory:
+            root = Path(directory)
+            for name in ("config", "modules/services", "modules/globals", "modules/theme", "bin"):
+                (root / name).mkdir(parents=True)
+            services = root / "modules/services"
+            shutil.copy(SHELL / "modules/services/Screenshot.qml", services / "Screenshot.qml")
+            (services / "qmldir").write_text("singleton Screenshot 1.0 Screenshot.qml\nsingleton Visibilities 1.0 Visibilities.qml\nsingleton Compositor 1.0 Compositor.qml\nsingleton LauncherActions 1.0 LauncherActions.qml\n")
+            (services / "Visibilities.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { function setActiveModule(name) {} }\n')
+            (services / "Compositor.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property var monitors: ({values: []}); property var clients: ({values: []}) }\n')
+            (services / "LauncherActions.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { function ocrLangString() { return "eng+jpn"; } }\n')
+            (root / "config/qmldir").write_text("singleton Paths 1.0 Paths.qml\n")
+            (root / "config/Paths.qml").write_text('''pragma Singleton
+import Quickshell
+Singleton {
+    readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") + "/pangu"
+    readonly property string picturesDir: Quickshell.env("XDG_CACHE_HOME") + "/pictures"
+    function runtimePath(name) { return runtimeDir + "/" + name; }
+    function script(name) { return SCRIPT_ROOT + "/" + name; }
+}
+'''.replace("SCRIPT_ROOT", json.dumps(str(SHELL / "scripts"))))
+            (root / "modules/globals/qmldir").write_text("singleton GlobalStates 1.0 GlobalStates.qml\n")
+            (root / "modules/globals/GlobalStates.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property bool screenshotToolVisible: false }\n')
+            (root / "modules/theme/qmldir").write_text("singleton Styling 1.0 Styling.qml\n")
+            (root / "modules/theme/Styling.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property int animDuration: 0 }\n')
+            stub = root / "bin/stub"
+            stub.write_text(f"#!{shutil.which('python3')}\n" + '''import json, os, pathlib, sys
+name = pathlib.Path(sys.argv[0]).name
+with open(os.environ["PANGU_CAPTURE_LOG"], "a") as log:
+    log.write(json.dumps([name] + sys.argv[1:]) + "\\n")
+if name in ("grim", "magick"):
+    pathlib.Path(sys.argv[-1]).write_bytes(b"frozen frame")
+elif name in ("tesseract", "zbarimg"):
+    print("recognized")
+elif name == "wl-copy":
+    sys.stdin.buffer.read()
+elif name == "xdg-user-dir":
+    print(pathlib.Path(os.environ["XDG_CACHE_HOME"]) / "pictures")
+''')
+            stub.chmod(0o755)
+            for name in ("grim", "magick", "tesseract", "zbarimg", "wl-copy", "notify-send", "xdg-user-dir"):
+                (root / "bin" / name).symlink_to(stub)
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.modules.services
+import qs.modules.globals
+ShellRoot {
+    id: root
+    property int step: 0
+    Component.onCompleted: Screenshot.startCapture("ocr")
+    Connections {
+        target: GlobalStates
+        function onScreenshotToolVisibleChanged() {
+            if (GlobalStates.screenshotToolVisible) Screenshot.freezeScreen();
+        }
+    }
+    Connections {
+        target: Screenshot
+        function onMonitorScreenshotReady(name, path) {
+            Screenshot.processRegion(10, 20, 30, 40);
+            GlobalStates.screenshotToolVisible = false;
+            Screenshot.cancelCapture();
+        }
+        function onErrorOccurred(message) { console.log("CHECK_FAILED", message); Qt.quit(); }
+        function onImageSaved(path) { root.step = 4; }
+    }
+    Connections {
+        target: Screenshot.toolProcess
+        function onExited(code) {
+            if (code !== 0) { console.log("CHECK_FAILED recognition"); Qt.quit(); return; }
+            root.step++;
+        }
+    }
+    Timer {
+        interval: 100; repeat: true; running: true
+        onTriggered: {
+            if (Screenshot.cleanupProcess.running || Screenshot.toolProcess.running) return;
+            if (root.step === 1) {
+                root.step = 2;
+                Screenshot.startCapture("qr");
+            } else if (root.step === 3) {
+                Screenshot.startCapture("lens");
+                Screenshot.cancelCapture();
+                root.step = 5;
+                Screenshot.startCapture();
+            } else if (root.step === 4 && !Screenshot.copyProcess.running) {
+                console.log("CHECK_PASSED"); Qt.quit();
+            }
+        }
+    }
+}
+''', {"PATH": str(root / "bin") + ":" + os.environ["PATH"], "PANGU_CAPTURE_LOG": str(root / "calls.jsonl")})
+            calls = [json.loads(line) for line in (root / "calls.jsonl").read_text().splitlines()]
+            self.assertEqual([call[0] for call in calls].count("grim"), 3)
+            self.assertEqual([call[0] for call in calls].count("wl-copy"), 3)
+            self.assertEqual([call[0] for call in calls].count("tesseract"), 1)
+            self.assertEqual([call[0] for call in calls].count("zbarimg"), 1)
+            runtime = root / "runtime/pangu"
+            self.assertFalse(list(runtime.glob("ocr_*.png")))
+            self.assertFalse(list(runtime.glob("qr_*.png")))
+            self.assertEqual(len(list((root / "cache/pictures/Screenshots").glob("*.png"))), 1)
+
     def test_tmux_details_ignore_late_replies_and_coalesce_selections(self):
         with tempfile.TemporaryDirectory(prefix="pangu-tmux-") as directory:
             root = Path(directory)
@@ -587,7 +947,7 @@ Item {
             self.fail((error.stdout or b"").decode() + (error.stderr or b"").decode())
         log = result.stdout + result.stderr
         self.assertEqual(result.returncode, 0, log)
-        for error in ("TypeError", "ReferenceError", "Binding loop", "CHECK_FAILED", "Cannot assign"):
+        for error in ("TypeError", "ReferenceError", "Binding loop", "CHECK_FAILED", "Cannot assign", "Unable to assign"):
             self.assertNotIn(error, log)
         self.assertIn("CHECK_PASSED", log)
 

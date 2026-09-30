@@ -18,6 +18,7 @@ NotchAnimationBehavior {
 
     property int leftPanelWidth
     property string screenName: ""
+    property bool initialized: false
 
     property var state: QtObject {
         property int currentTab: 0
@@ -122,10 +123,12 @@ NotchAnimationBehavior {
 
     Component.onCompleted: {
         root.state.currentTab = root.visibleIndexOf(GlobalStates.dashboardCurrentTab);
+        initialized = true;
         root.clampCurrentTab();
     }
 
-    onTabCountChanged: {
+    onTabIndicesChanged: if (initialized) {
+        root.state.currentTab = root.visibleIndexOf(GlobalStates.dashboardCurrentTab);
         root.clampCurrentTab();
     }
 
@@ -135,7 +138,8 @@ NotchAnimationBehavior {
         if (root.state.currentTab >= root.tabCount) {
             root.state.currentTab = Math.max(0, root.tabCount - 1);
         }
-        GlobalStates.dashboardCurrentTab = root.componentIndexOf(root.state.currentTab);
+        if (isVisible)
+            GlobalStates.dashboardCurrentTab = root.componentIndexOf(root.state.currentTab);
     }
 
     onIsVisibleChanged: {

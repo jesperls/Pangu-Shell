@@ -10,7 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 
 class CaptureToolsTest(unittest.TestCase):
-    def run_tool(self, name, **settings):
+    def run_tool(self, name, supplied_image=False, **settings):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             binary = root / "bin"
@@ -40,12 +40,32 @@ sys.exit(int(os.environ.get(name.upper().replace("-", "_") + "_STATUS", "0")))
                        TEST_ROOT=str(root), TMPDIR=str(temporary))
             env.update({key: str(value) for key, value in settings.items()})
             command = [sys.executable, str(SCRIPTS / "colorpicker.py")] if name == "colorpicker" else ["bash", str(SCRIPTS / (name + ".sh"))]
+            if supplied_image:
+                image = root / "selected image's $literal.png"
+                image.write_bytes(b"selected frame")
+                for dependency in ("grim", "slurp"):
+                    (binary / dependency).unlink()
+                command.extend(["eng+jpn", str(image)] if name == "ocr" else [str(image)])
             result = subprocess.run(command, env=env,
                                     capture_output=True, text=True, timeout=10)
             calls = [json.loads(line) for line in (root / "calls").read_text().splitlines()]
             clipboard = (root / "clipboard").read_bytes() if (root / "clipboard").exists() else None
             self.assertEqual(list(temporary.iterdir()), [], "Capture temporary file leaked")
+            if supplied_image:
+                self.assertEqual(image.read_bytes(), b"selected frame")
             return result.returncode, calls, clipboard
+
+    def test_supplied_image_skips_capture_and_preserves_source(self):
+        for tool in ("ocr", "qr_scan"):
+            with self.subTest(tool=tool):
+                code, calls, clipboard = self.run_tool(tool, supplied_image=True)
+                self.assertEqual(code, 0)
+                self.assertEqual(clipboard, b"recognized")
+                self.assertFalse(any(call[0] in ("grim", "slurp") for call in calls))
+                recognition = calls[0]
+                self.assertTrue(any(argument.endswith("selected image's $literal.png") for argument in recognition))
+                if tool == "ocr":
+                    self.assertEqual(recognition[-2:], ["-l", "eng+jpn"])
 
     def test_cancel_does_not_capture(self):
         for tool in ("ocr", "qr_scan", "colorpicker"):

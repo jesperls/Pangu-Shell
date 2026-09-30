@@ -6,15 +6,17 @@ place, with settings you can change from the shell itself.
 
 ## Features
 
-- **Desktop:** configurable bar and dock, workspace overview, system tray and
-  notifications.
+- **Desktop:** configurable bar and dock, workspace overview, system tray with
+  persistent icon overflow and notifications.
 - **Launcher and dashboard:** application search, media controls, calendar,
   weather and system metrics.
 - **System controls:** audio, Wi-Fi, Bluetooth, brightness, power profiles and
   idle control.
-- **Personalization:** wallpaper picker, slideshows, color schemes and palettes
+- **Personalization:** landscape wallpaper previews, adjustable gallery density,
+  symlinked wallpaper collections, slideshows, color schemes and palettes
   for GTK, Qt and Kitty.
-- **Capture:** screenshots, OCR, screen recording and replay capture.
+- **Capture:** screenshots, OCR and QR scanning with a shared frozen-screen
+  selector, screen recording and replay capture.
 - **Utilities:** clipboard history, notes, macros, lockscreen and power menu.
 
 ## Requirements

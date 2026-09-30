@@ -58,18 +58,8 @@ PanelWindow {
     Connections {
         target: Screenshot
         function onImageSaved(path) {
-            var s = root.targetScreen;
-            var mx = Screenshot.selectionX;
-            var my = Screenshot.selectionY;
-            var logicalW = s.width;
-
-            if (mx >= s.x && mx < (s.x + s.width) && my >= s.y && my < (s.y + s.height)) {
+            if (Screenshot.savedScreenName === root.targetScreen.name) {
                 root.imagePath = path;
-            } else if (Screenshot.captureMode === "screen") {
-                var cursor = Quickshell.cursor;
-                if (cursor && cursor.screen && cursor.screen.name === s.name) {
-                    root.imagePath = path;
-                }
             }
         }
     }
@@ -141,9 +131,7 @@ PanelWindow {
 
                     onClicked: mouse => {
                         if (mouse.button === Qt.MiddleButton) {
-                            var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
-                            proc.command = ["rm", root.imagePath];
-                            proc.running = true;
+                            Quickshell.execDetached(["rm", "--", root.imagePath]);
                             root.imagePath = "";
                         } else {
                             Qt.openUrlExternally("file://" + root.imagePath);
@@ -205,9 +193,7 @@ PanelWindow {
             ActionButton {
                 icon: Icons.edit
                 onTriggered: {
-                    var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
-                    proc.command = ["swappy", "-f", root.imagePath, "-o", root.imagePath];
-                    proc.running = true;
+                    ApplicationLauncher.launchCommand(["swappy", "-f", root.imagePath, "-o", root.imagePath]);
                     root.imagePath = "";
                 }
                 StyledToolTip {
@@ -223,9 +209,7 @@ PanelWindow {
                 isTrash: true
 
                 onTriggered: {
-                    var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
-                    proc.command = ["rm", root.imagePath];
-                    proc.running = true;
+                    Quickshell.execDetached(["rm", "--", root.imagePath]);
                     root.imagePath = "";
                 }
                 StyledToolTip {

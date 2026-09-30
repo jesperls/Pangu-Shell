@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.modules.globals
+import qs.modules.theme
 import qs.config
 
 QtObject {
@@ -20,6 +21,31 @@ QtObject {
     property string lensPath: Paths.runtimePath("lens.png")
     
     property string captureMode: "normal"
+    property string processingMode: "normal"
+    property string savedScreenName: ""
+    property string toolImagePath: ""
+
+    function startCapture(mode = "normal") {
+        if (GlobalStates.screenshotToolVisible || _freezing || cropProcess.running || toolProcess.running
+                || cleanupProcess.running || verifyImageProcess.running || lensProcess.running)
+            return;
+        initialize();
+        captureMode = ["normal", "lens", "ocr", "qr"].includes(mode) ? mode : "normal";
+        Visibilities.setActiveModule("");
+        // Launcher actions have already begun closing the notch when they arrive here.
+        captureTimer.interval = Math.max(1, Styling.animDuration) + 50;
+        captureTimer.restart();
+    }
+
+    property Timer captureTimer: Timer {
+        id: captureTimer
+        onTriggered: GlobalStates.screenshotToolVisible = true
+    }
+
+    function cancelCapture() {
+        captureTimer.stop();
+        captureMode = "normal";
+    }
     
     property string screenshotsDir: ""
     property string finalPath: ""
@@ -78,19 +104,38 @@ QtObject {
     
     property Process cropProcess: Process {
         id: cropProcess
-        onExited: exitCode => {
-            if (exitCode === 0) {
-                if (root.captureMode === "lens") {
-                    root.runLensScript()
-                    root.captureMode = "normal" 
-                } else {
-                    copyProcess.running = true
-                    root.imageSaved(root.finalPath)
-                }
-            } else {
-                root.errorOccurred("Failed to save image")
-            }
+        onExited: exitCode => root.finishCrop(exitCode)
+    }
+
+    function finishCrop(exitCode) {
+        const mode = processingMode;
+        processingMode = "normal";
+        if (exitCode !== 0) {
+            root.errorOccurred("Failed to save image");
+            return;
         }
+        if (mode === "lens") {
+            root.runLensScript();
+        } else if (mode === "ocr" || mode === "qr") {
+            toolImagePath = finalPath;
+            toolProcess.command = mode === "ocr"
+                ? ["bash", Paths.script("ocr.sh"), LauncherActions.ocrLangString(), toolImagePath]
+                : ["bash", Paths.script("qr_scan.sh"), toolImagePath];
+            toolProcess.running = true;
+        } else {
+            copyProcess.running = true;
+            root.imageSaved(finalPath);
+        }
+    }
+
+    property Process toolProcess: Process {
+        id: toolProcess
+        onExited: cleanupProcess.running = true
+    }
+
+    property Process cleanupProcess: Process {
+        id: cleanupProcess
+        command: ["rm", "-f", "--", root.toolImagePath]
     }
 
     property Process copyProcess: Process {
@@ -180,7 +225,9 @@ QtObject {
             return;
         }
         
-        const captures = root.monitors.flatMap(m => [m.name, root.tempPathBase + "_" + m.name + ".png"]);
+        const captures = [];
+        for (const monitor of root.monitors)
+            captures.push(monitor.name, root.tempPathBase + "_" + monitor.name + ".png");
         freezeProcess.command = ["bash", "-c",
             'mkdir -p -- "$1" || exit; shift; pids=(); status=0; '
             + 'while (( $# )); do grim -o "$1" "$2" & pids+=("$!"); shift 2; done; '
@@ -197,12 +244,15 @@ QtObject {
                pad(d.getDate()) + '-' + 
                pad(d.getHours()) + '-' + 
                pad(d.getMinutes()) + '-' + 
-               pad(d.getSeconds());
+               pad(d.getSeconds()) + '-' + d.getMilliseconds();
     }
 
-    function processRegion(x, y, w, h) {
-        if (root.captureMode === "lens") {
+    function prepareOutput() {
+        processingMode = captureMode;
+        if (processingMode === "lens") {
             root.finalPath = root.lensPath;
+        } else if (processingMode === "ocr" || processingMode === "qr") {
+            root.finalPath = Paths.runtimePath(processingMode + "_" + getTimestamp() + ".png");
         } else {
             if (root.screenshotsDir === "") {
                 root.screenshotsDir = Paths.picturesDir + "/Screenshots"
@@ -210,7 +260,19 @@ QtObject {
             var filename = "Screenshot_" + getTimestamp() + ".png"
             root.finalPath = root.screenshotsDir + "/" + filename
         }
-        
+    }
+
+    function saveCapture(command) {
+        prepareOutput();
+        // Directory discovery can finish after the user selects a region.
+        cropProcess.command = ["bash", "-c", 'mkdir -p -- "$1" && shift && exec "$@"', "pangu-capture",
+            finalPath.slice(0, finalPath.lastIndexOf("/"))].concat(command, [finalPath]);
+        cropProcess.running = true;
+    }
+
+    function processRegion(x, y, w, h) {
+        if (w <= 0 || h <= 0 || cropProcess.running)
+            return;
         var m = null;
         if (root.monitors.length > 0) {
             m = root.monitors.find(mon => {
@@ -224,9 +286,10 @@ QtObject {
         
         if (!m) {
             console.warn("Screenshot: Could not find monitor for region " + x + "," + y);
-            if (root.monitors.length > 0) m = root.monitors[0];
-            else return; 
+            root.errorOccurred("Could not find monitor for the selected region");
+            return;
         }
+        savedScreenName = m.name;
         
         var localX = x - m.x;
         var localY = y - m.y;
@@ -242,24 +305,15 @@ QtObject {
         var srcPath = root.tempPathBase + "_" + m.name + ".png";
         
         var geom = `${physW}x${physH}+${physX}+${physY}`;
-        cropProcess.command = ["magick", srcPath, "-crop", geom, root.finalPath];
-        cropProcess.running = true;
+        saveCapture(["magick", srcPath, "-crop", geom, "+repage"]);
     }
 
     function processMonitorScreen(monitorName) {
-         if (root.captureMode === "lens") {
-            root.finalPath = root.lensPath;
-        } else {
-            if (root.screenshotsDir === "") {
-                root.screenshotsDir = Paths.picturesDir + "/Screenshots"
-            }
-            var filename = "Screenshot_" + getTimestamp() + ".png"
-            root.finalPath = root.screenshotsDir + "/" + filename
-        }
-        
+        if (cropProcess.running || !root.monitors.some(m => m.name === monitorName))
+            return;
+        savedScreenName = monitorName;
         var srcPath = root.tempPathBase + "_" + monitorName + ".png";
-        cropProcess.command = ["cp", srcPath, root.finalPath];
-        cropProcess.running = true;
+        saveCapture(["cp", "--", srcPath]);
     }
 
     function runLensScript() {

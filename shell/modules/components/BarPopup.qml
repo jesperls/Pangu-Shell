@@ -23,6 +23,8 @@ PopupWindow {
     property string variant: "popup"  // StyledRect variant for background
 
     property bool closeOnFocusLost: true
+    property var parentPopup: null
+    readonly property var focusWindows: parentPopup ? [root].concat(parentPopup.focusWindows) : [root]
 
     property bool isOpen: false
 
@@ -82,14 +84,22 @@ PopupWindow {
     FocusGrab {
         id: focusGrab
         active: root.visible && root.focusActive
-        windows: [root]
+        windows: root.focusWindows
 
         onCleared: {
-            if (root.closeOnFocusLost && root.isOpen) {
+            if (root.closeOnFocusLost && root.isOpen && root.focusActive) {
                 root.isOpen = false;
                 root.closedExternally();
                 root.close();
+                if (root.parentPopup) root.parentPopup.close();
             }
+        }
+    }
+
+    Connections {
+        target: root.parentPopup
+        function onIsOpenChanged() {
+            if (!root.parentPopup.isOpen) root.close();
         }
     }
 
@@ -143,9 +153,10 @@ PopupWindow {
     }
 
     function open() {
-        if (visible)
+        if (isOpen)
             return;
 
+        closeTimer.stop();
         Visibilities.registerBarPopup(root);
 
         isOpen = true;
@@ -156,6 +167,10 @@ PopupWindow {
         visible = true;
 
         Qt.callLater(() => {
+            if (!isOpen)
+                return;
+            // A nested menu owns one grab covering both surfaces until it closes.
+            if (root.parentPopup) root.parentPopup.focusActive = false;
             popupOpacity = 1;
             popupScale = 1;
             focusActive = true;
@@ -170,6 +185,9 @@ PopupWindow {
 
         isOpen = false;
         focusActive = false;
+        if (root.parentPopup) Qt.callLater(() => {
+            if (!root.isOpen && root.parentPopup?.isOpen) root.parentPopup.focusActive = true;
+        });
 
         popupOpacity = 0;
         popupScale = 0.9;
@@ -178,7 +196,7 @@ PopupWindow {
     }
 
     function toggle() {
-        if (visible) {
+        if (isOpen) {
             close();
         } else {
             open();
@@ -195,5 +213,6 @@ PopupWindow {
 
     Component.onDestruction: {
         Visibilities.unregisterBarPopup(root);
+        if (root.parentPopup?.isOpen) root.parentPopup.focusActive = true;
     }
 }

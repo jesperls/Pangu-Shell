@@ -611,7 +611,7 @@ WlSessionLockSurface {
 
     Timer {
         id: unlockTimer
-        interval: Styling.animDuration * 2  // Wait for zoom out (1x) + fade out (1x)
+        interval: Math.max(1, Styling.animDuration * 2)  // Finish unlocking even when animations are disabled.
         onTriggered: {
             GlobalStates.lockscreenVisible = false;
         }

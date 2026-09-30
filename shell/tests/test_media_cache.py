@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import media_cache
 import lockwall
 import thumbgen
+import wallpaper_files
 
 
 class MediaCacheTest(unittest.TestCase):
@@ -53,6 +54,39 @@ class MediaCacheTest(unittest.TestCase):
         (self.root / '.hidden' / 'image.png').touch()
         (self.root / 'image.png').touch()
         self.assertEqual(list(thumbgen.media_files(self.root)), [self.root / 'image.png'])
+
+    def test_wallpaper_scanner_follows_aliases_without_recursing_cycles(self):
+        actual = self.root / 'actual'
+        actual.mkdir()
+        (actual / 'WALL.BMP').touch()
+        (actual / 'video.MP4').touch()
+        (actual / '.hidden.png').touch()
+        (actual / 'back').symlink_to(self.root, target_is_directory=True)
+        (self.root / 'linked').symlink_to(actual, target_is_directory=True)
+        (self.root / 'file.PNG').symlink_to(actual / 'WALL.BMP')
+        (self.root / 'missing.png').symlink_to(self.root / 'missing')
+        discovered = wallpaper_files.discover(self.root)
+        self.assertEqual(set(discovered['files']), {str(actual / 'WALL.BMP'), str(actual / 'video.MP4'),
+            str(self.root / 'linked/WALL.BMP'), str(self.root / 'linked/video.MP4'), str(self.root / 'file.PNG')})
+        self.assertEqual(set(discovered['directories']), {str(actual), str(self.root / 'linked')})
+        self.assertEqual(set(map(str, thumbgen.media_files(self.root))), set(discovered['files']))
+
+    def test_scanner_and_thumbnails_share_expanded_fallback_paths(self):
+        (self.root / 'empty').mkdir()
+        (self.root / 'fallback').mkdir()
+        image = self.root / 'fallback/line\nwith quotes \' and Ö.PNG'
+        image.touch()
+        result = wallpaper_files.scan(str(self.root / 'empty'), str(self.root / 'fallback'))
+        self.assertTrue(result['fallback'])
+        self.assertEqual(result['files'], [str(image)])
+        with patch.dict('os.environ', {'HOME': str(self.root)}):
+            self.assertEqual(wallpaper_files.discover('~/fallback')['files'], [str(image)])
+
+    def test_thumbnail_card_keeps_landscape_dimensions(self):
+        with patch('thumbgen.render_atomic') as render:
+            self.assertTrue(thumbgen.generate(self.root / 'image.PNG', self.root / 'output.jpg'))
+        self.assertIn('320x200', render.call_args.args[0])
+        self.assertIn('crop=320:200', ' '.join(media_cache.frame_command('video.mp4', thumbnail=True)))
 
 
 if __name__ == '__main__':

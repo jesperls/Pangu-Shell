@@ -8,7 +8,11 @@ import qs.config
 Singleton {
     id: wallpaper
 
-    property string wallpaperDir: wallpaperConfig.adapter.wallPath
+    readonly property string wallpaperDir: expandDirectory(wallpaperConfig.adapter.wallPath || fallbackDir)
+    property string scanRoot: wallpaperDir
+    property string scanDirectory: ""
+    property bool scanPending: false
+    property bool thumbnailsPending: false
     property string fallbackDir: Paths.wallpapersDir
     property var wallpaperPaths: []
     property var subfolderFilters: []
@@ -146,15 +150,15 @@ Singleton {
             return weWallpapers[filePath];
         }
 
-        var basePath = wallpaperDir.endsWith("/") ? wallpaperDir : wallpaperDir + "/";
+        var basePath = scanRoot.endsWith("/") ? scanRoot : scanRoot + "/";
         var relativePath = filePath.replace(basePath, "");
 
         var pathParts = relativePath.split('/');
         var fileName = pathParts.pop();
-        var thumbnailName = fileName + ".jpg";
+        var thumbnailName = fileName + ".preview.jpg";
         var relativeDir = pathParts.join('/');
 
-        var thumbnailPath = Paths.cachePath("thumbnails/" + Qt.md5(wallpaperDir.replace(/\/+$/, "") || "/") + "/" + relativeDir + "/" + thumbnailName);
+        var thumbnailPath = Paths.cachePath("thumbnails/" + Qt.md5(scanRoot.replace(/\/+$/, "") || "/") + "/" + relativeDir + "/" + thumbnailName);
         return thumbnailPath;
     }
 
@@ -219,7 +223,7 @@ Singleton {
         if (getFileType(filePath) === 'wallpaperengine') {
             return "";
         }
-        var basePath = wallpaperDir.endsWith("/") ? wallpaperDir : wallpaperDir + "/";
+        var basePath = scanRoot.endsWith("/") ? scanRoot : scanRoot + "/";
         var relativePath = filePath.replace(basePath, "");
         var parts = relativePath.split("/");
         if (parts.length > 1) {
@@ -228,43 +232,52 @@ Singleton {
         return "";
     }
 
+    function expandDirectory(path) {
+        const value = String(path || "").trim();
+        return value === "~" ? Paths.home : value.startsWith("~/") ? Paths.home + value.slice(1) : value;
+    }
+
     function setWallpaperDirectory(path) {
-        wallpaperAdapter.wallPath = path.trim() || fallbackDir;
+        wallpaperAdapter.wallPath = expandDirectory(path) || fallbackDir;
     }
 
     function scanSubfolders() {
-        if (!wallpaperDir)
-            return;
-        var cmd = ["find", wallpaperDir, "-mindepth", "1", "-name", ".*", "-prune", "-o", "-type", "d", "-print"];
-        scanSubfoldersProcess.command = cmd;
-        scanSubfoldersProcess.running = true;
+        scanDebounce.restart();
     }
 
-    onWallpaperDirChanged: {
-        if (!_wallpaperDirInitialized)
+    function startScan() {
+        if (scanWallpapers.running) {
+            scanPending = true;
             return;
-
-
-        console.log("Wallpaper directory changed to:", wallpaperDir);
-        usingFallback = false;
-
-        scannedPaths = [];
-        wallpaperPaths = wePaths.slice();
-        subfolderFilters = [];
-
-        directoryWatcher.path = wallpaperDir;
-
-        var cmd = ["find", wallpaperDir, "-name", ".*", "-prune", "-o", "-type", "f", "(", "-name", "*.jpg", "-o", "-name", "*.jpeg", "-o", "-name", "*.png", "-o", "-name", "*.webp", "-o", "-name", "*.tif", "-o", "-name", "*.tiff", "-o", "-name", "*.gif", "-o", "-name", "*.mp4", "-o", "-name", "*.webm", "-o", "-name", "*.mov", "-o", "-name", "*.avi", "-o", "-name", "*.mkv", ")", "-print"];
-        scanWallpapers.command = cmd;
+        }
+        scanPending = false;
+        scanDirectory = wallpaperDir;
+        scanWallpapers.command = ["python3", Paths.script("wallpaper_files.py"), scanDirectory, "--fallback", fallbackDir];
         scanWallpapers.running = true;
-
-        scanSubfolders();
-
-        if (delayedThumbnailGen.running)
-            delayedThumbnailGen.restart();
-        else
-            delayedThumbnailGen.start();
     }
+
+    function applyScan(result) {
+        if (!result || !Array.isArray(result.files) || !Array.isArray(result.directories) || !result.root)
+            return;
+        scanRoot = result.root;
+        usingFallback = result.fallback === true;
+        allSubdirs = result.directories;
+        const prefix = scanRoot.endsWith("/") ? scanRoot : scanRoot + "/";
+        subfolderFilters = allSubdirs.filter(path => path.startsWith(prefix)
+            && !path.slice(prefix.length).includes("/")).map(path => path.slice(prefix.length));
+        scannedPaths = result.files;
+        _regularScanDone = true;
+        mergeWallpaperLists();
+        delayedThumbnailGen.restart();
+    }
+
+    Timer {
+        id: scanDebounce
+        interval: 100
+        onTriggered: wallpaper.startScan()
+    }
+
+    onWallpaperDirChanged: if (_wallpaperDirInitialized) scanSubfolders()
 
     function setWallpaper(path, targetScreen = null) {
 
@@ -438,22 +451,9 @@ Singleton {
             }
 
             onWallPathChanged: {
-                if (wallPath) {
-                    console.log("Config wallPath updated:", wallPath);
-
-                    if (!wallpaper._wallpaperDirInitialized) {
-                        wallpaper._wallpaperDirInitialized = true;
-
-                        directoryWatcher.path = wallPath;
-                        directoryWatcher.reload();
-
-                        var cmd = ["find", wallPath, "-name", ".*", "-prune", "-o", "-type", "f", "(", "-name", "*.jpg", "-o", "-name", "*.jpeg", "-o", "-name", "*.png", "-o", "-name", "*.webp", "-o", "-name", "*.tif", "-o", "-name", "*.tiff", "-o", "-name", "*.gif", "-o", "-name", "*.mp4", "-o", "-name", "*.webm", "-o", "-name", "*.mov", "-o", "-name", "*.avi", "-o", "-name", "*.mkv", ")", "-print"];
-                        scanWallpapers.command = cmd;
-                        scanWallpapers.running = true;
-                        wallpaper.scanSubfolders();
-
-                        delayedThumbnailGen.start();
-                    }
+                if (wallPath && !wallpaper._wallpaperDirInitialized) {
+                    wallpaper._wallpaperDirInitialized = true;
+                    wallpaper.scanSubfolders();
                 }
             }
         }
@@ -496,7 +496,7 @@ Singleton {
     Process {
         id: thumbnailGeneratorScript
         running: false
-        command: ["python3", Paths.script("thumbgen.py"), Paths.cachePath("wallpapers.json"), Paths.cacheDir, fallbackDir]
+        command: ["python3", Paths.script("thumbgen.py"), Paths.cachePath("wallpapers.json"), Paths.cacheDir, fallbackDir, "--directory", scanRoot]
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -522,6 +522,10 @@ Singleton {
             } else {
                 console.warn("⚠️ Thumbnail generation failed with code:", exitCode);
             }
+            if (thumbnailsPending) {
+                thumbnailsPending = false;
+                delayedThumbnailGen.restart();
+            }
         }
     }
 
@@ -529,7 +533,10 @@ Singleton {
         id: delayedThumbnailGen
         interval: 2000
         repeat: false
-        onTriggered: thumbnailGeneratorScript.running = true
+        onTriggered: {
+            if (thumbnailGeneratorScript.running) wallpaper.thumbnailsPending = true;
+            else thumbnailGeneratorScript.running = true;
+        }
     }
 
     Process {
@@ -568,91 +575,23 @@ Singleton {
         }
     }
 
-    Process {
-        id: scanSubfoldersProcess
-        running: false
-        command: wallpaperDir ? ["find", wallpaperDir, "-mindepth", "1", "-name", ".*", "-prune", "-o", "-type", "d", "-print"] : []
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                console.log("scanSubfolders stdout:", text);
-                var rawPaths = text.trim().split("\n").filter(function (f) {
-                    return f.length > 0;
-                });
-
-                allSubdirs = rawPaths;
-
-                var basePath = wallpaperDir.endsWith("/") ? wallpaperDir : wallpaperDir + "/";
-
-                var topLevelFolders = rawPaths.filter(function (path) {
-                    var relative = path.replace(basePath, "");
-                    return relative.indexOf("/") === -1;
-                }).map(function (path) {
-                    return path.split("/").pop();
-                }).filter(function (name) {
-                    return name.length > 0 && !name.startsWith(".");
-                });
-
-                topLevelFolders.sort();
-                subfolderFilters = topLevelFolders;
-                console.log("Updated subfolderFilters:", subfolderFilters);
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Error scanning subfolders:", text);
-                }
-            }
-        }
-
-        onRunningChanged: {
-            if (running) {
-                console.log("Starting scanSubfolders for directory:", wallpaperDir);
-            } else {
-                console.log("Finished scanSubfolders");
-            }
-        }
-    }
-
     FileView {
         id: directoryWatcher
         path: wallpaperDir
         watchChanges: true
         printErrors: false
 
-        onFileChanged: {
-            if (wallpaperDir === "")
-                return;
-            console.log("Wallpaper directory changed, rescanning...");
-            scanWallpapers.running = true;
-            scanSubfoldersProcess.running = true;
-            if (delayedThumbnailGen.running)
-                delayedThumbnailGen.restart();
-            else
-                delayedThumbnailGen.start();
-        }
-
+        onFileChanged: wallpaper.scanSubfolders()
     }
 
     Instantiator {
-        model: allSubdirs
-
+        model: allSubdirs.concat(usingFallback ? [scanRoot] : [])
         delegate: FileView {
+            required property string modelData
             path: modelData
             watchChanges: true
             printErrors: false
-            onFileChanged: {
-                console.log("Subdirectory content changed (" + path + "), rescanning...");
-                scanWallpapers.running = true;
-                scanSubfoldersProcess.running = true;
-
-                if (delayedThumbnailGen.running)
-                    delayedThumbnailGen.restart();
-                else
-                    delayedThumbnailGen.start();
-            }
+            onFileChanged: wallpaper.scanSubfolders()
         }
     }
 
@@ -670,54 +609,17 @@ Singleton {
 
     Process {
         id: scanWallpapers
-        running: false
-        command: wallpaperDir ? ["find", wallpaperDir, "-name", ".*", "-prune", "-o", "-type", "f", "(", "-name", "*.jpg", "-o", "-name", "*.jpeg", "-o", "-name", "*.png", "-o", "-name", "*.webp", "-o", "-name", "*.tif", "-o", "-name", "*.tiff", "-o", "-name", "*.gif", "-o", "-name", "*.mp4", "-o", "-name", "*.webm", "-o", "-name", "*.mov", "-o", "-name", "*.avi", "-o", "-name", "*.mkv", ")", "-print"] : []
-
-        onRunningChanged: {
-            if (running && wallpaperDir === "") {
-                console.log("Blocking scanWallpapers because wallpaperDir is empty");
-                running = false;
-            }
-        }
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var files = text.trim().split("\n").filter(function (f) {
-                    return f.length > 0;
-                });
-                if (files.length === 0) {
-                    console.log("No wallpapers found in main directory, using fallback");
-                    usingFallback = true;
-                    scanFallback.running = true;
-                } else {
-                    usingFallback = false;
-                    var newFiles = files.sort();
-                    if (JSON.stringify(newFiles) !== JSON.stringify(scannedPaths)) {
-                        console.log("Wallpaper directory updated. Found", newFiles.length, "images");
-                        scannedPaths = newFiles;
-
-                        if (delayedThumbnailGen.running)
-                            delayedThumbnailGen.restart();
-                        else
-                            delayedThumbnailGen.start();
-                    }
-                    _regularScanDone = true;
-                    mergeWallpaperLists();
-                }
-            }
-        }
-
+        stdout: StdioCollector {}
         stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Error scanning wallpaper directory:", text);
-                    if (wallpaperPaths.length === 0 && wallpaperDir !== "") {
-                        console.log("Directory scan failed for " + wallpaperDir + ", using fallback");
-                        usingFallback = true;
-                        scanFallback.running = true;
-                    }
-                }
+            onStreamFinished: if (text.trim()) console.warn("Wallpaper scan:", text.trim())
+        }
+        onExited: code => {
+            if (scanDirectory === wallpaperDir && code === 0) {
+                try { wallpaper.applyScan(JSON.parse(stdout.text)); }
+                catch (error) { console.warn("Invalid wallpaper scan:", error); }
             }
+            if (scanPending || scanDirectory !== wallpaperDir)
+                scanDebounce.restart();
         }
     }
 
@@ -767,27 +669,6 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: scanWallpaperEngine()
-    }
-
-    Process {
-        id: scanFallback
-        running: false
-        command: ["find", fallbackDir, "-name", ".*", "-prune", "-o", "-type", "f", "(", "-name", "*.jpg", "-o", "-name", "*.jpeg", "-o", "-name", "*.png", "-o", "-name", "*.webp", "-o", "-name", "*.tif", "-o", "-name", "*.tiff", "-o", "-name", "*.gif", "-o", "-name", "*.mp4", "-o", "-name", "*.webm", "-o", "-name", "*.mov", "-o", "-name", "*.avi", "-o", "-name", "*.mkv", ")", "-print"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var files = text.trim().split("\n").filter(function (f) {
-                    return f.length > 0;
-                });
-                console.log("Using fallback wallpapers. Found", files.length, "images");
-
-                if (usingFallback) {
-                    scannedPaths = files.sort();
-                    _regularScanDone = true;
-                    mergeWallpaperLists();
-                }
-            }
-        }
     }
 
     Process {

@@ -9,19 +9,11 @@ import sys
 import subprocess
 
 from media_cache import current, frame_command, render_atomic
-
-VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.avi', '.mkv'}
-IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp'}
-MEDIA_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS | {'.gif'}
+from wallpaper_files import discover, scan, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
 
 def media_files(root):
-    for directory, folders, files in os.walk(root):
-        folders[:] = sorted(folder for folder in folders if not folder.startswith('.'))
-        for name in sorted(files):
-            path = Path(directory) / name
-            if not name.startswith('.') and path.suffix.lower() in MEDIA_EXTENSIONS:
-                yield path
+    yield from (Path(path) for path in discover(root)['files'])
 
 
 def generate(source, destination):
@@ -30,8 +22,8 @@ def generate(source, destination):
     try:
         if source.suffix.lower() in IMAGE_EXTENSIONS:
             command = ['magick', '-limit', 'thread', '1', str(source) + '[0]',
-                       '-auto-orient', '-resize', '140x140^', '-gravity', 'center',
-                       '-extent', '140x140', '-quality', '85']
+                       '-auto-orient', '-resize', '320x200^', '-gravity', 'center',
+                       '-extent', '320x200', '-quality', '85']
             render_atomic(command, destination, 15)
         elif source.suffix.lower() in VIDEO_EXTENSIONS:
             try:
@@ -51,19 +43,19 @@ def main():
     parser.add_argument('config')
     parser.add_argument('cache')
     parser.add_argument('fallback', nargs='?')
+    parser.add_argument('--directory')
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text())
-    directory = config.get('wallPath') or args.fallback
+    directory = args.directory or config.get('wallPath') or args.fallback
     if not directory:
         raise ValueError('Wallpaper directory is not configured')
-    root = Path(directory).expanduser()
-    if not root.is_dir():
-        raise ValueError(f'Wallpaper directory does not exist: {root}')
-    namespace = hashlib.md5((directory.rstrip('/') or '/').encode()).hexdigest()
+    result = scan(directory, None if args.directory else args.fallback)
+    root = Path(result['root'])
+    namespace = hashlib.md5((str(root).rstrip('/') or '/').encode()).hexdigest()
     cache = Path(args.cache) / 'thumbnails' / namespace
-    files = list(media_files(root))
+    files = [Path(path) for path in result['files']]
     def render(source):
-        destination = cache / (str(source.relative_to(root)) + '.jpg')
+        destination = cache / (str(source.relative_to(root)) + '.preview.jpg')
         return generate(source, destination)
     with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1)) as executor:
         results = list(executor.map(render, files))

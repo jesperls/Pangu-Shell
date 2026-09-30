@@ -19,6 +19,7 @@ FocusScope {
     function setSelectedIndex(newIndex: int) {
         GlobalStates.wallpaperSelectedIndex = newIndex;
         selectedIndex = newIndex;
+        selectedPath = filteredWallpapers[newIndex] || "";
     }
 
     readonly property string currentScreenName: Compositor.focusedMonitor ? Compositor.focusedMonitor.name : ""
@@ -42,31 +43,30 @@ FocusScope {
         }
     }
 
-    property var activeFilters: []  // Lista de tipos de archivo seleccionados para filtrar
+    property var activeFilters: []
 
-    readonly property int gridColumns: 7
-    readonly property int wallpaperMargin: 4
+    readonly property int gridColumns: Math.max(1, Math.floor(width / (Math.max(100, Math.min(240, Config.dashboard.wallpaperCardWidth ?? 160)) + 12)))
+    readonly property int wallpaperMargin: 6
+    readonly property bool showNames: Config.dashboard.wallpaperShowNames ?? true
+    property string selectedPath: ""
 
     property var focusableElements: [
         {
             id: "perScreenCheckbox",
             focusFunc: function () {
-                perScreenCheckboxContainer.keyboardNavigationActive = true;
-                perScreenCheckbox.forceActiveFocus();
+                perScreenChip.forceActiveFocus();
             }
         },
         {
             id: "oledCheckbox",
             focusFunc: function () {
-                oledCheckboxContainer.keyboardNavigationActive = true;
-                oledCheckbox.forceActiveFocus();
+                oledChip.forceActiveFocus();
             }
         },
         {
             id: "tintCheckbox",
             focusFunc: function () {
-                tintCheckboxContainer.keyboardNavigationActive = true;
-                tintCheckbox.forceActiveFocus();
+                tintChip.forceActiveFocus();
             }
         },
         {
@@ -125,15 +125,12 @@ FocusScope {
         }
     }
 
-    function centerCurrentWallpaper() {
+    function revealCurrentWallpaper() {
         const currentIndex = findCurrentWallpaperIndex();
         if (currentIndex !== -1) {
             setSelectedIndex(currentIndex);
 
-            const currentRow = Math.floor(currentIndex / wallpapersTabRoot.gridColumns);
-            const rowStartIndex = currentRow * wallpapersTabRoot.gridColumns;
-
-            wallpaperGrid.positionViewAtIndex(rowStartIndex, GridView.Center);
+            wallpaperGrid.positionViewAtIndex(currentIndex, GridView.Contain);
         }
     }
 
@@ -159,7 +156,7 @@ FocusScope {
     }
 
     Component.onCompleted: {
-        centerTimer.start();
+        revealTimer.start();
     }
 
     onVisibleChanged: {
@@ -168,16 +165,16 @@ FocusScope {
                 console.log("WallpapersTab became visible, updating subfolders");
                 GlobalStates.wallpaperManager.scanSubfolders();
             }
-            centerTimer.restart();
+            revealTimer.restart();
         }
     }
 
     Timer {
-        id: centerTimer
+        id: revealTimer
         interval: 50
         repeat: false
         onTriggered: {
-            centerCurrentWallpaper();
+            revealCurrentWallpaper();
             focusSearch();
         }
     }
@@ -216,6 +213,12 @@ FocusScope {
         return wallpapers;
     }
 
+    onFilteredWallpapersChanged: {
+        const previous = filteredWallpapers.indexOf(selectedPath);
+        const current = findCurrentWallpaperIndex();
+        setSelectedIndex(previous >= 0 ? previous : current >= 0 ? current : filteredWallpapers.length ? 0 : -1);
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
@@ -238,14 +241,7 @@ FocusScope {
                 disableCursorNavigation: true
                 radius: Styling.radius(4)
 
-                onSearchTextChanged: text => {
-                    searchText = text;
-                    if (text.length > 0 && filteredWallpapers.length > 0) {
-                        setSelectedIndex(0);
-                    } else {
-                        setSelectedIndex(-1);
-                    }
-                }
+                onSearchTextChanged: text => searchText = text
 
                 onEscapePressed: {
                     Visibilities.setActiveModule("");
@@ -314,430 +310,6 @@ FocusScope {
             }
 
             Item {
-                id: perScreenCheckboxContainer
-                Layout.preferredWidth: 120  // wider for long monitor names
-                Layout.preferredHeight: 48
-
-                property bool keyboardNavigationActive: false
-
-                StyledRect {
-                    variant: perScreenCheckboxContainer.keyboardNavigationActive && perScreenCheckbox.activeFocus ? "focus" : "pane"
-                    anchors.fill: parent
-                    radius: Styling.radius(4)
-                    opacity: 1.0
-
-                    Behavior on opacity {
-                        enabled: Styling.animDuration > 0
-                        NumberAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutQuart
-                        }
-                    }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        spacing: 4
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: Colors.background
-                            radius: Styling.radius(0)
-
-                            Text {
-                                anchors.fill: parent
-                                text: currentScreenName
-                                color: Colors.overSurface
-                                font.family: Config.theme.font
-                                font.pixelSize: Config.theme.fontSize
-                                font.weight: Font.Medium
-                                verticalAlignment: Text.AlignVCenter
-                                horizontalAlignment: Text.AlignHCenter
-                                elide: Text.ElideRight
-                                
-                                Behavior on color {
-                                    enabled: Styling.animDuration > 0
-                                    ColorAnimation {
-                                        duration: Styling.animDuration / 2
-                                        easing.type: Easing.OutQuart
-                                    }
-                                }
-                            }
-                        }
-
-                        Item {
-                            id: perScreenCheckbox
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-                            
-                            property bool checked: isPerScreen
-
-                            onActiveFocusChanged: {
-                                if (!activeFocus) {
-                                    perScreenCheckboxContainer.keyboardNavigationActive = false;
-                                }
-                            }
-
-                            Keys.onPressed: event => {
-                                if (event.key === Qt.Key_Tab) {
-                                    perScreenCheckboxContainer.keyboardNavigationActive = false;
-                                    if (event.modifiers & Qt.ShiftModifier) {
-                                        wallpapersTabRoot.focusPreviousElement();
-                                    } else {
-                                        wallpapersTabRoot.focusNextElement();
-                                    }
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                    togglePerScreenMode();
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    perScreenCheckboxContainer.keyboardNavigationActive = false;
-                                    focusSearch();
-                                    event.accepted = true;
-                                }
-                            }
-
-                            Item {
-                                anchors.fill: parent
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    color: Colors.background
-                                    visible: !perScreenCheckbox.checked
-                                }
-
-                                StyledRect {
-                                    variant: "primary"
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    visible: perScreenCheckbox.checked
-                                    opacity: perScreenCheckbox.checked ? 1.0 : 0.0
-
-                                    Behavior on opacity {
-                                        enabled: Styling.animDuration > 0
-                                        NumberAnimation {
-                                            duration: Styling.animDuration / 2
-                                            easing.type: Easing.OutQuart
-                                        }
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Icons.accept
-                                        color: Styling.srItem("primary")
-                                        font.family: Icons.font
-                                        font.pixelSize: 20
-                                        scale: perScreenCheckbox.checked ? 1.0 : 0.0
-
-                                        Behavior on scale {
-                                            enabled: Styling.animDuration > 0
-                                            NumberAnimation {
-                                                duration: Styling.animDuration / 2
-                                                easing.type: Easing.OutBack
-                                                easing.overshoot: 1.5
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    togglePerScreenMode();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            Item {
-                id: oledCheckboxContainer
-                Layout.preferredWidth: 100
-                Layout.preferredHeight: 48
-
-                property bool keyboardNavigationActive: false
-
-                StyledRect {
-                    variant: oledCheckboxContainer.keyboardNavigationActive && oledCheckbox.activeFocus ? "focus" : "pane"
-                    anchors.fill: parent
-                    radius: Styling.radius(4)
-                    opacity: oledCheckbox.enabled ? 1.0 : 0.5
-
-                    Behavior on opacity {
-                        enabled: Styling.animDuration > 0
-                        NumberAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutQuart
-                        }
-                    }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        spacing: 4
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: Colors.background
-                            radius: Styling.radius(0)
-
-                            Text {
-                                anchors.fill: parent
-                                text: "OLED"
-                                color: Colors.overSurface
-                                font.family: Config.theme.font
-                                font.pixelSize: Config.theme.fontSize
-                                font.weight: Font.Medium
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 8
-
-                                Behavior on color {
-                                    enabled: Styling.animDuration > 0
-                                    ColorAnimation {
-                                        duration: Styling.animDuration / 2
-                                        easing.type: Easing.OutQuart
-                                    }
-                                }
-                            }
-                        }
-
-                        Item {
-                            id: oledCheckbox
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-
-                            property bool checked: Config.theme.oledMode
-                            property bool enabled: !Config.theme.lightMode
-
-                            onActiveFocusChanged: {
-                                if (!activeFocus) {
-                                    oledCheckboxContainer.keyboardNavigationActive = false;
-                                }
-                            }
-
-                            Keys.onPressed: event => {
-                                if (event.key === Qt.Key_Tab) {
-                                    oledCheckboxContainer.keyboardNavigationActive = false;
-                                    if (event.modifiers & Qt.ShiftModifier) {
-                                        wallpapersTabRoot.focusPreviousElement();
-                                    } else {
-                                        wallpapersTabRoot.focusNextElement();
-                                    }
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                    if (enabled) {
-                                        Config.theme.oledMode = !Config.theme.oledMode;
-                                    }
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    oledCheckboxContainer.keyboardNavigationActive = false;
-                                    focusSearch();
-                                    event.accepted = true;
-                                }
-                            }
-
-                            Connections {
-                                target: Config.theme
-                                function onOledModeChanged() {
-                                    oledCheckbox.checked = Config.theme.oledMode;
-                                }
-                            }
-
-                            Item {
-                                anchors.fill: parent
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    color: Colors.background
-                                    visible: !oledCheckbox.checked
-                                }
-
-                                StyledRect {
-                                    variant: "primary"
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    visible: oledCheckbox.checked
-                                    opacity: oledCheckbox.checked ? 1.0 : 0.0
-
-                                    Behavior on opacity {
-                                        enabled: Styling.animDuration > 0
-                                        NumberAnimation {
-                                            duration: Styling.animDuration / 2
-                                            easing.type: Easing.OutQuart
-                                        }
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Icons.accept
-                                        color: Styling.srItem("primary")
-                                        font.family: Icons.font
-                                        font.pixelSize: 20
-                                        scale: oledCheckbox.checked ? 1.0 : 0.0
-
-                                        Behavior on scale {
-                                            enabled: Styling.animDuration > 0
-                                            NumberAnimation {
-                                                duration: Styling.animDuration / 2
-                                                easing.type: Easing.OutBack
-                                                easing.overshoot: 1.5
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: oledCheckbox.enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-                                onClicked: {
-                                    if (oledCheckbox.enabled) {
-                                        Config.theme.oledMode = !Config.theme.oledMode;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item {
-                id: tintCheckboxContainer
-                Layout.preferredWidth: 100
-                Layout.preferredHeight: 48
-
-                property bool keyboardNavigationActive: false
-
-                StyledRect {
-                    variant: tintCheckboxContainer.keyboardNavigationActive && tintCheckbox.activeFocus ? "focus" : "pane"
-                    anchors.fill: parent
-                    radius: Styling.radius(4)
-                    opacity: 1.0
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        spacing: 4
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            color: Colors.background
-                            radius: Styling.radius(0)
-
-                            Text {
-                                anchors.fill: parent
-                                text: "Tint"
-                                color: Colors.overSurface
-                                font.family: Config.theme.font
-                                font.pixelSize: Config.theme.fontSize
-                                font.weight: Font.Medium
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 8
-                            }
-                        }
-
-                        Item {
-                            id: tintCheckbox
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-
-                            property bool checked: GlobalStates.wallpaperManager ? GlobalStates.wallpaperManager.tintEnabled : false
-
-                            onActiveFocusChanged: {
-                                if (!activeFocus) {
-                                    tintCheckboxContainer.keyboardNavigationActive = false;
-                                }
-                            }
-
-                            Keys.onPressed: event => {
-                                if (event.key === Qt.Key_Tab) {
-                                    tintCheckboxContainer.keyboardNavigationActive = false;
-                                    if (event.modifiers & Qt.ShiftModifier) {
-                                        wallpapersTabRoot.focusPreviousElement();
-                                    } else {
-                                        wallpapersTabRoot.focusNextElement();
-                                    }
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                                    if (GlobalStates.wallpaperManager) {
-                                        GlobalStates.wallpaperManager.tintEnabled = !GlobalStates.wallpaperManager.tintEnabled;
-                                    }
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    tintCheckboxContainer.keyboardNavigationActive = false;
-                                    focusSearch();
-                                    event.accepted = true;
-                                }
-                            }
-
-                            Item {
-                                anchors.fill: parent
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    color: Colors.background
-                                    visible: !tintCheckbox.checked
-                                }
-
-                                StyledRect {
-                                    variant: "primary"
-                                    anchors.fill: parent
-                                    radius: Styling.radius(0)
-                                    visible: tintCheckbox.checked
-                                    opacity: tintCheckbox.checked ? 1.0 : 0.0
-
-                                    Behavior on opacity {
-                                        enabled: Styling.animDuration > 0
-                                        NumberAnimation {
-                                            duration: Styling.animDuration / 2
-                                            easing.type: Easing.OutQuart
-                                        }
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Icons.accept
-                                        color: Styling.srItem("primary")
-                                        font.family: Icons.font
-                                        font.pixelSize: 20
-                                        scale: tintCheckbox.checked ? 1.0 : 0.0
-
-                                        Behavior on scale {
-                                            enabled: Styling.animDuration > 0
-                                            NumberAnimation {
-                                                duration: Styling.animDuration / 2
-                                                easing.type: Easing.OutBack
-                                                easing.overshoot: 1.5
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (GlobalStates.wallpaperManager) {
-                                        GlobalStates.wallpaperManager.tintEnabled = !GlobalStates.wallpaperManager.tintEnabled;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item {
                 Layout.preferredWidth: 200
                 Layout.preferredHeight: 48
 
@@ -763,6 +335,59 @@ FocusScope {
                         wallpapersTabRoot.focusPreviousElement();
                     }
                 }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            ControlChip {
+                id: perScreenChip
+                text: currentScreenName || "This screen"
+                checked: isPerScreen
+                enabled: currentScreenName !== ""
+                Accessible.name: "Use a separate wallpaper for " + text
+                onClicked: togglePerScreenMode()
+                onTabPressed: focusNextElement()
+                onShiftTabPressed: focusPreviousElement()
+                onEscapePressed: focusSearch()
+                StyledToolTip {
+                    show: perScreenChip.hovered
+                    tooltipText: "Separate wallpaper for this screen"
+                }
+            }
+
+            ControlChip {
+                id: oledChip
+                text: "OLED black"
+                checked: Config.theme.oledMode
+                enabled: !Config.theme.lightMode
+                onClicked: Config.theme.oledMode = !Config.theme.oledMode
+                onTabPressed: focusNextElement()
+                onShiftTabPressed: focusPreviousElement()
+                onEscapePressed: focusSearch()
+            }
+
+            ControlChip {
+                id: tintChip
+                text: "Wallpaper tint"
+                checked: GlobalStates.wallpaperManager ? GlobalStates.wallpaperManager.tintEnabled : false
+                onClicked: {
+                    if (GlobalStates.wallpaperManager)
+                        GlobalStates.wallpaperManager.tintEnabled = !GlobalStates.wallpaperManager.tintEnabled;
+                }
+                onTabPressed: focusNextElement()
+                onShiftTabPressed: focusPreviousElement()
+                onEscapePressed: focusSearch()
+            }
+
+            Item { Layout.fillWidth: true }
+            Text {
+                text: filteredWallpapers.length + (filteredWallpapers.length === 1 ? " wallpaper" : " wallpapers")
+                color: Colors.overSurfaceVariant
+                font.family: Config.theme.font
+                font.pixelSize: Config.theme.fontSize - 1
             }
         }
 
@@ -805,16 +430,44 @@ FocusScope {
             readonly property real gridWidth: width + (wallpapersTabRoot.wallpaperMargin * 2)
             readonly property real cellSize: gridWidth / wallpapersTabRoot.gridColumns
 
+            Column {
+                anchors.centerIn: parent
+                spacing: 10
+                visible: filteredWallpapers.length === 0
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Icons.wallpapers
+                    font.family: Icons.font
+                    font.pixelSize: 32
+                    color: Colors.overSurfaceVariant
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: searchText || activeFilters.length ? "No matching wallpapers" : "No wallpapers yet"
+                    color: Colors.overBackground
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(0)
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: searchText || activeFilters.length ? "Try another search or clear the filters" : "Choose a wallpaper folder in Theme settings"
+                    color: Colors.overSurfaceVariant
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(-1)
+                }
+            }
+
             GridView {
                 id: wallpaperGrid
                 anchors.fill: parent
                 anchors.margins: -wallpapersTabRoot.wallpaperMargin
                 cellWidth: wallpaperGridContainer.cellSize
-                cellHeight: wallpaperGridContainer.cellSize
+                cellHeight: wallpaperGridContainer.cellSize * 0.625 + (wallpapersTabRoot.showNames ? 36 : 12)
                 flow: GridView.FlowLeftToRight
                 boundsBehavior: Flickable.StopAtBounds
                 model: filteredWallpapers
                 currentIndex: selectedIndex
+                keyNavigationEnabled: false
 
                 property bool isScrolling: dragging || flicking
 
@@ -828,177 +481,12 @@ FocusScope {
                 flickDeceleration: 5000
                 maximumFlickVelocity: 8000
 
-                onCurrentIndexChanged: {
-                    if (currentIndex !== selectedIndex && currentIndex >= 0) {
-                        setSelectedIndex(currentIndex);
-                    }
-                }
-
-                highlight: Item {
-                    width: wallpaperGrid.cellWidth
-                    height: wallpaperGrid.cellHeight
-                    z: 100
-
-                    Behavior on x {
-                        enabled: Styling.animDuration > 0 && !wallpaperGrid.isScrolling
-                        NumberAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutQuart
-                        }
-                    }
-
-                    Behavior on y {
-                        enabled: Styling.animDuration > 0 && !wallpaperGrid.isScrolling
-                        NumberAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutQuart
-                        }
-                    }
-
-                    ClippingRectangle {
-                        id: highlightRectangle
-                        anchors.centerIn: parent
-                        width: parent.width - wallpapersTabRoot.wallpaperMargin * 2
-                        height: parent.height - wallpapersTabRoot.wallpaperMargin * 2
-                        color: "transparent"
-                        border.color: Styling.srItem("overprimary")
-                        border.width: 2
-                        visible: selectedIndex >= 0
-                        radius: Styling.radius(4)
-                        z: 10
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.topMargin: -20
-                            anchors.bottomMargin: 0
-                            anchors.leftMargin: -20
-                            anchors.rightMargin: -20
-                            color: "transparent"
-                            border.color: Colors.background
-                            border.width: 28
-                            radius: Styling.radius(24)
-                            z: 5
-
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottomMargin: 0
-                                height: 28
-                                color: "transparent"
-                                z: 6
-                                clip: true
-
-                                property var currentItem: wallpaperGrid.currentItem
-                                property bool isCurrentWallpaper: {
-                                    if (!GlobalStates.wallpaperManager || wallpaperGrid.currentIndex < 0)
-                                        return false;
-                                        
-                                    let perScreen = GlobalStates.wallpaperManager.perScreenWallpapers || {};
-                                    let currentWall = "";
-                                    if (currentScreenName !== "" && perScreen[currentScreenName] !== undefined) {
-                                        currentWall = perScreen[currentScreenName];
-                                    } else {
-                                        currentWall = GlobalStates.wallpaperManager.currentWallpaper;
-                                    }
-                                        
-                                    return currentWall === filteredWallpapers[wallpaperGrid.currentIndex];
-                                }
-                                property bool showHoveredItem: currentItem && currentItem.isHovered && !visible
-
-                                visible: selectedIndex >= 0 || showHoveredItem
-
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    width: wallpaperGrid.cellWidth - 20
-                                    height: parent.height
-                                    color: "transparent"
-                                    clip: true
-
-                                    Text {
-                                        id: labelText
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        anchors.horizontalCenter: needsScroll ? undefined : parent.horizontalCenter
-                                        x: needsScroll ? 4 : undefined
-                                        text: {
-                                            if (parent.parent.isCurrentWallpaper) {
-                                                return "CURRENT";
-                                            } else if (wallpaperGrid.currentIndex >= 0 && wallpaperGrid.currentIndex < filteredWallpapers.length) {
-                                                return GlobalStates.wallpaperManager.getDisplayName(filteredWallpapers[wallpaperGrid.currentIndex]);
-                                            }
-                                            return "";
-                                        }
-                                        color: parent.parent.isCurrentWallpaper ? Styling.srItem("overprimary") : Colors.overBackground
-                                        font.family: Config.theme.font
-                                        font.pixelSize: Config.theme.fontSize
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-
-                                        readonly property bool needsScroll: contentWidth > parent.width - 8
-
-                                        onTextChanged: {
-                                            if (needsScroll) {
-                                                x = 4;
-                                            }
-                                        }
-
-                                        onNeedsScrollChanged: {
-                                            if (needsScroll) {
-                                                x = 4;
-                                                scrollAnimation.restart();
-                                            }
-                                        }
-
-                                        SequentialAnimation {
-                                            id: scrollAnimation
-                                            running: labelText.needsScroll && labelText.parent && labelText.parent.parent.visible && !labelText.parent.parent.isCurrentWallpaper
-                                            loops: Animation.Infinite
-
-                                            PauseAnimation {
-                                                duration: 1000
-                                            }
-                                            NumberAnimation {
-                                                target: labelText
-                                                property: "x"
-                                                to: labelText.parent.width - labelText.contentWidth - 4
-                                                duration: 2000
-                                                easing.type: Easing.InOutQuad
-                                            }
-                                            PauseAnimation {
-                                                duration: 1000
-                                            }
-                                            NumberAnimation {
-                                                target: labelText
-                                                property: "x"
-                                                to: 4
-                                                duration: 2000
-                                                easing.type: Easing.InOutQuad
-                                            }
-                                        }
-                                    }
-
-                                    Item {
-                                        Layout.fillHeight: true
-                                    }
-                                }
-
-                                onVisibleChanged: {
-                                    if (visible) {
-                                        labelText.x = 4;
-                                        if (labelText.needsScroll && !isCurrentWallpaper) {
-                                            scrollAnimation.restart();
-                                        }
-                                    } else {
-                                        scrollAnimation.stop();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                highlight: null
 
                 delegate: Rectangle {
+                    id: wallpaperCard
+                    required property string modelData
+                    required property int index
                     width: wallpaperGrid.cellWidth
                     height: wallpaperGrid.cellHeight
                     color: "transparent"
@@ -1030,44 +518,70 @@ FocusScope {
                         return itemBottom + buffer >= gridTop && itemTop - buffer <= gridBottom;
                     }
 
-                    Item {
+                    StyledRect {
+                        id: cardBackground
                         anchors.fill: parent
                         anchors.margins: wallpapersTabRoot.wallpaperMargin
+                        variant: wallpaperCard.isSelected ? "focus" : "common"
+                        radius: Styling.radius(2)
 
                         ClippingRectangle {
-                            anchors.fill: parent
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 3
+                            height: parent.height - (wallpapersTabRoot.showNames ? 30 : 6)
+                            radius: Styling.radius(0)
                             color: Colors.surface
-                            radius: Styling.radius(4)
 
-                                Loader {
-                                    anchors.fill: parent
-                                    sourceComponent: staticImageComponent
-                                    property string sourceFile: modelData
-                                    active: isInViewport && wallpapersTabRoot.visible && GlobalStates.dashboardOpen
-                                    asynchronous: true
+                            Loader {
+                                anchors.fill: parent
+                                sourceComponent: staticImageComponent
+                                property string sourceFile: wallpaperCard.modelData
+                                active: wallpaperCard.isInViewport && wallpapersTabRoot.visible && GlobalStates.dashboardOpen
+                                asynchronous: true
+                            }
+                        }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: Colors.surface
-                                    visible: !parent.active || parent.status !== Loader.Ready
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: cardBackground.radius
+                            border.width: wallpaperCard.isSelected || wallpaperCard.isCurrentWallpaper ? 2 : 1
+                            border.color: wallpaperCard.isSelected || wallpaperCard.isCurrentWallpaper ? Colors.primary
+                                : wallpaperCard.isHovered ? Colors.outline : "transparent"
+                        }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Icons.circleNotch
-                                        font.family: Icons.font
-                                        font.pixelSize: 24
-                                        color: Colors.overSurfaceVariant
-                                        rotation: 0
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 9
+                            text: GlobalStates.wallpaperManager?.getDisplayName(wallpaperCard.modelData) ?? ""
+                            visible: wallpapersTabRoot.showNames
+                            color: cardBackground.item
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: wallpaperCard.isCurrentWallpaper ? Font.DemiBold : Font.Normal
+                            elide: Text.ElideMiddle
+                        }
 
-                                        NumberAnimation on rotation {
-                                            from: 0
-                                            to: 360
-                                            duration: 1000
-                                            loops: Animation.Infinite
-                                            running: parent.visible
-                                        }
-                                    }
-                                }
+                        StyledRect {
+                            id: currentBadge
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: 8
+                            width: 24
+                            height: 24
+                            radius: Styling.radius(-2)
+                            variant: "primary"
+                            visible: wallpaperCard.isCurrentWallpaper
+                            Text {
+                                anchors.centerIn: parent
+                                text: Icons.accept
+                                font.family: Icons.font
+                                font.pixelSize: 14
+                                color: currentBadge.item
                             }
                         }
                     }
@@ -1081,7 +595,6 @@ FocusScope {
                             if (wallpaperGrid.isScrolling)
                                 return;
                             parent.isHovered = true;
-                            setSelectedIndex(index);
                         }
                         onExited: {
                             parent.isHovered = false;
@@ -1091,10 +604,12 @@ FocusScope {
                                 parent.scale = 0.95;
                         }
                         onReleased: parent.scale = 1.0
+                        onCanceled: parent.scale = 1.0
 
                         onClicked: {
                             if (wallpaperGrid.isScrolling)
                                 return;
+                            setSelectedIndex(index);
                             if (GlobalStates.wallpaperManager) {
                                 if (isPerScreen && currentScreenName !== "") {
                                     GlobalStates.wallpaperManager.setWallpaper(modelData, currentScreenName);
@@ -1103,6 +618,12 @@ FocusScope {
                                 }
                             }
                         }
+                    }
+
+                    StyledToolTip {
+                        show: wallpaperCard.isHovered && !wallpaperGrid.isScrolling
+                        tooltipText: GlobalStates.wallpaperManager?.getDisplayName(wallpaperCard.modelData) ?? ""
+                        description: wallpaperCard.isCurrentWallpaper ? "Current wallpaper" : "Click to apply"
                     }
 
                     Behavior on color {
@@ -1140,13 +661,17 @@ FocusScope {
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             smooth: true
-            cache: false  // skip image caching to save RAM
+            cache: true
             sourceSize.width: wallpaperGridContainer.cellSize
-            sourceSize.height: wallpaperGridContainer.cellSize
+            sourceSize.height: Math.round(wallpaperGridContainer.cellSize * 0.625)
 
-            onStatusChanged: {
-                if (status === Image.Error) {
-                }
+            Text {
+                anchors.centerIn: parent
+                visible: parent.status === Image.Error || parent.status === Image.Null
+                text: Icons.image
+                font.family: Icons.font
+                font.pixelSize: 28
+                color: Colors.overSurfaceVariant
             }
         }
     }

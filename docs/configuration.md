@@ -79,6 +79,11 @@ formats are preserved, so adopting this flake needs no data migration.
 ```nix
 programs.pangu.settings = {
   bar.position = "top";
+  bar.trayIconSize = 20;
+  bar.traySpacing = 8;
+  bar.trayIconStyle = "theme";
+  dashboard.wallpaperCardWidth = 160;
+  dashboard.wallpaperShowNames = true;
   system.ocr.spa = false;
 };
 ```
@@ -89,6 +94,19 @@ Removing an override leaves its last saved value. Arrays replace arrays.
 `pinnedapps` overrides target the data directory, matching the shell's storage.
 Unknown file names fail module validation; nested settings follow the QML
 schema. Override metadata lets the UI identify Nix-managed values.
+
+The Shell settings panel exposes tray icon size (16–32 pixels), spacing
+(0–24 pixels) and color style (`theme`, `original` or `monochrome`). `theme`
+follows the theme's icon tint setting. Shift-click a tray icon to move it
+between the bar and overflow. Right-click the overflow arrow to manage all
+icons. These choices persist as app IDs in shell state across restarts and
+apply to every monitor; middle-click keeps the application's secondary action.
+
+Wallpaper cards adapt to available space with a preferred width of 100–240
+pixels and optional filenames. Both controls are under Shell → Dashboard.
+Wallpaper folders accept `~/` paths and symlinked files or directories; cycles
+and hidden entries are skipped. If a collection is empty or unavailable, the
+browser uses the packaged fallback wallpapers.
 
 `RuntimeDirectory=pangu` contains transient idle and audio configs. The separate
 `pangu-session-started` marker survives service restarts to distinguish them

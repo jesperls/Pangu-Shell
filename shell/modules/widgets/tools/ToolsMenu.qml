@@ -109,8 +109,7 @@ ActionGrid {
 
     onActionTriggered: action => {
         if (action.tooltip === "Screenshot") {
-            Screenshot.initialize();
-            GlobalStates.screenshotToolVisible = true;
+            Screenshot.startCapture();
             root.itemSelected();
         } else if (action.tooltip === "Screen Recorder") {
             ScreenRecorder.initialize();
@@ -142,14 +141,13 @@ ActionGrid {
             ApplicationLauncher.launchCommand(["python3", Paths.script("colorpicker.py")]);
             root.itemSelected();
         } else if (action.tooltip === "OCR") {
-            ApplicationLauncher.launchCommand(["bash", Paths.script("ocr.sh"), LauncherActions.ocrLangString()]);
+            Screenshot.startCapture("ocr");
             root.itemSelected();
         } else if (action.tooltip === "QR Code") {
-            ApplicationLauncher.launchCommand(["bash", Paths.script("qr_scan.sh")]);
+            Screenshot.startCapture("qr");
             root.itemSelected();
         } else if (action.tooltip === "Google Lens") {
-            Screenshot.captureMode = "lens";
-            GlobalStates.screenshotToolVisible = true;
+            Screenshot.startCapture("lens");
             root.itemSelected();
         } else if (action.tooltip === "Mirror") {
             GlobalStates.mirrorWindowVisible = !GlobalStates.mirrorWindowVisible;

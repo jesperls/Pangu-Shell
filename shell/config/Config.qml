@@ -486,6 +486,9 @@ Singleton {
             property string clockPosition: "right"
             property string launcherPosition: "start"
             property bool flatButtons: false
+            property int trayIconSize: 20
+            property int traySpacing: 8
+            property string trayIconStyle: "theme"
             property bool showWorkspaces: true
             property list<string> screenList: []
             property bool enableFirefoxPlayer: false
@@ -779,6 +782,8 @@ Singleton {
             property bool showWidgets: true
             property bool showWallpapers: true
             property bool showMetrics: true
+            property int wallpaperCardWidth: 160
+            property bool wallpaperShowNames: true
             property real backgroundOpacity: 1.0
         }
     }

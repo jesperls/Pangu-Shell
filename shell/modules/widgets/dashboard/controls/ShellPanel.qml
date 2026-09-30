@@ -924,6 +924,31 @@ Item {
                             onActionClicked: launcherIconPicker.running = true
                         }
 
+                        SettingsNumberInputRow {
+                            label: "Tray Icon Size"
+                            value: Config.bar.trayIconSize
+                            minValue: 16
+                            maxValue: 32
+                            suffix: "px"
+                            onValueEdited: value => { GlobalStates.markShellChanged(); Config.bar.trayIconSize = value; }
+                        }
+
+                        SettingsNumberInputRow {
+                            label: "Tray Spacing"
+                            value: Config.bar.traySpacing
+                            minValue: 0
+                            maxValue: 24
+                            suffix: "px"
+                            onValueEdited: value => { GlobalStates.markShellChanged(); Config.bar.traySpacing = value; }
+                        }
+
+                        SelectorRow {
+                            label: "Tray Icon Style"
+                            options: [{label: "Theme", value: "theme"}, {label: "Original", value: "original"}, {label: "Monochrome", value: "monochrome"}]
+                            value: Config.bar.trayIconStyle
+                            onValueSelected: value => { GlobalStates.markShellChanged(); Config.bar.trayIconStyle = value; }
+                        }
+
                         ToggleRow {
                             label: "Launcher Icon Tint"
                             checked: Config.bar.launcherIconTint ?? true
@@ -1804,6 +1829,21 @@ Item {
                                     Config.dashboard.height = newValue;
                                 }
                             }
+                        }
+
+                        SettingsNumberInputRow {
+                            label: "Wallpaper Card Width"
+                            value: Config.dashboard.wallpaperCardWidth
+                            minValue: 100
+                            maxValue: 240
+                            suffix: "px"
+                            onValueEdited: value => { GlobalStates.markShellChanged(); Config.dashboard.wallpaperCardWidth = value; }
+                        }
+
+                        ToggleRow {
+                            label: "Wallpaper Names"
+                            checked: Config.dashboard.wallpaperShowNames
+                            onToggled: value => { GlobalStates.markShellChanged(); Config.dashboard.wallpaperShowNames = value; }
                         }
 
                         ToggleRow {

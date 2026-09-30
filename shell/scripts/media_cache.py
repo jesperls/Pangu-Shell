@@ -33,5 +33,5 @@ def frame_command(source, thumbnail=False, seek=None):
         command += ['-ss', str(seek)]
     command += ['-i', str(source), '-frames:v', '1', '-threads', '1', '-filter_threads', '1']
     if thumbnail:
-        command += ['-vf', 'scale=140:140:force_original_aspect_ratio=increase,crop=140:140']
+        command += ['-vf', 'scale=320:200:force_original_aspect_ratio=increase,crop=320:200']
     return command + ['-q:v', '2', '-f', 'image2']

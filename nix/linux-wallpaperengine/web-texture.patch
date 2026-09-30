@@ -1,0 +1,14 @@
+Backport https://github.com/Almamu/linux-wallpaperengine/pull/639
+Commit: c71613860082d5508f3bc7d2db3fd59d9d4472b5
+
+diff --git a/src/WallpaperEngine/WebBrowser/CEF/RenderHandler.cpp b/src/WallpaperEngine/WebBrowser/CEF/RenderHandler.cpp
+--- a/src/WallpaperEngine/WebBrowser/CEF/RenderHandler.cpp
++++ b/src/WallpaperEngine/WebBrowser/CEF/RenderHandler.cpp
+@@ -24,4 +24,4 @@ int RenderHandler::getWidth () const { return this->m_webdata->getWidth (); }
+ 
+ int RenderHandler::getHeight () const { return this->m_webdata->getHeight (); }
+ 
+-GLuint RenderHandler::texture () const { return this->m_webdata->getWallpaperFramebuffer (); }
+\ No newline at end of file
++GLuint RenderHandler::texture () const { return this->m_webdata->getWallpaperTexture (); }
+\ No newline at end of file

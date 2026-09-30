@@ -20,7 +20,12 @@
       systems = [ "x86_64-linux" ];
       forAllSystems = lib.genAttrs systems;
       version = self.shortRev or self.dirtyShortRev or "dev";
-      packageFor = pkgs: pkgs.callPackage ./nix/package { inherit version; };
+      packageFor =
+        pkgs:
+        pkgs.callPackage ./nix/package {
+          inherit version;
+          linux-wallpaperengine = pkgs.callPackage ./nix/linux-wallpaperengine { };
+        };
       pkgsFor = system: nixpkgs.legacyPackages.${system};
     in
     {

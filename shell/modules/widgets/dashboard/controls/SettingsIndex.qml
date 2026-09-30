@@ -128,6 +128,9 @@ QtObject {
         { label: "Bar Margin", keywords: "gap distance edge offset bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Bar Spacing", keywords: "gap between widgets buttons bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Bar Padding", keywords: "inner padding content bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
+        { label: "Tray Icon Size", keywords: "system tray systray icons scale", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.dotsNine, isIcon: true },
+        { label: "Tray Spacing", keywords: "system tray systray gap compact", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.dotsNine, isIcon: true },
+        { label: "Tray Icon Style", keywords: "system tray tint monochrome original color", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.dotsNine, isIcon: true },
         { label: "Clock Position", keywords: "center right time bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.clock, isIcon: true },
         { label: "Clock Seconds", keywords: "time seconds precise bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.clock, isIcon: true },
         { label: "Clock Date", keywords: "time day month date bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.clock, isIcon: true },
@@ -168,6 +171,8 @@ QtObject {
         
         { label: "Dashboard", keywords: "menu panel widgets dashboard", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.layout, isIcon: true },
         { label: "Dashboard Width", keywords: "size width menu dashboard", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.layout, isIcon: true },
+        { label: "Wallpaper Card Width", keywords: "wallpapers thumbnails density size grid", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.wallpapers, isIcon: true },
+        { label: "Wallpaper Names", keywords: "wallpapers filename caption label", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.wallpapers, isIcon: true },
         { label: "Dashboard Height", keywords: "size height menu dashboard", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.layout, isIcon: true },
         { label: "Dashboard Tab Rail", keywords: "tabs show hide rail dashboard", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.layout, isIcon: true },
         { label: "Dashboard Tab Position", keywords: "tabs left right top bottom rail dashboard", section: "shell", subSection: "dashboard", subLabel: "Shell > Dashboard", icon: Icons.layout, isIcon: true },

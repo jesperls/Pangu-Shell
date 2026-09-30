@@ -25,6 +25,12 @@ snapshot/restore and beginEdit/save/endEdit for Apply and Discard. Keep one
 drafting owner per file; system settings save independently. Update
 `SettingsIndex.qml` when adding a searchable setting.
 
+`scripts/wallpaper_files.py` owns regular wallpaper discovery for both the QML
+browser and thumbnail worker. Keep their file types and path normalization
+shared so previews, saved selections and folder filters refer to the same
+paths. Landscape previews use a separate `.preview.jpg` cache suffix so older
+square thumbnails regenerate without deleting user caches.
+
 ## Verification
 
 ```sh
@@ -71,6 +77,15 @@ For a temporary package build, run
 consumer that exposes a `pangu` package. This leaves its lock file unchanged.
 
 ## Tests and debugging
+
+Pangu's default Wallpaper Engine dependency backports the web texture fix from
+[upstream PR #639](https://github.com/Almamu/linux-wallpaperengine/pull/639) and
+the CEF shutdown ownership fix from
+[upstream issue #680](https://github.com/Almamu/linux-wallpaperengine/issues/680).
+The patches live in `nix/linux-wallpaperengine`; remove each when the pinned
+nixpkgs package includes its fix. `pangu.wallpaperEnginePackage` exposes the renderer
+for isolated testing. To select another renderer, use
+`pangu.override { linux-wallpaperengine = yourRenderer; }`.
 
 For individual tests and shader tooling:
 

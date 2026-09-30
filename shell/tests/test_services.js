@@ -162,6 +162,97 @@ assert.ok(command.at(-1).startsWith('/tmp/space and "quote"/'));
 assert.ok(recorderContext.prepareProcess.running);
 console.log('Notification timing, clipboard request queue and recording argument tests passed');
 
+const captureEvents = [];
+const captureContext = {
+    root: {monitors: [{name: 'DP-2', x: -1000, y: 100, logicalWidth: 1000, logicalHeight: 800, scale: 1.5}],
+        errorOccurred(message) { captureEvents.push(message); },
+        imageSaved(path) { captureEvents.push(path); }, runLensScript() { captureEvents.push('lens'); }},
+    Paths: {picturesDir: '/pictures', runtimePath: name => '/runtime/' + name, script: name => '/scripts/' + name},
+    GlobalStates: {screenshotToolVisible: false}, Visibilities: {setActiveModule(name) { captureEvents.push('close:' + name); }},
+    Styling: {animDuration: 300}, initialize() {}, captureMode: 'normal', processingMode: 'normal',
+    _freezing: false, toolImagePath: '', finalPath: '', screenshotsDir: '', savedScreenName: '',
+    tempPathBase: '/runtime/freeze', getTimestamp: () => 'timestamp',
+    captureTimer: {stop() {}, restart() { captureEvents.push('scheduled'); }},
+    cropProcess: {running: false}, toolProcess: {running: false}, copyProcess: {running: false},
+    cleanupProcess: {running: false}, lensProcess: {running: false}, verifyImageProcess: {running: false},
+    LauncherActions: {ocrLangString: () => 'eng+jpn'}, console
+};
+Object.assign(captureContext, captureContext.root);
+captureContext.root = captureContext;
+serviceFunctions('Screenshot.qml', ['startCapture', 'cancelCapture', 'prepareOutput', 'saveCapture', 'processRegion', 'processMonitorScreen', 'finishCrop'], captureContext);
+captureContext.startCapture('ocr');
+assert.deepEqual(captureEvents, ['close:', 'scheduled']);
+assert.equal(captureContext.captureTimer.interval, 350);
+captureContext.processRegion(-990, 120, 20, 10);
+assert.equal(captureContext.processingMode, 'ocr');
+assert.equal(captureContext.savedScreenName, 'DP-2');
+assert.ok(captureContext.cropProcess.command.includes('30x15+15+30'));
+assert.equal(captureContext.finalPath, '/runtime/ocr_timestamp.png');
+captureContext.cancelCapture();
+assert.equal(captureContext.captureMode, 'normal');
+captureContext.finishCrop(0);
+assert.deepEqual(Array.from(captureContext.toolProcess.command), ['bash', '/scripts/ocr.sh', 'eng+jpn', '/runtime/ocr_timestamp.png']);
+assert.equal(captureContext.copyProcess.running, false);
+captureContext.cropProcess.running = false;
+captureContext.toolProcess.running = false;
+captureContext.captureMode = 'qr';
+captureContext.processMonitorScreen('DP-2');
+captureContext.cancelCapture();
+captureContext.finishCrop(0);
+assert.deepEqual(Array.from(captureContext.toolProcess.command), ['bash', '/scripts/qr_scan.sh', '/runtime/qr_timestamp.png']);
+captureContext.cropProcess.running = false;
+captureContext.toolProcess.running = false;
+captureContext.captureMode = 'lens';
+captureContext.cancelCapture();
+captureContext.processMonitorScreen('DP-2');
+assert.equal(captureContext.finalPath, '/pictures/Screenshots/Screenshot_timestamp.png');
+captureContext.finishCrop(0);
+assert.equal(captureContext.copyProcess.running, true);
+assert.equal(captureEvents.at(-1), captureContext.finalPath);
+captureContext.processingMode = 'ocr';
+captureContext.toolProcess.running = false;
+captureContext.finishCrop(1);
+assert.equal(captureContext.toolProcess.running, false);
+assert.equal(captureEvents.at(-1), 'Failed to save image');
+console.log('OCR and QR use frozen crops, preserve job routing after closing, and reset cancelled Lens captures');
+
+const popupEvents = [];
+const deferredPopup = [];
+const popupContext = {
+    root: {}, isOpen: false, visible: true, focusActive: false, popupOpacity: 0, popupScale: 0.9,
+    closeTimer: {stop() { popupEvents.push('stop'); }, restart() { popupEvents.push('closing'); }},
+    Visibilities: {registerBarPopup() { popupEvents.push('register'); }, unregisterBarPopup() { popupEvents.push('unregister'); }},
+    Qt: {callLater(callback) { deferredPopup.push(callback); }}
+};
+serviceFunctions('../components/BarPopup.qml', ['open', 'close', 'toggle'], popupContext);
+popupContext.toggle();
+assert.equal(popupContext.isOpen, true);
+assert.deepEqual(popupEvents, ['stop', 'register']);
+popupContext.close();
+deferredPopup.shift()();
+assert.equal(popupContext.focusActive, false);
+popupContext.open();
+deferredPopup.shift()();
+assert.equal(popupContext.focusActive, true);
+assert.equal(popupContext.popupOpacity, 1);
+console.log('Popups reopen during their closing animation and ignore stale focus callbacks');
+const parentPopup = {isOpen: true, focusActive: true};
+popupContext.root = popupContext;
+popupContext.parentPopup = parentPopup;
+popupContext.close();
+parentPopup.isOpen = false;
+while (deferredPopup.length) deferredPopup.shift()();
+assert.equal(parentPopup.focusActive, true);
+parentPopup.isOpen = true;
+popupContext.open();
+while (deferredPopup.length) deferredPopup.shift()();
+assert.equal(parentPopup.focusActive, false);
+popupContext.close();
+while (deferredPopup.length) deferredPopup.shift()();
+assert.equal(parentPopup.focusActive, true);
+console.log('Nested tray menus hand focus back to their open overflow owner');
+
+
 let replayNotices = 0;
 const replayContext = {
     root: {_pendingStart: true, _scanned: true, videosDir: '/tmp/Replays', active: false},
