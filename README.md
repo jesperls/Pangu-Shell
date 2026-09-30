@@ -1,18 +1,37 @@
 # Pangu Shell
 
-A standalone Quickshell desktop shell for Hyprland: bar, launcher, dashboard,
-notifications, wallpaper picker, lockscreen, screenshot and recording tools,
-clipboard, notes, macros, idle control and desktop palettes.
+A standalone desktop shell for Hyprland, built with Quickshell and packaged
+with Nix. Pangu brings the bar, launcher, dashboard and desktop tools into one
+place, with settings you can change from the shell itself.
 
-## Add to a Hyprland NixOS configuration
+## Features
 
-The integration uses Hyprland's Lua configuration API. Use a Lua-capable
-Hyprland and a Home Manager revision with `configType = "lua"`; the lock file
-pins the tested versions. Older Hyprlang-only releases are not supported.
-Pangu leaves your monitor configuration, application choices and desktop rules
-with your existing configuration unless you enable its desktop preset.
+- **Desktop:** configurable bar and dock, workspace overview, system tray and
+  notifications.
+- **Launcher and dashboard:** application search, media controls, calendar,
+  weather and system metrics.
+- **System controls:** audio, Wi-Fi, Bluetooth, brightness, power profiles and
+  idle control.
+- **Personalization:** wallpaper picker, slideshows, color schemes and palettes
+  for GTK, Qt and Kitty.
+- **Capture:** screenshots, OCR, screen recording and replay capture.
+- **Utilities:** clipboard history, notes, macros, lockscreen and power menu.
 
-Add this input (after publishing the repository):
+## Requirements
+
+The Nix integration requires a Hyprland version with the Lua configuration API
+and a Home Manager version that supports `configType = "lua"`. The revisions
+in [flake.lock](flake.lock) are the tested combination.
+
+Start with a working Hyprland session. Audio needs PipeWire; the network and
+Bluetooth controls need NetworkManager and Bluetooth services. Desktop portals
+belong in your system configuration too.
+
+## Install on NixOS
+
+These examples assume Home Manager is already integrated into your NixOS flake.
+
+Add Pangu to your flake inputs:
 
 ```nix
 inputs.pangu-shell = {
@@ -22,13 +41,15 @@ inputs.pangu-shell = {
 };
 ```
 
-Import the system module and the Home Manager module alongside your existing
-Hyprland configuration:
+Then add the modules to your NixOS configuration. Replace `alice` with your
+existing username:
 
 ```nix
 { inputs, ... }:
 {
   imports = [ inputs.pangu-shell.nixosModules.default ];
+
+  programs.hyprland.enable = true;
   programs.pangu = {
     enable = true;
     users = [ "alice" ];
@@ -36,10 +57,12 @@ Hyprland configuration:
 
   home-manager.users.alice = {
     imports = [ inputs.pangu-shell.homeManagerModules.default ];
+
     programs.pangu = {
       enable = true;
-      fonts.enable = false; # The system module installs the fonts.
+      fonts.enable = false; # The NixOS module installs the fonts.
     };
+
     wayland.windowManager.hyprland = {
       enable = true;
       configType = "lua";
@@ -48,60 +71,95 @@ Hyprland configuration:
 }
 ```
 
-No overlay or `extraSpecialArgs` is required for these modules. They build with
-the caller's package set, including any dependency overrides. The optional
-`overlays.default` supplies `pkgs.pangu` and `pkgs.ttf-phosphor-icons`.
+Rebuild your configuration and log into Hyprland. Pangu starts with the session
+through `pangu.service`. Log out and back in for new group memberships to apply.
 
-The system module provides fonts, the privileged recording helper, ydotool,
-power profiles and I2C brightness access. Your desktop must also supply its
-Hyprland session, portals, PipeWire, NetworkManager and Bluetooth services for
-those features. The `users` list grants access to the system helpers; it does
-not select which users run the shell.
+The NixOS module provides fonts, recording helpers, input automation, power
+profiles and brightness permissions. The Home Manager module installs and
+starts the shell, loads its Hyprland integration and connects GTK/Qt palettes.
+No overlay or extra module arguments are needed.
 
-The Home Manager module installs Pangu, starts `pangu.service` with
-`hyprland-session.target`, loads its Lua integration and connects GTK/Qt
-palettes. Default shell shortcuts are Super alone for launcher, Super+A for
-dashboard, Super+Tab for overview, Super+I for settings and Super+L for lock.
-Set `programs.pangu.hyprland.bindings.enable = false` to supply your own.
+To update an installed copy, run `nix flake update pangu-shell` in your NixOS
+configuration and rebuild.
 
-See [configuration](docs/configuration.md) for feature switches, the optional
-desktop preset, persistent settings and recording overrides.
+## Make it yours
 
-## Local checkout
-
-Before publishing, consume a committed local checkout:
+Open Settings with **Super + I** to adjust the shell. Wallpapers default to
+`~/Pictures/Wallpapers`. You can also set preferences through Home Manager:
 
 ```nix
-inputs.pangu-shell = {
-  url = "git+file:///home/alice/Source/Pangu-Shell";
-  inputs.nixpkgs.follows = "nixpkgs";
-  inputs.home-manager.follows = "home-manager";
+programs.pangu = {
+  wallpapers = "/srv/wallpapers";
+  theme.kitty.enable = true;
+  settings.bar.position = "top";
 };
 ```
 
-Commit Pangu edits, then run `nix flake update pangu-shell` in the consuming
-configuration. Its lock file pins a Git revision, so editing the Pangu checkout
-alone does not update the installed package. The absolute local URL works on
-the machine containing that checkout; use the GitHub URL for other machines
-after publishing. For a temporary development build, use
-`nix build --override-input pangu-shell /path/to/Pangu-Shell .#pangu` in the
-consumer; this leaves its lock file unchanged.
+Nix settings are merged when the service starts. Changes made in the UI to a
+Nix-managed value last until the next service start.
 
-## Build and develop
+By default, your existing monitor setup, application bindings and window layout
+stay with your Hyprland configuration. For Pangu's desktop bindings, window
+rules, animations and layout behavior, enable its optional preset:
 
-```sh
-nix build
-nix flake check
-nix run . -- help
+```nix
+programs.pangu.hyprland.preset.enable = true;
 ```
 
-For live development, stop the installed shell and start the checkout runner:
+See the [configuration guide](docs/configuration.md) for preset customization,
+feature switches, persistent settings and recording overrides.
+
+## Shortcuts and commands
+
+| Shortcut | Action |
+| --- | --- |
+| Super, released on its own | Launcher |
+| Super + A | Dashboard |
+| Super + Tab | Workspace overview |
+| Super + I | Settings |
+| Super + L | Lock screen |
+
+Set `programs.pangu.hyprland.bindings.enable = false` to provide your own shell
+shortcuts when using the default integration.
 
 ```sh
-systemctl --user stop pangu.service
+pangu run launcher
+pangu run dashboard
+pangu lock
+pangu reload
+pangu help
+```
+
+`pangu reload` restarts the installed service. To inspect it, use
+`systemctl --user status pangu.service`.
+
+## Develop from a checkout
+
+Run these commands inside an existing Hyprland session:
+
+```sh
+git clone https://github.com/jesperls/Pangu-Shell.git
+cd Pangu-Shell
+```
+
+If the installed service is running, stop it with
+`systemctl --user stop pangu.service`. Then start the checkout:
+
+```sh
 nix run .#dev
 ```
 
-The runner prepares shaders and uses the packaged runtime environment with
-the checkout's QML. Start the installed service again after exiting the runner.
-See [development](docs/development.md) for structure, tests and debugging.
+The runner compiles shaders and runs the checkout's QML with the packaged
+dependencies. Stop it with Ctrl+C; use `systemctl --user start pangu.service`
+to return to the installed shell.
+
+To build and check the project:
+
+```sh
+nix build
+nix fmt -- --ci
+nix flake check
+```
+
+The [development guide](docs/development.md) covers the source layout, individual
+tests, debugging and using a local checkout as a flake input.

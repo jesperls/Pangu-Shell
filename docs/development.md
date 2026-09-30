@@ -48,6 +48,30 @@ QML from the working directory's `shell/`. Pass another checkout directory as
 `pangu.service`, and compiles shader sources into ignored `.qsb` files first.
 It does not install a service or alter the consuming flake's lock file.
 
+## Use a local flake input
+
+To install from a committed checkout, use its absolute path in your consuming
+flake:
+
+```nix
+inputs.pangu-shell = {
+  url = "git+file:///home/alice/Source/Pangu-Shell";
+  inputs.nixpkgs.follows = "nixpkgs";
+  inputs.home-manager.follows = "home-manager";
+};
+```
+
+Commit your Pangu edits, then run `nix flake update pangu-shell` in the consuming
+configuration and rebuild. Its lock file pins a Git revision; editing the
+checkout alone does not update the installed package. The local URL works only
+on machines containing that checkout.
+
+For a temporary package build, run
+`nix build --override-input pangu-shell /path/to/Pangu-Shell .#pangu` in a
+consumer that exposes a `pangu` package. This leaves its lock file unchanged.
+
+## Tests and debugging
+
 For individual tests and shader tooling:
 
 ```sh
