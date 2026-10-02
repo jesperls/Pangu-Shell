@@ -108,6 +108,21 @@ Wallpaper folders accept `~/` paths and symlinked files or directories; cycles
 and hidden entries are skipped. If a collection is empty or unavailable, the
 browser uses the packaged fallback wallpapers.
 
+For Wallpaper Engine wallpapers, select a card and open **Wallpaper settings**
+(the gear button), or right-click the card. The panel reads the wallpaper's
+built-in properties and offers switches, sliders, choices, RGB color controls,
+and fields for text or file paths.
+**Apply** saves the values and restarts that wallpaper on every screen using it;
+**Discard** leaves the saved values intact. **Defaults** restores the author's
+values in the draft, ready to apply. Wallpapers without built-in properties show
+an empty state. Property support depends on the Linux Wallpaper Engine renderer.
+
+Values are saved per wallpaper directory in
+`$XDG_CONFIG_HOME/pangu/wallpaper-engine.json`. Existing custom properties from
+`Linux Wallpaper Engine/wallpaper-overrides.json` are used until superseded by
+Pangu's saved values. The source wallpaper and the other GUI's files are left
+intact. These properties are shared across screens using the same wallpaper.
+
 `RuntimeDirectory=pangu` contains transient idle and audio configs. The separate
 `pangu-session-started` marker survives service restarts to distinguish them
 from the first login. The lockscreen's PAM configuration is packaged with QML.

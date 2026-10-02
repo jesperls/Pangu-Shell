@@ -94,11 +94,10 @@ cmd_apply() {
     fi
     [ -d "$assets_dir" ] && args+=(--assets-dir "$assets_dir")
 
-    while IFS='=' read -r key value; do
-        [ -n "$key" ] && args+=(--set-property "$key=$value")
-    done < <(jq -r --arg bg "$wall_dir" \
-        '.overrides[$bg].customProperties // {} | to_entries[] | "\(.key)=\(.value)"' \
-        "$GUI_CONFIG_DIR/wallpaper-overrides.json" 2>/dev/null)
+    local property
+    while IFS= read -r -d '' property; do
+        args+=(--set-property "$property")
+    done < <(python3 "$(dirname -- "${BASH_SOURCE[0]}")/wallpaper_properties.py" arguments "$wall_dir")
 
     exec linux-wallpaperengine "${args[@]}"
 }

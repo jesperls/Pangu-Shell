@@ -31,6 +31,12 @@ shared so previews, saved selections and folder filters refer to the same
 paths. Landscape previews use a separate `.preview.jpg` cache suffix so older
 square thumbnails regenerate without deleting user caches.
 
+`scripts/wallpaper_properties.py` reads Wallpaper Engine property definitions,
+validates edits and saves per-wallpaper overrides atomically. The picker drafts
+those values in `WallpaperSettings.qml`; a successful save signals
+`WallpaperService` to restart matching renderer instances. The same helper
+merges legacy GUI properties with Pangu overrides for the renderer's arguments.
+
 ## Verification
 
 ```sh
@@ -83,7 +89,13 @@ Pangu's default Wallpaper Engine dependency backports the web texture fix from
 the CEF shutdown ownership fix from
 [upstream issue #680](https://github.com/Almamu/linux-wallpaperengine/issues/680).
 The patches live in `nix/linux-wallpaperengine`; remove each when the pinned
-nixpkgs package includes its fix. `pangu.wallpaperEnginePackage` exposes the renderer
+nixpkgs package includes its fix. The web property bridge patch also delivers
+typed defaults and CLI overrides to `wallpaperPropertyListener` after the main
+page loads, including listeners registered later by asynchronous scripts.
+Its tests verify payload types, delayed listeners and rendered colors under
+Xvfb. The `wallpaper-engine` flake check runs the real renderer with a synthetic
+web wallpaper and software OpenGL, without Steam assets or an active desktop.
+`pangu.wallpaperEnginePackage` exposes the renderer
 for isolated testing. To select another renderer, use
 `pangu.override { linux-wallpaperengine = yourRenderer; }`.
 

@@ -43,6 +43,7 @@ Singleton {
     property var weTitles: ({})  // dir -> title from project.json
     property string wallpaperEngineDir: wallpaperConfig.adapter.wallpaperEnginePath || (Paths.home + "/.local/share/Steam/steamapps/workshop/content/431960")
     property string weScriptPath: Paths.script("wallpaperengine.sh")
+    signal engineSettingsChanged(string path)
     property bool _regularScanDone: false
     property bool _weScanDone: false
 

@@ -589,8 +589,12 @@ try {
     }));
     fs.writeFileSync(path.join(configDir, 'wallpaper-overrides.json'), JSON.stringify({overrides: {
         [background]: {audioProcessing: false, disableMouse: false, volume: 0,
-            customProperties: {caption: 'literal $value; with spaces'}}
+            customProperties: {caption: 'legacy caption', bloom: true, inherited: 'keep'}}
     }}));
+    fs.mkdirSync(path.join(engineDirectory, 'pangu'));
+    fs.writeFileSync(path.join(engineDirectory, 'pangu/wallpaper-engine.json'), JSON.stringify({
+        [background]: {caption: 'literal $value; with spaces', bloom: false, speed: 0}
+    }));
     const bash = spawnSync('bash', ['-c', 'command -v bash'], {encoding: 'utf8'}).stdout.trim();
     fs.writeFileSync(path.join(engineDirectory, 'linux-wallpaperengine'),
         `#!${bash}\nprintf '%s\\n' "$$" "$@"\n`, {mode: 0o755});
@@ -608,6 +612,9 @@ try {
     assert.ok(args.includes('--no-fullscreen-pause'));
     assert.ok(!args.includes('--disable-mouse'));
     assert.equal(args[args.indexOf('--set-property') + 1], 'caption=literal $value; with spaces');
+    assert.ok(args.includes('bloom=0'));
+    assert.ok(args.includes('speed=0'));
+    assert.ok(args.includes('inherited=keep'));
 } finally {
     fs.rmSync(engineDirectory, {recursive: true});
 }

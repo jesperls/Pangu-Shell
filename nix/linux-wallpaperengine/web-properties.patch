@@ -1,0 +1,145 @@
+Deliver Wallpaper Engine web user properties after the main page loads.
+
+diff --git a/src/WallpaperEngine/Render/Wallpapers/CWeb.cpp b/src/WallpaperEngine/Render/Wallpapers/CWeb.cpp
+--- a/src/WallpaperEngine/Render/Wallpapers/CWeb.cpp
++++ b/src/WallpaperEngine/Render/Wallpapers/CWeb.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "WallpaperEngine/Data/Model/Project.h"
+ #include "WallpaperEngine/Data/Model/Wallpaper.h"
++#include "WallpaperEngine/WebBrowser/CEF/WebProperties.h"
+ 
+ using namespace WallpaperEngine::Render;
+ using namespace WallpaperEngine::Render::Wallpapers;
+@@ -29,7 +30,12 @@
+     // documentaion says that 60 fps is maximum value
+     browserSettings.windowless_frame_rate = std::max (60, context.getApp ().getContext ().settings.render.maximumFPS);
+ 
+-    this->m_client = new WebBrowser::CEF::BrowserClient (m_renderHandler);
++    const auto projectJSON = nlohmann::json::parse (this->getWeb ().project.assetLocator->readString ("project.json"));
++    const auto definitions = projectJSON.value ("general", nlohmann::json::object ()).value (
++        "properties", nlohmann::json::object ()
++    );
++    const auto properties = webProperties (definitions, context.getApp ().getContext ().settings.general.properties);
++    this->m_client = new WebBrowser::CEF::BrowserClient (m_renderHandler, webPropertyScript (properties));
+     // use the custom scheme for the wallpaper's files
+     const std::string htmlURL = WPSchemeHandlerFactory::generateSchemeName (this->getWeb ().project.workshopId)
+ 	+ "://root/" + this->getWeb ().filename;
+diff --git a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp b/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp
+--- a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp
++++ b/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp
+@@ -1,7 +1,15 @@
+ #include "BrowserClient.h"
++#include "include/cef_frame.h"
+ 
+ using namespace WallpaperEngine::WebBrowser::CEF;
+ 
+-BrowserClient::BrowserClient (CefRefPtr<CefRenderHandler> ptr) : m_renderHandler (std::move (ptr)) { }
++BrowserClient::BrowserClient (CefRefPtr<CefRenderHandler> ptr, std::string propertyScript) :
++    m_renderHandler (std::move (ptr)), m_propertyScript (std::move (propertyScript)) { }
+ 
+-CefRefPtr<CefRenderHandler> BrowserClient::GetRenderHandler () { return m_renderHandler; }
+\ No newline at end of file
++CefRefPtr<CefRenderHandler> BrowserClient::GetRenderHandler () { return m_renderHandler; }
++
++void BrowserClient::OnLoadEnd (CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) {
++    if (frame->IsMain ()) {
++        frame->ExecuteJavaScript (this->m_propertyScript, frame->GetURL (), 0);
++    }
++}
+diff --git a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h b/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h
+--- a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h
++++ b/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h
+@@ -1,20 +1,28 @@
+ #pragma once
+ 
+ #include "include/cef_client.h"
++#include "include/cef_load_handler.h"
++#include <string>
+ 
+ namespace WallpaperEngine::WebBrowser::CEF {
+ // *************************************************************************
+ //! \brief Provide access to browser-instance-specific callbacks. A single
+ //! CefClient instance can be shared among any number of browsers.
+ // *************************************************************************
+-class BrowserClient : public CefClient {
++class BrowserClient : public CefClient, public CefLoadHandler {
+ public:
+-    explicit BrowserClient (CefRefPtr<CefRenderHandler> ptr);
++    explicit BrowserClient (CefRefPtr<CefRenderHandler> ptr, std::string propertyScript);
++
++    CefRefPtr<CefLoadHandler> GetLoadHandler () override { return this; }
++    void OnLoadEnd (CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) override;
+ 
+     [[nodiscard]] CefRefPtr<CefRenderHandler> GetRenderHandler () override;
+ 
+     CefRefPtr<CefRenderHandler> m_renderHandler = nullptr;
+ 
+     IMPLEMENT_REFCOUNTING (BrowserClient);
++
++private:
++    std::string m_propertyScript;
+ };
+ } // namespace WallpaperEngine::WebBrowser::CEF
+\ No newline at end of file
+diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h
+--- /dev/null
++++ b/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h
+@@ -0,0 +1,57 @@
++#pragma once
++
++#include <map>
++#include <string>
++#include <nlohmann/json.hpp>
++
++namespace WallpaperEngine::WebBrowser::CEF {
++inline nlohmann::json webProperties (
++    const nlohmann::json& definitions, const std::map<std::string, std::string>& overrides
++) {
++    auto result = nlohmann::json::object ();
++    for (const auto& [name, definition] : definitions.items ()) {
++        if (!definition.is_object () || !definition.contains ("value")) continue;
++        auto property = definition;
++        const auto override = overrides.find (name);
++        if (override != overrides.end ()) {
++            const auto type = definition.value ("type", "");
++            const auto& value = override->second;
++            if (type == "bool") {
++                property["value"] = value == "1" || value == "true";
++            } else if (type == "slider") {
++                property["value"] = std::stod (value);
++            } else if (type == "combo") {
++                for (const auto& option : definition.at ("options")) {
++                    const auto& candidate = option.at ("value");
++                    if ((candidate.is_string () ? candidate.get<std::string> () : candidate.dump ()) == value) {
++                        property["value"] = candidate;
++                        break;
++                    }
++                }
++            } else {
++                property["value"] = value;
++            }
++        }
++        result[name] = std::move (property);
++    }
++    return result;
++}
++
++inline std::string webPropertyScript (const nlohmann::json& properties) {
++    // The listener may be installed asynchronously after the page load callback.
++    return R"JS((function () {
++        const properties = )JS" + properties.dump (-1, ' ', true) + R"JS(;
++        function deliver() {
++            const listener = window.wallpaperPropertyListener;
++            if (!listener || typeof listener.applyUserProperties !== "function") return false;
++            listener.applyUserProperties(properties);
++            return true;
++        }
++        if (!deliver()) {
++            const timer = setInterval(function () {
++                if (deliver()) clearInterval(timer);
++            }, 100);
++        }
++    })(); )JS";
++}
++}

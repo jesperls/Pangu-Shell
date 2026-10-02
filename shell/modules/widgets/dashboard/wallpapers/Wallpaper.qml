@@ -430,6 +430,13 @@ PanelWindow {
 
                 Component.onDestruction: weApplyProcess.running = false
 
+                Connections {
+                    target: WallpaperService
+                    function onEngineSettingsChanged(path) {
+                        if (path === sourceFile) reapply();
+                    }
+                }
+
                 Process {
                     id: weApplyProcess
                     running: false

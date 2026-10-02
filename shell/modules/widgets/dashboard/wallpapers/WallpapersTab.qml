@@ -49,6 +49,12 @@ FocusScope {
     readonly property int wallpaperMargin: 6
     readonly property bool showNames: Config.dashboard.wallpaperShowNames ?? true
     property string selectedPath: ""
+    property string settingsPath: ""
+    readonly property bool selectedIsEngine: selectedPath !== "" && GlobalStates.wallpaperManager?.getFileType(selectedPath) === "wallpaperengine"
+
+    function openWallpaperSettings(path) {
+        if (GlobalStates.wallpaperManager?.getFileType(path) === "wallpaperengine") settingsPath = path;
+    }
 
     property var focusableElements: [
         {
@@ -79,6 +85,13 @@ FocusScope {
             id: "filters",
             focusFunc: function () {
                 wallpapersFilterBar.focusFilters();
+            }
+        },
+        {
+            id: "wallpaperSettings",
+            focusFunc: function () {
+                if (selectedIsEngine) settingsButton.forceActiveFocus();
+                else focusSearch();
             }
         }
     ]
@@ -222,6 +235,7 @@ FocusScope {
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
+        visible: wallpapersTabRoot.settingsPath === ""
 
         RowLayout {
             Layout.fillWidth: true
@@ -383,6 +397,17 @@ FocusScope {
             }
 
             Item { Layout.fillWidth: true }
+            ToggleButton {
+                id: settingsButton
+                visible: wallpapersTabRoot.selectedIsEngine
+                buttonIcon: Icons.gear
+                tooltipText: "Wallpaper settings"
+                Accessible.name: tooltipText
+                onToggle: function () { wallpapersTabRoot.openWallpaperSettings(wallpapersTabRoot.selectedPath); }
+                Keys.onEscapePressed: wallpapersTabRoot.focusSearch()
+                Keys.onTabPressed: wallpapersTabRoot.focusNextElement()
+                Keys.onBacktabPressed: wallpapersTabRoot.focusPreviousElement()
+            }
             Text {
                 text: filteredWallpapers.length + (filteredWallpapers.length === 1 ? " wallpaper" : " wallpapers")
                 color: Colors.overSurfaceVariant
@@ -588,6 +613,7 @@ FocusScope {
 
                     MouseArea {
                         anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: !wallpaperGrid.isScrolling
                         cursorShape: Qt.PointingHandCursor
 
@@ -606,10 +632,14 @@ FocusScope {
                         onReleased: parent.scale = 1.0
                         onCanceled: parent.scale = 1.0
 
-                        onClicked: {
+                        onClicked: mouse => {
                             if (wallpaperGrid.isScrolling)
                                 return;
                             setSelectedIndex(index);
+                            if (mouse.button === Qt.RightButton) {
+                                wallpapersTabRoot.openWallpaperSettings(modelData);
+                                return;
+                            }
                             if (GlobalStates.wallpaperManager) {
                                 if (isPerScreen && currentScreenName !== "") {
                                     GlobalStates.wallpaperManager.setWallpaper(modelData, currentScreenName);
@@ -623,7 +653,9 @@ FocusScope {
                     StyledToolTip {
                         show: wallpaperCard.isHovered && !wallpaperGrid.isScrolling
                         tooltipText: GlobalStates.wallpaperManager?.getDisplayName(wallpaperCard.modelData) ?? ""
-                        description: wallpaperCard.isCurrentWallpaper ? "Current wallpaper" : "Click to apply"
+                        description: GlobalStates.wallpaperManager?.getFileType(wallpaperCard.modelData) === "wallpaperengine"
+                            ? "Click to apply · Right-click for settings"
+                            : wallpaperCard.isCurrentWallpaper ? "Current wallpaper" : "Click to apply"
                     }
 
                     Behavior on color {
@@ -642,6 +674,18 @@ FocusScope {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    Loader {
+        anchors.fill: parent
+        active: wallpapersTabRoot.settingsPath !== ""
+        sourceComponent: WallpaperSettings {
+            wallpaperPath: wallpapersTabRoot.settingsPath
+            onClosed: {
+                wallpapersTabRoot.settingsPath = "";
+                wallpapersTabRoot.focusSearch();
             }
         }
     }

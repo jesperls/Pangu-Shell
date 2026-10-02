@@ -82,6 +82,24 @@ let
 in
 {
   package = pangu;
+  wallpaper-engine =
+    pkgs.runCommand "pangu-wallpaper-engine-check"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.xvfb-run
+          pkgs.imagemagick
+          pkgs.dbus
+        ];
+      }
+      ''
+        export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri
+        export LD_LIBRARY_PATH=${pkgs.mesa}/lib
+        dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- \
+          xvfb-run -a -s "-screen 0 320x240x24 -nolisten tcp" \
+          python3 ${./linux-wallpaperengine/test-rendering.py} ${lib.getExe pangu.wallpaperEnginePackage}
+        touch "$out"
+      '';
   home-manager =
     assert valid plain && valid preset && valid overrides && valid disabled && valid manual;
     assert !invalid.success;

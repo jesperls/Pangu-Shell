@@ -198,6 +198,10 @@ Item {
 ''')
             for name in ("ControlChip.qml", "StyledToolTip.qml"):
                 shutil.copy(SHELL / "modules/components" / name, components / name)
+            with (components / "qmldir").open("a") as stream:
+                stream.write("ToggleButton 1.0 ToggleButton.qml\n")
+            (components / "ToggleButton.qml").write_text('import QtQuick.Controls\nButton { property string buttonIcon; property string tooltipText; property var onToggle; onClicked: onToggle() }\n')
+            (gallery / "WallpaperSettings.qml").write_text('import QtQuick\nItem { property string wallpaperPath; signal closed }\n')
             (gallery / "SearchInput.qml").write_text('''import QtQuick
 Item {
     height: 48
@@ -932,6 +936,96 @@ Item {
     }
 }
 ''')
+
+    def test_wallpaper_settings_load_edit_reset_and_save_all_control_types(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-wallpaper-ui-") as directory:
+            root = Path(directory)
+            for name in ("config", "modules/theme", "modules/components", "wallpapers", "project"):
+                (root / name).mkdir(parents=True)
+            project = root / "project"
+            (project / "project.json").write_text(json.dumps({"general": {"properties": {
+                "bloom": {"type": "bool", "value": True},
+                "speed": {"type": "slider", "value": 1, "min": 0, "max": 2, "step": 0.1},
+                "mode": {"type": "combo", "value": 0, "options": [{"label": "First", "value": 0}, {"label": "Second", "value": 1}]},
+                "tint": {"type": "color", "value": "1 0 0"},
+                "caption": {"type": "textinput", "value": ""},
+                "file": {"type": "file", "value": "texture.jpg"}
+            }}}))
+            shutil.copy(SHELL / "modules/widgets/dashboard/wallpapers/WallpaperSettings.qml", root / "wallpapers")
+            (root / "wallpapers/qmldir").write_text("WallpaperSettings 1.0 WallpaperSettings.qml\nsingleton WallpaperService 1.0 WallpaperService.qml\n")
+            (root / "wallpapers/WallpaperService.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property int updates: 0
+    property string updatedPath: ""
+    signal engineSettingsChanged(string path)
+    onEngineSettingsChanged: path => { updates++; updatedPath = path; }
+    function getDisplayName(path) { return "Test wallpaper"; }
+}
+''')
+            config = root / "config"
+            (config / "qmldir").write_text("singleton Config 1.0 Config.qml\nsingleton Paths 1.0 Paths.qml\n")
+            (config / "Config.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property var theme: ({font: "Sans", monoFont: "Monospace", fontSize: 12}) }\n')
+            (config / "Paths.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { function script(name) { return ' + json.dumps(str(SHELL / "scripts") + "/") + ' + name; } }\n')
+            theme = root / "modules/theme"
+            (theme / "qmldir").write_text("singleton Styling 1.0 Styling.qml\nsingleton Colors 1.0 Colors.qml\nsingleton Icons 1.0 Icons.qml\n")
+            (theme / "Styling.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { function radius(n) { return 8; } function fontSize(n) { return 12 + n; } }\n')
+            (theme / "Colors.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property color overBackground: "white"; property color overSurfaceVariant: "gray"; property color primary: "orange"; property color overPrimary: "black"; property color red: "red"; property color outline: "gray"; property color surfaceBright: "gray" }\n')
+            shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
+            components = root / "modules/components"
+            (components / "qmldir").write_text("StyledRect 1.0 StyledRect.qml\nControlChip 1.0 ControlChip.qml\n")
+            (components / "StyledRect.qml").write_text('import QtQuick\nRectangle { property string variant; property color item: "white" }\n')
+            shutil.copy(SHELL / "modules/components/ControlChip.qml", components / "ControlChip.qml")
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import "wallpapers"
+ShellRoot {
+    FloatingWindow {
+        visible: true; implicitWidth: 700; implicitHeight: 600
+        WallpaperSettings { id: settings; anchors.fill: parent; wallpaperPath: PROJECT_PATH }
+    }
+    function find(item, name) {
+        if (item.objectName === name) return item;
+        for (const child of item.children || []) { const match = find(child, name); if (match) return match; }
+        return null;
+    }
+    property int step: 0
+    Timer {
+        interval: 100; repeat: true; running: true
+        onTriggered: {
+            if (settings.loading || settings.saving) return;
+            if (step === 0) {
+                if (settings.error || settings.dirty || settings.properties.length !== 6)
+                    console.log("CHECK_FAILED initial load " + settings.error);
+                find(settings, "setting-bloom").clicked();
+                const slider = find(settings, "setting-speed"); slider.value = 0; slider.moved();
+                find(settings, "setting-mode").currentIndex = 1;
+                find(settings, "setting-mode").activated(1);
+                const color = find(settings, "setting-tint"); color.text = "#00ff00"; color.editingFinished();
+                if (settings.values.bloom !== "0" || settings.values.speed !== "0" || settings.values.mode !== "1" || settings.values.tint !== "0 1 0")
+                    console.log("CHECK_FAILED controls " + JSON.stringify(settings.values));
+                settings.defaults();
+                if (settings.dirty) console.log("CHECK_FAILED reset");
+                settings.editHex("tint", "invalid");
+                if (!settings.error) console.log("CHECK_FAILED invalid color");
+                settings.editHex("tint", "#0000ff");
+                const caption = find(settings, "setting-caption"); caption.text = "hello world"; caption.textEdited();
+                settings.edit("speed", 0);
+                settings.apply();
+                step++;
+            } else {
+                if (settings.error || settings.dirty || WallpaperService.updates !== 1 || WallpaperService.updatedPath !== settings.wallpaperPath)
+                    console.log("CHECK_FAILED save " + settings.error);
+                console.log("CHECK_PASSED"); Qt.quit();
+            }
+        }
+    }
+}
+'''.replace("PROJECT_PATH", json.dumps(str(project))), {"XDG_CONFIG_HOME": str(root / "userconfig")})
+            saved = json.loads((root / "userconfig/pangu/wallpaper-engine.json").read_text())
+            self.assertEqual(saved[str(project)]["speed"], "0")
+            self.assertEqual(saved[str(project)]["tint"], "0 0 1")
+            self.assertEqual(saved[str(project)]["caption"], "hello world")
 
     def run_scene(self, root, scene, extra_env=None):
         (root / "runtime").mkdir(mode=0o700, exist_ok=True)
