@@ -95,6 +95,8 @@ page loads, including listeners registered later by asynchronous scripts.
 Its tests verify payload types, delayed listeners and rendered colors under
 Xvfb. The `wallpaper-engine` flake check runs the real renderer with a synthetic
 web wallpaper and software OpenGL, without Steam assets or an active desktop.
+Use `xvfb-run -a` for manual renderer tests too. Avoid `Xvfb -displayfd` in an
+active desktop: probing low display numbers can remove a live Xwayland socket.
 `pangu.wallpaperEnginePackage` exposes the renderer
 for isolated testing. To select another renderer, use
 `pangu.override { linux-wallpaperengine = yourRenderer; }`.
