@@ -63,7 +63,7 @@ Singleton {
     }
 
     Variants {
-        model: ToplevelManager.toplevels
+        model: [...ToplevelManager.toplevels.values]
         Connections {
             required property var modelData
             target: modelData

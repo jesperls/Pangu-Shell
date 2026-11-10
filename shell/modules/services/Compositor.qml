@@ -388,7 +388,7 @@ end`, reply => {
     }
 
     Variants {
-        model: Hyprland.toplevels
+        model: [...Hyprland.toplevels.values]
         Connections {
             required property var modelData
             target: modelData
@@ -397,7 +397,7 @@ end`, reply => {
     }
 
     Variants {
-        model: Hyprland.monitors
+        model: [...Hyprland.monitors.values]
         Connections {
             required property var modelData
             target: modelData
@@ -406,7 +406,7 @@ end`, reply => {
     }
 
     Variants {
-        model: Hyprland.workspaces
+        model: [...Hyprland.workspaces.values]
         Connections {
             required property var modelData
             target: modelData

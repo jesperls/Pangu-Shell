@@ -1049,7 +1049,7 @@ ShellRoot {
             self.fail((error.stdout or b"").decode() + (error.stderr or b"").decode())
         log = result.stdout + result.stderr
         self.assertEqual(result.returncode, 0, log)
-        for error in ("TypeError", "ReferenceError", "Binding loop", "CHECK_FAILED", "Cannot assign", "Unable to assign"):
+        for error in ("TypeError", "ReferenceError", "Binding loop", "CHECK_FAILED", "Cannot assign", "Unable to assign", "Non list data"):
             self.assertNotIn(error, log)
         self.assertIn("CHECK_PASSED", log)
 
