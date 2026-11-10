@@ -78,7 +78,7 @@ Item {
                 }
 
                 StyledToolTip {
-                    visible: muteButton.hovered
+                    show: muteButton.hovered
                     tooltipText: root.isMuted ? "Unmute" : "Mute"
                 }
             }
@@ -89,6 +89,7 @@ Item {
                 Layout.preferredHeight: 20
                 value: root.volume
                 scroll: false
+                tooltipText: `${Math.round(effectiveValue * 100)}%`
                 progressColor: {
                     if (root.isMuted)
                         return Colors.outline;
@@ -97,9 +98,9 @@ Item {
                     return Styling.srItem("overprimary");
                 }
 
-                onValueChanged: {
-                    if (root.node?.audio && Math.abs(value - root.volume) > 0.001) {
-                        Audio.setNodeVolume(root.node, value);
+                onMoved: newValue => {
+                    if (root.node?.audio) {
+                        Audio.setNodeVolume(root.node, newValue);
                     }
                 }
 
@@ -135,7 +136,7 @@ Item {
                 color: Colors.warning
 
                 StyledToolTip {
-                    visible: parent.visible && protectionIndicatorMa.containsMouse
+                    show: parent.visible && protectionIndicatorMa.containsMouse
                     tooltipText: "Volume protection active"
                 }
 
@@ -147,7 +148,7 @@ Item {
             }
 
             Text {
-                text: `${Math.round(root.volume * 100)}%`
+                text: `${Math.round(volumeSlider.effectiveValue * 100)}%`
                 font.family: Config.theme.font
                 font.pixelSize: Styling.fontSize(-2)
                 color: Colors.overSurfaceVariant

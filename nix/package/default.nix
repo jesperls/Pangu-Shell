@@ -51,6 +51,7 @@
   systemd,
   tesseract,
   tmux,
+  wireplumber,
   wl-clipboard,
   wlsunset,
   wtype,
@@ -75,6 +76,21 @@
 }:
 
 let
+  qmlEnv = buildEnv {
+    name = "pangu-qml";
+    paths = [
+      kdePackages.qtmultimedia
+      kdePackages.syntax-highlighting
+      qt6.qtdeclarative
+      qt6.qtimageformats
+      qt6.qtsvg
+    ];
+    pathsToLink = [
+      "/lib/qt-6/qml"
+      "/lib/qt-6/plugins"
+    ];
+  };
+
   src = stdenvNoCC.mkDerivation {
     name = "pangu-shell";
     src = lib.cleanSourceWith {
@@ -111,6 +127,10 @@ let
     checkPhase = ''
       runHook preCheck
 
+      export QML2_IMPORT_PATH="${qmlEnv}/lib/qt-6/qml''${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+      export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
+      export QT_PLUGIN_PATH="${qmlEnv}/lib/qt-6/plugins''${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+
       node tests/test_services.js
       PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
       python3 -m compileall -q scripts
@@ -141,21 +161,6 @@ let
       patchShebangs "$out/scripts"
       runHook postInstall
     '';
-  };
-
-  qmlEnv = buildEnv {
-    name = "pangu-qml";
-    paths = [
-      kdePackages.qtmultimedia
-      kdePackages.syntax-highlighting
-      qt6.qtdeclarative
-      qt6.qtimageformats
-      qt6.qtsvg
-    ];
-    pathsToLink = [
-      "/lib/qt-6/qml"
-      "/lib/qt-6/plugins"
-    ];
   };
 
   runtimeInputs = [
@@ -201,6 +206,7 @@ let
     systemd # systemctl, loginctl
     (tesseract.override { enableLanguages = ocrLanguages; })
     tmux # the dashboard's tmux tab drives real sessions
+    wireplumber
     wl-clipboard
     wlsunset
     wtype
@@ -215,24 +221,28 @@ in
 writeShellApplication {
   name = "pangu";
 
-  inherit runtimeInputs;
+  runtimeInputs = [ ]; # captured into PANGU_USER_PATH below before prepending internal tools
 
   text = ''
+    export PANGU_USER_PATH="''${PATH:-}"
+    export PANGU_USER_QT_PLUGIN_PATH="''${QT_PLUGIN_PATH-__UNSET__}"
+    export PANGU_USER_QML2_IMPORT_PATH="''${QML2_IMPORT_PATH-__UNSET__}"
+    export PANGU_USER_QML_IMPORT_PATH="''${QML_IMPORT_PATH-__UNSET__}"
+    export PATH="${lib.makeBinPath runtimeInputs}''${PATH:+:$PATH}"
+
     shellRoot="''${PANGU_SHELL_DIR:-${src}}"
     version=${lib.escapeShellArg version}
     export PANGU_VERSION="$version"
 
-    # hypridle invokes pangu through PATH.
     pangu_bin="$(dirname -- "$(readlink -f -- "$0")")"
-    export PATH="$pangu_bin''${PATH:+:$PATH}"
+    export PATH="$pangu_bin''${PATH:+:$PATH}" # hypridle invokes pangu through PATH
 
     export QML2_IMPORT_PATH="${qmlEnv}/lib/qt-6/qml''${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
     export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
     export QT_PLUGIN_PATH="${qmlEnv}/lib/qt-6/plugins''${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
 
     if [ -d /run/wrappers/bin ]; then
-      # Prefer the privileged screen-recorder wrapper.
-      export PATH="/run/wrappers/bin:$PATH"
+      export PATH="/run/wrappers/bin:$PATH" # prefer setcap gpu-screen-recorder wrapper
     fi
   ''
   + builtins.readFile ./cli.sh;

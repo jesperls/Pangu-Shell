@@ -13,6 +13,7 @@ ActionGrid {
 
     QtObject {
         id: recordAction
+        property string name: "record"
         property string icon: ScreenRecorder.isRecording ? Icons.stop : Icons.recordScreen
         property string text: ScreenRecorder.isRecording ? ScreenRecorder.duration : ""
         property string tooltip: ScreenRecorder.isRecording ? "Stop Recording" : "Screen Recorder"
@@ -23,6 +24,7 @@ ActionGrid {
 
     QtObject {
         id: replayAction
+        property string name: "replay"
         property string icon: Icons.rewind
         property string tooltip: ReplayService.active ? "Stop Replay Buffer" : "Replay Buffer"
         property string command: ""
@@ -32,6 +34,7 @@ ActionGrid {
 
     QtObject {
         id: saveReplayAction
+        property string name: "saveReplay"
         property string icon: Icons.clip
         property string tooltip: "Save Replay"
         property string command: ""
@@ -46,11 +49,13 @@ ActionGrid {
 
     property var allActions: [
         {
+            name: "screenshot",
             icon: Icons.camera,
             tooltip: "Screenshot",
             command: ""
         },
         {
+            name: "openScreenshots",
             icon: Icons.screenshots,
             tooltip: "Open Screenshots",
             command: ""
@@ -62,6 +67,7 @@ ActionGrid {
         replayAction,
         saveReplayAction,
         {
+            name: "openRecordings",
             icon: Icons.recordings,
             tooltip: "Open Recordings",
             command: ""
@@ -70,31 +76,37 @@ ActionGrid {
             type: "separator"
         },
         {
+            name: "colorPicker",
             icon: Icons.picker,
             tooltip: "Color Picker",
             command: ""
         },
         {
+            name: "ocr",
             icon: Icons.textT,
             tooltip: "OCR",
             command: ""
         },
         {
+            name: "qr",
             icon: Icons.qrCode,
             tooltip: "QR Code",
             command: ""
         },
         {
+            name: "lens",
             icon: Icons.google,
             tooltip: "Google Lens",
             command: ""
         },
         {
+            name: "mirror",
             icon: GlobalStates.mirrorWindowVisible ? Icons.webcamSlash : Icons.webcam,
             tooltip: "Mirror",
             command: ""
         },
         {
+            name: "macros",
             icon: Icons.keyboard,
             tooltip: "Macros & Hotkeys",
             command: ""
@@ -108,18 +120,20 @@ ActionGrid {
     }
 
     onActionTriggered: action => {
-        if (action.tooltip === "Screenshot") {
+        switch (action.name) {
+        case "screenshot":
             Screenshot.startCapture();
-            root.itemSelected();
-        } else if (action.tooltip === "Screen Recorder") {
-            ScreenRecorder.initialize();
-            GlobalStates.screenRecordReplayMode = false;
-            GlobalStates.screenRecordToolVisible = true;
-            root.itemSelected();
-        } else if (action.tooltip === "Stop Recording") {
-            ScreenRecorder.toggleRecording();
-            root.itemSelected();
-        } else if (action.tooltip === "Replay Buffer" || action.tooltip === "Stop Replay Buffer") {
+            break;
+        case "record":
+            if (ScreenRecorder.isRecording) {
+                ScreenRecorder.toggleRecording();
+            } else {
+                ScreenRecorder.initialize();
+                GlobalStates.screenRecordReplayMode = false;
+                GlobalStates.screenRecordToolVisible = true;
+            }
+            break;
+        case "replay":
             if (ReplayService.active) {
                 ReplayService.stop();
             } else {
@@ -127,34 +141,37 @@ ActionGrid {
                 GlobalStates.screenRecordReplayMode = true;
                 GlobalStates.screenRecordToolVisible = true;
             }
-            root.itemSelected();
-        } else if (action.tooltip === "Save Replay") {
+            break;
+        case "saveReplay":
             ReplayService.saveClip();
-            root.itemSelected();
-        } else if (action.tooltip === "Open Screenshots") {
+            break;
+        case "openScreenshots":
             root.openFolder("PICTURES", "Screenshots");
-            root.itemSelected();
-        } else if (action.tooltip === "Open Recordings") {
+            break;
+        case "openRecordings":
             root.openFolder("VIDEOS", "Recordings");
-            root.itemSelected();
-        } else if (action.tooltip === "Color Picker") {
+            break;
+        case "colorPicker":
             ApplicationLauncher.launchCommand(["python3", Paths.script("colorpicker.py")]);
-            root.itemSelected();
-        } else if (action.tooltip === "OCR") {
+            break;
+        case "ocr":
             Screenshot.startCapture("ocr");
-            root.itemSelected();
-        } else if (action.tooltip === "QR Code") {
+            break;
+        case "qr":
             Screenshot.startCapture("qr");
-            root.itemSelected();
-        } else if (action.tooltip === "Google Lens") {
+            break;
+        case "lens":
             Screenshot.startCapture("lens");
-            root.itemSelected();
-        } else if (action.tooltip === "Mirror") {
+            break;
+        case "mirror":
             GlobalStates.mirrorWindowVisible = !GlobalStates.mirrorWindowVisible;
-            root.itemSelected();
-        } else if (action.tooltip === "Macros & Hotkeys") {
+            break;
+        case "macros":
             GlobalShortcuts.toggleMacros();
-            root.itemSelected();
+            break;
+        default:
+            return;
         }
+        root.itemSelected();
     }
 }

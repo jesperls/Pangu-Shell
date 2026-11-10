@@ -33,6 +33,7 @@ QtObject {
             case "notes": toggleLauncherWithPrefix(4, Config.prefix.notes + " "); break;
 
             case "dashboard": toggleDashboardTab(0); break;
+            case "wallpaper":
             case "wallpapers": toggleDashboardTab(1); break;
             case "dashboard-widgets": toggleDashboardTab(0); break;
             case "dashboard-wallpapers": toggleDashboardTab(1); break;
@@ -193,6 +194,10 @@ QtObject {
     function seekActivePlayer(offset) {
         const player = MprisController.activePlayer;
         if (!player || !player.canSeek) {
+            return;
+        }
+        if (typeof player.seek === "function") {
+            player.seek(offset);
             return;
         }
 

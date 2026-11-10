@@ -25,10 +25,13 @@ Singleton {
                 font: "Inter",
                 srBarBg: { gradient: [["surfaceDim", 0.0], ["surfaceContainerLow", 1.0]], opacity: 1.0, border: ["surfaceBright", 0] }
             },
-            bar: { position: "top", height: 0, pillStyle: "default", clockPosition: "right", launcherPosition: "start", flatButtons: false, showWorkspaces: true, launcherIcon: Icons.cube, launcherIconTint: false, launcherIconSize: 24, use12hFormat: false },
-            dock: { enabled: false, theme: "default", position: "bottom" },
-            notch: { theme: "default", position: "top", keepHidden: false },
+            bar: { position: "top", height: 0, style: "floating", margin: 4, spacing: 4, padding: 4, pillStyle: "default", clockPosition: "right", launcherPosition: "start", flatButtons: false, showWorkspaces: true, launcherIcon: Icons.cube, launcherIconTint: false, launcherIconSize: 24, use12hFormat: false, containBar: false, splitOnCenteredLayout: true },
+            workspaces: { shown: 10, showAppIcons: true, alwaysShowNumbers: false, showNumbers: false, dynamic: false },
+            dock: { enabled: false, theme: "default", position: "bottom", keepHidden: false },
+            notch: { theme: "default", position: "top", keepHidden: false, splitSide: "left" },
             overview: { enabled: true, layout: "standard", rows: 2, columns: 5 },
+            dashboard: { showTabRail: true, tabPosition: "left" },
+            osd: { position: "bottom", showPercentage: true, showSlider: true, iconStyle: "chip", width: 260 },
             lockscreen: { position: "bottom" },
             compositor: { gapsIn: 2, gapsOut: 4, borderSize: 2, syncRoundness: true }
         }
@@ -100,7 +103,7 @@ Singleton {
         let list = userPresets.filter(p => p.id !== id);
         list.push(preset);
         presetsFile.adapter.presets = list;
-        presetsFile.writeAdapter();
+        presetsFile.saveAdapter();
         return id;
     }
 
@@ -109,7 +112,7 @@ Singleton {
             return false;
         const list = userPresets.filter(p => p.id !== id);
         presetsFile.adapter.presets = list;
-        presetsFile.writeAdapter();
+        presetsFile.saveAdapter();
         return true;
     }
 

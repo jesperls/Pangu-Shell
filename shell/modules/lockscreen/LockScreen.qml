@@ -4,11 +4,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
-import Quickshell.Io
-import Quickshell.Services.Pam
 import Quickshell.Wayland
 import qs.modules.components
 import qs.modules.corners
+import qs.modules.services
 import qs.modules.theme
 import qs.modules.globals
 import qs.modules.widgets.dashboard.widgets
@@ -18,7 +17,8 @@ WlSessionLockSurface {
     id: root
 
     property bool startAnim: false
-    property bool authenticating: false
+    readonly property bool authenticating: LockscreenService.authenticating
+    readonly property bool isPrimaryScreen: Quickshell.screens.length <= 1 || root.screen === Quickshell.screens[0]
 
     color: "transparent"
 
@@ -281,14 +281,14 @@ WlSessionLockSurface {
             Text {
                 id: usernameText
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: usernameCollector.text.trim()
+                text: LockscreenService.currentUser
                 font.family: Config.theme.font
                 font.pixelSize: Styling.fontSize(2)
                 font.weight: Font.Normal
                 color: Colors.overSurfaceVariant
                 antialiasing: true
                 opacity: startAnim ? 1 : 0
-                visible: (Config.lockscreen.showUsername ?? true) && usernameCollector.text.trim() !== ""
+                visible: (Config.lockscreen.showUsername ?? true) && LockscreenService.currentUser !== ""
 
                 Behavior on opacity {
                     enabled: Styling.animDuration > 0
@@ -311,7 +311,7 @@ WlSessionLockSurface {
     Item {
         id: playerContainer
         z: 10
-        visible: Config.lockscreen.showMediaPlayer ?? true
+        visible: (Config.lockscreen.showMediaPlayer ?? true) && root.isPrimaryScreen
 
         property bool isTopPosition: Config.lockscreen.position === "top"
 
@@ -436,7 +436,7 @@ WlSessionLockSurface {
                         mipmap: true
                         id: userAvatar
                         anchors.fill: parent
-                        source: GlobalStates.hasAvatar ? "file://" + Paths.avatar : ""
+                        source: GlobalStates.hasAvatar ? "file://" + Paths.avatar + (GlobalStates.avatarCacheBuster ? "?t=" + GlobalStates.avatarCacheBuster : "") : ""
                         fillMode: Image.PreserveAspectCrop
                         smooth: true
                         asynchronous: true
@@ -472,7 +472,7 @@ WlSessionLockSurface {
                     width: parent.width - (avatarContainer.visible ? avatarContainer.width + parent.spacing : 0)
                     height: 48
                     anchors.verticalCenter: parent.verticalCenter
-                    variant: passwordInputBox.showError ? "error" : "common"
+                    variant: (passwordInputBox.showError || LockscreenService.showError) ? "error" : "common"
                     radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
 
                     RowLayout {
@@ -522,15 +522,15 @@ WlSessionLockSurface {
                             id: passwordInput
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
-                            placeholderText: usernameCollector.text.trim()
-                            placeholderTextColor: Qt.rgba(passwordFieldBg.item.r, passwordFieldBg.item.g, passwordFieldBg.item.b, 0.5)
+                            placeholderText: LockscreenService.showError && LockscreenService.errorMessage ? LockscreenService.errorMessage : LockscreenService.currentUser
+                            placeholderTextColor: Qt.rgba(passwordFieldBg.item.r, passwordFieldBg.item.g, passwordFieldBg.item.b, LockscreenService.showError ? 0.85 : 0.5)
                             font.family: Config.theme.font
                             font.pixelSize: Styling.fontSize(0)
                             color: passwordFieldBg.item
                             background: null
                             echoMode: TextInput.Password
                             verticalAlignment: TextInput.AlignVCenter
-                            enabled: !authenticating
+                            enabled: !root.authenticating
 
                             Behavior on color {
                                 enabled: Styling.animDuration > 0
@@ -548,15 +548,23 @@ WlSessionLockSurface {
                                 }
                             }
 
+                            onTextEdited: {
+                                if (text.length > 0 && LockscreenService.showError)
+                                    LockscreenService.clearError();
+                            }
+
+                            Keys.onEscapePressed: {
+                                passwordInput.text = "";
+                                LockscreenService.clearError();
+                            }
+
                             onAccepted: {
-                                if (passwordInput.text.trim() === "")
+                                if (passwordInput.text.length === 0)
                                     return;
 
-                                authPasswordHolder.password = passwordInput.text;
+                                const submitted = passwordInput.text;
                                 passwordInput.text = "";
-
-                                authenticating = true;
-                                pamAuth.start();
+                                LockscreenService.authenticate(submitted);
                             }
                         }
                     }
@@ -601,8 +609,8 @@ WlSessionLockSurface {
                 ScriptAction {
                     script: {
                         passwordInput.text = "";
-                        authenticating = false;
                         passwordInputBox.showError = false;
+                        passwordInput.forceActiveFocus();
                     }
                 }
             }
@@ -617,58 +625,29 @@ WlSessionLockSurface {
         }
     }
 
-    Process {
-        id: usernameProc
-        command: ["whoami"]
-        running: true
-
-        stdout: StdioCollector {
-            id: usernameCollector
-            waitForEnd: true
-        }
-    }
-
-    QtObject {
-        id: authPasswordHolder
-        property string password: ""
-    }
-
-    PamContext {
-        id: pamAuth
-        configDirectory: Paths.shellDir + "/config/pam"
-        config: "password.conf"
-
-        onPamMessage: {
-            console.log("PAM Message:", this.message, "Type:", this.messageType, "Required:", this.responseRequired);
-            if (this.responseRequired) {
-                this.respond(authPasswordHolder.password);
-            }
-        }
-
-        onCompleted: result => {
-            authPasswordHolder.password = "";
-
-            if (result === PamResult.Success) {
-                startAnim = false;
-
+    Connections {
+        target: LockscreenService
+        function onUnlocked() {
+            root.startAnim = false;
+            if (root.isPrimaryScreen)
                 unlockTimer.start();
-
-                authenticating = false;
+        }
+        function onAuthFailed() {
+            passwordInput.text = "";
+            if (Styling.animDuration > 0) {
+                wrongPasswordAnim.start();
             } else {
-                console.warn("PAM auth failed with result:", result);
-                if (Styling.animDuration > 0) {
-                    wrongPasswordAnim.start();
-                } else {
-                    passwordInput.text = "";
-                    authenticating = false;
-                    passwordInputBox.showError = false;
-                }
+                passwordInputBox.showError = false;
+                passwordInput.forceActiveFocus();
             }
         }
     }
+
+    readonly property bool showScreenCorners: (Config.theme.enableCorners ?? true) && Config.roundness > 0
 
     RoundCorner {
         id: topLeft
+        visible: root.showScreenCorners
         size: Styling.radius(4)
         anchors.left: parent.left
         anchors.top: parent.top
@@ -678,6 +657,7 @@ WlSessionLockSurface {
 
     RoundCorner {
         id: topRight
+        visible: root.showScreenCorners
         size: Styling.radius(4)
         anchors.right: parent.right
         anchors.top: parent.top
@@ -687,6 +667,7 @@ WlSessionLockSurface {
 
     RoundCorner {
         id: bottomLeft
+        visible: root.showScreenCorners
         size: Styling.radius(4)
         anchors.left: parent.left
         anchors.bottom: parent.bottom
@@ -696,6 +677,7 @@ WlSessionLockSurface {
 
     RoundCorner {
         id: bottomRight
+        visible: root.showScreenCorners
         size: Styling.radius(4)
         anchors.right: parent.right
         anchors.bottom: parent.bottom

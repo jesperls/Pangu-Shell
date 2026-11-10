@@ -21,7 +21,7 @@ Item {
 
     RoundCorner {
         id: topLeft
-        visible: !root.hasFullscreenWindow
+        visible: !root.hasFullscreenWindow && !root.frameEnabled
         size: root.cornerSize
         anchors.left: root.left
         anchors.top: root.top
@@ -30,7 +30,7 @@ Item {
 
     RoundCorner {
         id: topRight
-        visible: !root.hasFullscreenWindow
+        visible: !root.hasFullscreenWindow && !root.frameEnabled
         size: root.cornerSize
         anchors.right: root.right
         anchors.top: root.top
@@ -39,7 +39,7 @@ Item {
 
     RoundCorner {
         id: bottomLeft
-        visible: !root.hasFullscreenWindow
+        visible: !root.hasFullscreenWindow && !root.frameEnabled
         size: root.cornerSize
         anchors.left: root.left
         anchors.bottom: root.bottom
@@ -48,7 +48,7 @@ Item {
 
     RoundCorner {
         id: bottomRight
-        visible: !root.hasFullscreenWindow
+        visible: !root.hasFullscreenWindow && !root.frameEnabled
         size: root.cornerSize
         anchors.right: root.right
         anchors.bottom: root.bottom

@@ -92,7 +92,8 @@ QtObject {
     function setHidden(item, hidden) { hiddenIds = hidden ? [item.id] : []; }
 }
 ''')
-            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\nsingleton Paths 1.0 Paths.qml\n")
+            shutil.copy(SHELL / "config/Paths.qml", root / "config/Paths.qml")
             (root / "config/Config.qml").write_text('''pragma Singleton
 import QtQuick
 QtObject {
@@ -108,7 +109,7 @@ QtObject {
             shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
             components = root / "modules/components"
             (components / "qmldir").write_text("StyledRect 1.0 StyledRect.qml\nStyledToolTip 1.0 StyledToolTip.qml\nTinted 1.0 Tinted.qml\nBarPopup 1.0 BarPopup.qml\nControlChip 1.0 ControlChip.qml\n")
-            (components / "StyledRect.qml").write_text('import QtQuick\nItem { property real radius; property color color; property string variant: "common"; property color item: "white"; property real topLeftRadius; property real topRightRadius; property real bottomLeftRadius; property real bottomRightRadius; default property alias contentData: bodyContent.data; property Item body: Item { id: bodyContent; parent: root; anchors.fill: parent }; id: root }\n')
+            (components / "StyledRect.qml").write_text('import QtQuick\nItem { property real radius; property color color; property string variant: "common"; property bool enableShadow: false; property color item: "white"; property real topLeftRadius; property real topRightRadius; property real bottomLeftRadius; property real bottomRightRadius; default property alias contentData: bodyContent.data; property Item body: Item { id: bodyContent; parent: root; anchors.fill: parent }; id: root }\n')
             shutil.copy(SHELL / "modules/components/StyledToolTip.qml", components / "StyledToolTip.qml")
             shutil.copy(SHELL / "modules/components/ControlChip.qml", components / "ControlChip.qml")
             (components / "Tinted.qml").write_text('import QtQuick\nItem { property var sourceItem; property bool active; property bool fullTint }\n')
@@ -597,8 +598,15 @@ ShellRoot {
             "singleton GlobalStates 1.0 GlobalStates.qml\n"
             "singleton WallpaperService 1.0 WallpaperService.qml\n"
             "singleton Visibilities 1.0 Visibilities.qml\n"
+            "singleton Audio 1.0 Audio.qml\n"
+            "singleton Brightness 1.0 Brightness.qml\n"
         )
-        for name, body in (("WallpaperService", ""), ("Visibilities", "function getForActive() { return null; }")):
+        for name, body in (
+            ("WallpaperService", ""),
+            ("Visibilities", "function getForActive() { return null; }"),
+            ("Audio", "signal volumeChanged(real volume, bool muted, var node); signal micVolumeChanged(real volume, bool muted, var node)"),
+            ("Brightness", "property bool syncBrightness: true; signal brightnessChanged(real value, var screen)"),
+        ):
             (globals_dir / f"{name}.qml").write_text(f"pragma Singleton\nimport QtQuick\nQtObject {{ {body} }}\n")
 
     def test_theme_drafts_and_presets_track_new_fields_and_preserve_objects(self):
@@ -1136,7 +1144,8 @@ ShellRoot {
             root = Path(directory)
             for folder in ("config", "modules/services", "modules/globals"):
                 (root / folder).mkdir(parents=True)
-            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\nsingleton Paths 1.0 Paths.qml\n")
+            shutil.copy(SHELL / "config/Paths.qml", root / "config/Paths.qml")
             (root / "config/Config.qml").write_text('''pragma Singleton
 import QtQuick
 QtObject {
@@ -1307,6 +1316,166 @@ ShellRoot {
             const registered = Object.keys(Visibilities.screens).length;
             console.log(absent === null && registered === Quickshell.screens.length
                 ? "CHECK_PASSED" : "CHECK_FAILED");
+            Qt.quit();
+        }
+    }
+}
+''')
+
+    def test_styled_slider_preserves_external_value_binding_across_moves(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-slider-") as directory:
+            root = Path(directory)
+            for folder in ("config", "modules/theme", "modules/components"):
+                (root / folder).mkdir(parents=True)
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
+            (root / "config/Config.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property QtObject theme: QtObject {
+        property int animDuration: 0
+        property string font: "Sans"
+        property string monoFont: "Monospace"
+        property int fontSize: 12
+    }
+}
+''')
+            theme = root / "modules/theme"
+            (theme / "qmldir").write_text("singleton Styling 1.0 Styling.qml\nsingleton Colors 1.0 Colors.qml\nsingleton Icons 1.0 Icons.qml\n")
+            (theme / "Styling.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property int animDuration: 0; function radius(n) { return 8; } function fontSize(n) { return 12 + n; } function srItem(n) { return "white"; } }\n')
+            (theme / "Colors.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property color overBackground: "white"; property color surfaceBright: "gray"; property color overSurfaceVariant: "gray"; property color primary: "orange" }\n')
+            shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
+            components = root / "modules/components"
+            for name in ("StyledSlider.qml", "StyledToolTip.qml"):
+                shutil.copy(SHELL / f"modules/components/{name}", components / name)
+            (components / "CarouselProgress.qml").write_text(
+                'import QtQuick\nItem { property real frequency; property color color; property real amplitudeMultiplier; property real lineWidth; property real fullLength; property bool active }\n'
+            )
+            (components / "StyledRect.qml").write_text(
+                'import QtQuick\nRectangle { property string variant: "common"; property color item: "white" }\n'
+            )
+            (components / "qmldir").write_text(
+                "StyledSlider 1.0 StyledSlider.qml\n"
+                "StyledToolTip 1.0 StyledToolTip.qml\n"
+                "CarouselProgress 1.0 CarouselProgress.qml\n"
+                "StyledRect 1.0 StyledRect.qml\n"
+            )
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.config
+import qs.modules.theme
+import qs.modules.components
+Item {
+    width: 240; height: 40
+    property real modelValue: 0.25
+    property real lastMoved: -1
+    StyledSlider {
+        id: slider
+        width: 200; height: 20
+        resizeParent: false
+        value: modelValue
+        onMoved: newValue => {
+            lastMoved = newValue;
+            modelValue = Math.min(0.8, newValue);
+        }
+    }
+    Timer {
+        interval: 120; running: true
+        onTriggered: {
+            slider.moved(0.95);
+            const clampedOk = Math.abs(slider.value - 0.8) < 0.001 && Math.abs(slider.effectiveValue - 0.8) < 0.001;
+            modelValue = 0.4;
+            const reboundOk = Math.abs(slider.value - 0.4) < 0.001 && Math.abs(lastMoved - 0.95) < 0.001;
+            console.log(clampedOk && reboundOk ? "CHECK_PASSED" : "CHECK_FAILED");
+            Qt.quit();
+        }
+    }
+}
+''')
+
+    def test_pomodoro_service_synchronizes_multiple_views(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-pomodoro-") as directory:
+            root = Path(directory)
+            for folder in ("config", "modules/theme", "modules/components", "modules/services", "clock"):
+                (root / folder).mkdir(parents=True)
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\nsingleton Paths 1.0 Paths.qml\n")
+            (root / "config/Config.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+    property QtObject theme: QtObject {
+        property int animDuration: 0
+        property string font: "Sans"
+        property string monoFont: "Monospace"
+        property int fontSize: 12
+    }
+    property QtObject system: QtObject {
+        property QtObject pomodoro: QtObject {
+            property int workTime: 1500
+            property int restTime: 300
+            property bool autoStart: false
+            property bool syncSpotify: false
+        }
+    }
+}
+''')
+            (root / "config/Paths.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject { function assetUrl(name) { return "file://" + '
+                + json.dumps(str(SHELL / "assets") + "/")
+                + ' + name; } }\n'
+            )
+            theme = root / "modules/theme"
+            (theme / "qmldir").write_text("singleton Styling 1.0 Styling.qml\nsingleton Colors 1.0 Colors.qml\nsingleton Icons 1.0 Icons.qml\n")
+            (theme / "Styling.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property int animDuration: 0; function radius(n) { return 8; } function fontSize(n) { return 12 + n; } function srItem(n) { return "white"; } }\n')
+            (theme / "Colors.qml").write_text('pragma Singleton\nimport QtQuick\nQtObject { property color overBackground: "white"; property color outline: "gray"; property color surfaceBright: "gray"; property color background: "black" }\n')
+            shutil.copy(SHELL / "modules/theme/Icons.qml", theme / "Icons.qml")
+            services = root / "modules/services"
+            shutil.copy(SHELL / "modules/services/PomodoroService.qml", services / "PomodoroService.qml")
+            (services / "MprisController.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { property var filteredPlayers: [] }
+''')
+            (services / "Notifications.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { function notifyInternal(payload) {} }
+''')
+            (services / "Compositor.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { property var focusedMonitor: ({name: "DP-2"}) }
+''')
+            (services / "qmldir").write_text(
+                "singleton PomodoroService 1.0 PomodoroService.qml\n"
+                "singleton MprisController 1.0 MprisController.qml\n"
+                "singleton Notifications 1.0 Notifications.qml\n"
+                "singleton Compositor 1.0 Compositor.qml\n"
+            )
+            components = root / "modules/components"
+            (components / "StyledRect.qml").write_text(
+                'import QtQuick\nItem { id: root; property string variant: "common"; property bool enableShadow: false; property real radius: 0; property color color: "transparent"; property color item: "white"; default property alias contentData: body.data; property Item content: Item { id: body; parent: root; anchors.fill: parent } }\n'
+            )
+            (components / "qmldir").write_text("StyledRect 1.0 StyledRect.qml\n")
+            shutil.copy(SHELL / "modules/bar/clock/Pomodoro.qml", root / "clock/Pomodoro.qml")
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.config
+import qs.modules.theme
+import qs.modules.services
+import "clock"
+ShellRoot {
+    property int openedOnPrimary: 0
+    property int openedOnSecondary: 0
+    Item {
+        Pomodoro { id: first; screenName: "DP-2"; onRequestPopupOpen: openedOnPrimary++ }
+        Pomodoro { id: second; screenName: "DP-3"; onRequestPopupOpen: openedOnSecondary++ }
+    }
+    Timer {
+        interval: 150; running: true
+        onTriggered: {
+            PomodoroService.setSeconds(900);
+            PomodoroService.start();
+            const runningSynced = first.isRunning && second.isRunning && first.timeLeft === second.timeLeft;
+            PomodoroService.pause();
+            PomodoroService.requestPopupOpen();
+            const routedToFocused = !first.isRunning && !second.isRunning && openedOnPrimary === 1 && openedOnSecondary === 0;
+            console.log(runningSynced && routedToFocused ? "CHECK_PASSED" : "CHECK_FAILED");
             Qt.quit();
         }
     }

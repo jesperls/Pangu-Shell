@@ -27,8 +27,8 @@ Rectangle {
     focus: true
 
     property int leftPanelWidth: isCompact ? 464 : 300
-    property int currentTab: GlobalStates.widgetsTabCurrentIndex  // 0=launcher, 1=clip, 2=emoji, 3=tmux, 4=notes
-    property bool prefixDisabled: false  // Flag to prevent re-activation after backspace
+    property int currentTab: GlobalStates.widgetsTabCurrentIndex
+    property bool prefixDisabled: false
 
     onCurrentTabChanged: {
         GlobalStates.widgetsTabCurrentIndex = currentTab;
@@ -56,7 +56,7 @@ Rectangle {
             let focused = false;
             if (currentTab === 0) {
                 appLauncher.focusSearchInput();
-                focused = true;  // Apps launcher is usually always ready
+                focused = true;
             } else {
                 let loader = internalStack.itemAt(currentTab - 1);
                 if (loader && loader.item && loader.item.focusSearchInput) {
@@ -266,6 +266,20 @@ Rectangle {
             }
             
             appLauncher.loadedCount = initialBatch;
+
+            if (newApps.length > 0 && appLauncher.selectedIndex < 0) {
+                GlobalStates.launcherSelectedIndex = 0;
+                appLauncher.selectedIndex = 0;
+                resultsList.currentIndex = 0;
+            } else if (newApps.length === 0) {
+                GlobalStates.launcherSelectedIndex = -1;
+                appLauncher.selectedIndex = -1;
+                resultsList.currentIndex = -1;
+            } else if (appLauncher.selectedIndex >= newApps.length) {
+                GlobalStates.launcherSelectedIndex = 0;
+                appLauncher.selectedIndex = 0;
+                resultsList.currentIndex = 0;
+            }
             
             if (appLauncher.loadedCount < newApps.length) {
                 incrementalLoader.start();
@@ -396,12 +410,8 @@ Rectangle {
             if (index < 0 || index >= appsModel.count)
                 return;
 
-            var itemY = 0;
-            for (var i = 0; i < index; i++) {
-                itemY += 48;  // All items before are collapsed (base height)
-            }
-
-            var listHeight = 36 * 3;
+            var itemY = index * 48;
+            var listHeight = 36 * 2;
             var expandedHeight = 48 + 4 + listHeight + 8;
 
             var maxContentY = Math.max(0, resultsList.contentHeight - resultsList.height);
@@ -444,19 +454,16 @@ Rectangle {
 
                     resultsList.enableScrollAnimation = false;
 
-                    if (text.length > 0) {
+                    if (appsModel.count > 0) {
                         GlobalStates.launcherSelectedIndex = 0;
                         appLauncher.selectedIndex = 0;
                         resultsList.currentIndex = 0;
-
-                        resultsList.contentY = 0;
                     } else {
                         GlobalStates.launcherSelectedIndex = -1;
                         appLauncher.selectedIndex = -1;
                         resultsList.currentIndex = -1;
-
-                        resultsList.contentY = 0;
                     }
+                    resultsList.contentY = 0;
 
                     Qt.callLater(() => {
                         resultsList.enableScrollAnimation = true;
@@ -517,7 +524,7 @@ Rectangle {
 
                 onDownPressed: {
                     if (appLauncher.expandedItemIndex >= 0) {
-                        if (appLauncher.selectedOptionIndex < 2) {
+                        if (appLauncher.selectedOptionIndex < 1) {
                             appLauncher.selectedOptionIndex++;
                             appLauncher.keyboardNavigation = true;
                         }
@@ -633,7 +640,7 @@ Rectangle {
                         for (var i = 0; i < currentIndex && i < appsModel.count; i++) {
                             var itemHeight = 48;
                             if (i === appLauncher.expandedItemIndex) {
-                                var listHeight = 36 * 3;
+                                var listHeight = 36 * 2;
                                 itemHeight = 48 + 4 + listHeight + 8;
                             }
                             itemY += itemHeight;
@@ -641,7 +648,7 @@ Rectangle {
 
                         var currentItemHeight = 48;
                         if (currentIndex === appLauncher.expandedItemIndex) {
-                            var listHeight = 36 * 3;
+                            var listHeight = 36 * 2;
                             currentItemHeight = 48 + 4 + listHeight + 8;
                         }
 
@@ -657,6 +664,7 @@ Rectangle {
                 }
 
                 delegate: Rectangle {
+                    id: delegateRoot
                     required property string appId
                     required property string appName
                     required property string appIcon
@@ -667,12 +675,20 @@ Rectangle {
                     required property int index
 
                     property bool isExpanded: index === appLauncher.expandedItemIndex
+                    property bool reusing: false
+
+                    ListView.onReused: {
+                        reusing = true;
+                        Qt.callLater(() => {
+                            reusing = false;
+                        });
+                    }
 
                     width: resultsList.width
                     height: {
                         let baseHeight = 48;
                         if (isExpanded) {
-                            var listHeight = 36 * 3;
+                            var listHeight = 36 * 2;
                             return baseHeight + 4 + listHeight + 8;
                         }
                         return baseHeight;
@@ -681,7 +697,7 @@ Rectangle {
                     radius: 16
 
                     Behavior on height {
-                        enabled: Styling.animDuration > 0
+                        enabled: Styling.animDuration > 0 && !delegateRoot.reusing
                         NumberAnimation {
                             duration: Styling.animDuration
                             easing.type: Easing.OutQuart
@@ -866,7 +882,7 @@ Rectangle {
 
                         ClippingRectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 36 * 3
+                            Layout.preferredHeight: 36 * 2
                             color: Colors.background
                             radius: Styling.radius(0)
 
@@ -1021,7 +1037,7 @@ Rectangle {
                     height: {
                         let baseHeight = 48;
                         if (resultsList.currentIndex === appLauncher.expandedItemIndex) {
-                            var listHeight = 36 * 3;
+                            var listHeight = 36 * 2;
                             return baseHeight + 4 + listHeight + 8;
                         }
                         return baseHeight;
@@ -1032,7 +1048,7 @@ Rectangle {
                         for (var i = 0; i < resultsList.currentIndex && i < appsModel.count; i++) {
                             var itemHeight = 48;
                             if (i === appLauncher.expandedItemIndex) {
-                                var listHeight = 36 * 3;
+                                var listHeight = 36 * 2;
                                 itemHeight = 48 + 4 + listHeight + 8;
                             }
                             yPos += itemHeight;

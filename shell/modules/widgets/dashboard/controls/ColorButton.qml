@@ -13,8 +13,8 @@ StyledRect {
     required property string currentColor
     property string label: ""
 
-    property bool circlePreview: false  // Use circular preview (for dot colors)
-    property bool compact: false  // Compact mode for tighter spaces
+    property bool circlePreview: false
+    property bool compact: false
     property string dialogTitle: "Select Color"
 
     signal colorSelected(string color)

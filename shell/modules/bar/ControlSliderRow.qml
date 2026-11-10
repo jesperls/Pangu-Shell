@@ -13,6 +13,8 @@ Item {
 
     property string icon: ""
     property real sliderValue: 0
+    property real _dragValue: 0
+    readonly property real effectiveValue: mouseArea.pressed ? _dragValue : sliderValue
     property color progressColor: Styling.srItem("overprimary")
     property bool wavy: false
     property real wavyAmplitude: 0.8
@@ -105,10 +107,10 @@ Item {
             Layout.preferredHeight: 20
             Layout.alignment: Qt.AlignVCenter
 
-            property real animatedProgress: root.sliderValue
+            property real animatedProgress: Math.max(0, Math.min(1, root.effectiveValue))
 
             Behavior on animatedProgress {
-                enabled: Styling.animDuration > 0
+                enabled: Styling.animDuration > 0 && !mouseArea.pressed
                 NumberAnimation {
                     duration: Styling.animDuration
                     easing.type: Easing.OutQuart
@@ -183,8 +185,9 @@ Item {
             }
 
             StyledToolTip {
-                tooltipText: `${Math.round(root.sliderValue * 100)}%`
-                visible: mouseArea.pressed
+                delay: 0
+                tooltipText: `${Math.round(root.effectiveValue * 100)}%`
+                show: mouseArea.pressed
                 x: dragHandle.x + dragHandle.width / 2 - width / 2
                 y: dragHandle.y - height - 5
             }
@@ -196,29 +199,27 @@ Item {
                 preventStealing: true
 
                 function calculateValue(mouseX: real): real {
+                    if (sliderContainer.width <= 0)
+                        return root.sliderValue;
                     return Math.max(0, Math.min(1, mouseX / sliderContainer.width));
                 }
 
                 onPressed: mouse => {
-                    root.sliderValue = calculateValue(mouse.x);
-                    root.valueChanged(root.sliderValue);
+                    root._dragValue = calculateValue(mouse.x);
+                    root.valueChanged(root._dragValue);
                 }
 
                 onPositionChanged: mouse => {
                     if (pressed) {
-                        root.sliderValue = calculateValue(mouse.x);
-                        root.valueChanged(root.sliderValue);
+                        root._dragValue = calculateValue(mouse.x);
+                        root.valueChanged(root._dragValue);
                     }
                 }
 
                 onWheel: wheel => {
                     const step = 0.05;
-                    if (wheel.angleDelta.y > 0) {
-                        root.sliderValue = Math.min(1, root.sliderValue + step);
-                    } else {
-                        root.sliderValue = Math.max(0, root.sliderValue - step);
-                    }
-                    root.valueChanged(root.sliderValue);
+                    const next = wheel.angleDelta.y > 0 ? Math.min(1, root.sliderValue + step) : Math.max(0, root.sliderValue - step);
+                    root.valueChanged(next);
                 }
             }
         }

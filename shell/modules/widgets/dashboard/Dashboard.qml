@@ -289,18 +289,8 @@ NotchAnimationBehavior {
                 width: root.tabWidth
                 height: root.tabWidth
                 radius: Styling.radius(4)
-                variant: controlsButton.hovered ? "focus" : "common"
+                variant: GlobalStates.settingsWindowVisible ? (controlsButton.hovered ? "primaryfocus" : "primary") : (controlsButton.hovered ? "focus" : "common")
                 z: -1
-
-                opacity: GlobalStates.settingsWindowVisible ? 0 : 1
-
-                Behavior on opacity {
-                    enabled: Styling.animDuration > 0
-                    NumberAnimation {
-                        duration: Styling.animDuration
-                        easing.type: Easing.OutCubic
-                    }
-                }
             }
 
             Button {
@@ -367,13 +357,6 @@ NotchAnimationBehavior {
 
                 property int currentIndex: root.state.currentTab
 
-                Connections {
-                    target: GlobalStates
-                    function onDashboardCurrentTabChanged() {
-                        stack.navigateToTab(root.visibleIndexOf(GlobalStates.dashboardCurrentTab));
-                    }
-                }
-
                 function navigateToTab(index) {
                     if (index >= 0 && index < root.tabCount && index !== root.state.currentTab) {
                         if (root.componentIndexOf(root.state.currentTab) === 0 && root.componentIndexOf(index) !== 0) {
@@ -400,10 +383,15 @@ NotchAnimationBehavior {
                     
                     opacity: visible ? 1 : 0
                     transform: Translate {
-                        y: visible ? 0 : (root.state.currentTab > root.visibleIndexOf(index) ? -20 : 20)
+                        x: root.railVertical ? 0 : (visible ? 0 : (root.state.currentTab > root.visibleIndexOf(index) ? -20 : 20))
+                        y: root.railVertical ? (visible ? 0 : (root.state.currentTab > root.visibleIndexOf(index) ? -20 : 20)) : 0
+                        Behavior on x {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation { duration: Styling.animDuration; easing.type: Easing.OutQuart }
+                        }
                         Behavior on y {
-                             enabled: Styling.animDuration > 0
-                             NumberAnimation { duration: Styling.animDuration; easing.type: Easing.OutQuart }
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation { duration: Styling.animDuration; easing.type: Easing.OutQuart }
                         }
                     }
 
@@ -466,25 +454,25 @@ NotchAnimationBehavior {
                         startY = mouse.y;
                         startX = mouse.x;
                         swiping = false;
-                        mouse.accepted = false;  // Let children handle clicks
+                        mouse.accepted = false;
                     }
 
                     onPositionChanged: mouse => {
-                        let deltaY = mouse.y - startY;
-                        let deltaX = Math.abs(mouse.x - startX);
+                        let primaryDelta = root.railVertical ? (mouse.y - startY) : (mouse.x - startX);
+                        let crossDelta = root.railVertical ? Math.abs(mouse.x - startX) : Math.abs(mouse.y - startY);
 
-                        if (Math.abs(deltaY) > 20 && deltaX < 30) {
+                        if (Math.abs(primaryDelta) > 20 && crossDelta < 30) {
                             swiping = true;
                         }
                     }
 
                     onReleased: mouse => {
                         if (swiping) {
-                            let deltaY = mouse.y - startY;
+                            let primaryDelta = root.railVertical ? (mouse.y - startY) : (mouse.x - startX);
 
-                            if (deltaY < -swipeThreshold && root.state.currentTab < root.tabCount - 1) {
+                            if (primaryDelta < -swipeThreshold && root.state.currentTab < root.tabCount - 1) {
                                 stack.navigateToTab(root.state.currentTab + 1);
-                            } else if (deltaY > swipeThreshold && root.state.currentTab > 0) {
+                            } else if (primaryDelta > swipeThreshold && root.state.currentTab > 0) {
                                 stack.navigateToTab(root.state.currentTab - 1);
                             }
                         }
@@ -499,7 +487,7 @@ NotchAnimationBehavior {
     Shortcut {
         id: nextTabShortcut
         sequence: "Ctrl+Tab"
-        enabled: GlobalStates.dashboardOpen
+        enabled: GlobalStates.dashboardOpen && root.tabCount > 0
 
         onActivated: {
             let nextIndex = (root.state.currentTab + 1) % root.tabCount;
@@ -510,7 +498,7 @@ NotchAnimationBehavior {
     Shortcut {
         id: prevTabShortcut
         sequence: "Ctrl+Shift+Tab"
-        enabled: GlobalStates.dashboardOpen
+        enabled: GlobalStates.dashboardOpen && root.tabCount > 0
 
         onActivated: {
             let prevIndex = root.state.currentTab - 1;

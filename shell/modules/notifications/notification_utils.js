@@ -18,13 +18,13 @@ const getFriendlyNotifTimeString = (timestamp) => {
         }
     }
 
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays > 0) {
-        return `${diffDays}d`;
-    }
-
     if (messageTime.toDateString() === new Date(now.getTime() - 86400000).toDateString())
         return 'Yesterday';
+
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays > 0 && diffDays < 7) {
+        return `${diffDays}d`;
+    }
 
     return Qt.formatDateTime(messageTime, "MMMM dd");
 };

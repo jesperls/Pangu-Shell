@@ -89,7 +89,7 @@ Item {
     property string currentItemId: ""
     property string currentFullContent: ""
     property bool loadingLinkPreview: false
-    property int linkPreviewCacheRevision: 0  // Increments when cache updates, triggers favicon rebinding
+    property int linkPreviewCacheRevision: 0
 
     readonly property var currentSelectedItem: {
         if (selectedIndex < 0 || selectedIndex >= allItems.length)
@@ -112,7 +112,7 @@ Item {
     }
 
     property var linkPreviewData: {
-        var _rev = linkPreviewCacheRevision;  // Depend on cache revision for reactivity
+        var _rev = linkPreviewCacheRevision;
 
         if (!currentSelectedItem)
             return null;
@@ -157,7 +157,7 @@ Item {
         if (!item.isImage && !item.isFile) {
             var content = item.preview || "";
             if (ClipboardUtils.isUrl(content)) {
-                return "link"; // Special marker for URL
+                return "link";
             }
         }
 
@@ -1277,8 +1277,8 @@ Item {
                             ClippingRectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: {
-                                    var count = 4;  // Copy, Pin, Alias, Delete
-                                    if (modelData.isFile || ClipboardUtils.isUrl(modelData.preview)) {
+                                    var count = 4;
+                                    if (modelData.isFile || modelData.isImage || ClipboardUtils.isUrl(modelData.preview)) {
                                         count++;
                                     }
                                     return 36 * Math.min(3, count);
@@ -1523,7 +1523,7 @@ Item {
                                             if (iconStr === "file")
                                                 return Icons.file;
                                             if (iconStr === "link")
-                                                return Icons.globe;  // Fallback for URLs (failed favicon or no favicon)
+                                                return Icons.globe;
                                             return Icons.clip;
                                         }
                                         color: iconBackground.item
@@ -1614,6 +1614,7 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: displayText
+                                        textFormat: Text.PlainText
                                         color: textColor
                                         font.family: Config.theme.font
                                         font.pixelSize: Config.theme.fontSize
@@ -1644,7 +1645,12 @@ Item {
                                             root.newAlias = text;
                                         }
 
+                                        onTextEdited: {
+                                            root.aliasButtonIndex = 1;
+                                        }
+
                                         Component.onCompleted: {
+                                            root.aliasButtonIndex = 1;
                                             Qt.callLater(() => {
                                                 forceActiveFocus();
                                                 selectAll();
@@ -1653,16 +1659,17 @@ Item {
 
                                         Keys.onPressed: event => {
                                             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                                root.confirmAliasItem();
+                                                if (root.aliasButtonIndex === 0) {
+                                                    root.cancelAliasMode();
+                                                } else {
+                                                    root.confirmAliasItem();
+                                                }
                                                 event.accepted = true;
                                             } else if (event.key === Qt.Key_Escape) {
                                                 root.cancelAliasMode();
                                                 event.accepted = true;
-                                            } else if (event.key === Qt.Key_Left) {
-                                                root.aliasButtonIndex = 0;
-                                                event.accepted = true;
-                                            } else if (event.key === Qt.Key_Right) {
-                                                root.aliasButtonIndex = 1;
+                                            } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                                                root.aliasButtonIndex = root.aliasButtonIndex === 0 ? 1 : 0;
                                                 event.accepted = true;
                                             }
                                         }
@@ -2097,6 +2104,7 @@ Item {
 
                                         Text {
                                             text: root.linkPreviewData ? root.linkPreviewData.site_name : ""
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Styling.fontSize(-2)
                                             font.weight: Font.Medium
@@ -2109,7 +2117,7 @@ Item {
                                     ClippingRectangle {
                                         id: videoThumbnailContainer
                                         width: parent.width
-                                        height: width * 9 / 16  // 16:9 aspect ratio
+                                        height: width * 9 / 16
                                         color: Colors.surfaceBright
                                         radius: Styling.radius(-4)
                                         visible: root.linkPreviewData && root.linkPreviewData.image
@@ -2178,6 +2186,7 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: root.linkPreviewData && root.linkPreviewData.title ? root.linkPreviewData.title : ""
+                                        textFormat: Text.PlainText
                                         font.family: Config.theme.font
                                         font.pixelSize: Config.theme.fontSize + 1
                                         font.weight: Font.Bold
@@ -2191,6 +2200,7 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: root.linkPreviewData && root.linkPreviewData.description ? root.linkPreviewData.description : ""
+                                        textFormat: Text.PlainText
                                         font.family: Config.theme.font
                                         font.pixelSize: Config.theme.fontSize
                                         color: Colors.outline
@@ -2262,6 +2272,7 @@ Item {
 
                                             Text {
                                                 text: root.linkPreviewData ? root.linkPreviewData.site_name : ""
+                                                textFormat: Text.PlainText
                                                 font.family: Config.theme.font
                                                 font.pixelSize: Styling.fontSize(-2)
                                                 font.weight: Font.Medium
@@ -2274,6 +2285,7 @@ Item {
                                         Text {
                                             width: parent.width
                                             text: root.linkPreviewData && root.linkPreviewData.title ? root.linkPreviewData.title : ""
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Config.theme.fontSize + 1
                                             font.weight: Font.Bold
@@ -2287,6 +2299,7 @@ Item {
                                         Text {
                                             width: parent.width
                                             text: root.linkPreviewData && root.linkPreviewData.description ? root.linkPreviewData.description : ""
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Config.theme.fontSize
                                             color: Colors.outline
@@ -2489,6 +2502,7 @@ Item {
                                                         return url.substring(0, 40) + (url.length > 40 ? "..." : "");
                                                     }
                                                 }
+                                                textFormat: Text.PlainText
                                                 font.family: Config.theme.font
                                                 font.pixelSize: Config.theme.fontSize
                                                 font.weight: Font.Bold
@@ -2579,6 +2593,7 @@ Item {
                                         }
                                         return content;
                                     }
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize + 2
                                     font.weight: Font.Bold
@@ -2596,7 +2611,7 @@ Item {
                                         if (content.startsWith("file://")) {
                                             var filePath = content.substring(7).trim();
                                             var parts = filePath.split('/');
-                                            parts.pop();  // Remove filename
+                                            parts.pop();
                                             var decodedParts = parts.map(function (part) {
                                                 return decodeURIComponent(part);
                                             });
@@ -2604,6 +2619,7 @@ Item {
                                         }
                                         return "";
                                     }
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize - 1
                                     color: Colors.outline
@@ -2936,13 +2952,7 @@ Item {
                 event.accepted = true;
             }
         } else if (root.aliasMode) {
-            if (event.key === Qt.Key_Left) {
-                root.aliasButtonIndex = 0;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Right) {
-                root.aliasButtonIndex = 1;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 if (root.aliasButtonIndex === 0) {
                     root.cancelAliasMode();
                 } else {

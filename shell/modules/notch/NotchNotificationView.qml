@@ -30,6 +30,7 @@ Item {
     property var currentNotification: {
         return (Notifications.popupList.length > currentIndex && currentIndex >= 0) ? Notifications.popupList[currentIndex] : (Notifications.popupList.length > 0 ? Notifications.popupList[0] : null);
     }
+    property string screenName: ""
     property bool notchHovered: false
     property bool isNavigating: false
     property bool hovered: notchHovered || isNavigating
@@ -107,11 +108,11 @@ Item {
     }
 
     onHoveredChanged: {
-        if (hovered) {
-            Notifications.pauseAllTimers();
-        } else {
-            Notifications.resumeAllTimers();
-        }
+        Notifications.setScreenHovered(root.screenName, hovered && visible);
+    }
+
+    Component.onDestruction: {
+        Notifications.setScreenHovered(root.screenName, false);
     }
 
     onVisibleChanged: {
@@ -125,7 +126,11 @@ Item {
                     "notification": Notifications.popupList[currentIndex]
                 });
             }
+            if (hovered) {
+                Notifications.setScreenHovered(root.screenName, true);
+            }
         } else if (!visible) {
+            Notifications.setScreenHovered(root.screenName, false);
             if (notificationStack.depth > 0) {
                 notificationStack.clear(StackView.Immediate);
             }
@@ -423,6 +428,7 @@ Item {
                                                                 return leftTextsContainer.width - (appNameText.visible ? appNameText.width + parent.spacing : 0);
                                                             }
                                                             text: notification ? notification.summary : ""
+                                                            textFormat: Text.PlainText
                                                             font.family: Config.theme.font
                                                             font.pixelSize: Config.theme.fontSize
                                                             font.weight: Font.Bold
@@ -444,6 +450,7 @@ Item {
                                                                 return Math.min(implicitWidth, Math.max(60, availableWidth, leftTextsContainer.width * 0.3));
                                                             }
                                                             text: notification ? "• " + notification.appName : ""
+                                                            textFormat: Text.PlainText
                                                             font.family: Config.theme.font
                                                             font.pixelSize: Config.theme.fontSize
                                                             font.weight: Font.Bold
@@ -459,6 +466,7 @@ Item {
                                                     Text {
                                                         id: timestampText
                                                         text: notification ? (root.timestampUpdateCounter, NotificationUtils.getFriendlyNotifTimeString(notification.time)) : ""
+                                                        textFormat: Text.PlainText
                                                         font.family: Config.theme.font
                                                         font.pixelSize: Config.theme.fontSize
                                                         font.weight: Font.Bold
@@ -470,7 +478,8 @@ Item {
 
                                                 Text {
                                                     width: parent.width
-                                                    text: notification ? processNotificationBody(notification.body, notification.appName) : ""
+                                                    text: notification ? NotificationUtils.processNotificationBody(notification.body, notification.appName) : ""
+                                                    textFormat: Text.PlainText
                                                     font.family: Config.theme.font
                                                     font.pixelSize: Config.theme.fontSize
                                                     font.weight: notification && notification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -498,6 +507,7 @@ Item {
                                                         return parent.width - (bodyCollapsed.visible ? bodyCollapsed.width + bulletCollapsed.width + parent.spacing * 2 : 0);
                                                     }
                                                     text: notification ? notification.summary : ""
+                                                    textFormat: Text.PlainText
                                                     font.family: Config.theme.font
                                                     font.pixelSize: Config.theme.fontSize
                                                     font.weight: Font.Bold
@@ -528,7 +538,8 @@ Item {
                                                         }
                                                         return Math.min(implicitWidth, Math.max(60, availableWidth, parent.width * 0.3));
                                                     }
-                                                    text: notification ? processNotificationBody(notification.body || "").replace(/\n/g, ' ') : ""
+                                                    text: notification ? NotificationUtils.processNotificationBody(notification.body || "", notification.appName).replace(/\n/g, ' ') : ""
+                                                    textFormat: Text.PlainText
                                                     font.family: Config.theme.font
                                                     font.pixelSize: Config.theme.fontSize
                                                     font.weight: notification && notification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -672,6 +683,7 @@ Item {
 
                                             contentItem: Text {
                                                 text: parent.text
+                                                textFormat: Text.PlainText
                                                 font: parent.font
                                                 color: notchActionBg.textColor
                                                 horizontalAlignment: Text.AlignHCenter
@@ -771,27 +783,5 @@ Item {
                 }
             }
         }
-    }
-
-    function processNotificationBody(body, appName) {
-        if (!body)
-            return "";
-
-        let processedBody = body;
-
-        if (appName) {
-            const lowerApp = appName.toLowerCase();
-            const chromiumBrowsers = ["brave", "chrome", "chromium", "vivaldi", "opera", "microsoft edge"];
-
-            if (chromiumBrowsers.some(name => lowerApp.includes(name))) {
-                const lines = body.split('\n\n');
-
-                if (lines.length > 1 && lines[0].startsWith('<a')) {
-                    processedBody = lines.slice(1).join('\n\n');
-                }
-            }
-        }
-
-        return processedBody;
     }
 }

@@ -14,6 +14,19 @@ Item {
     required property WifiAccessPoint network
 
     property bool expanded: false
+    readonly property bool askingPassword: network?.askingPassword ?? false
+
+    function resetState() {
+        expanded = false;
+        passwordInput.clear();
+    }
+
+    onAskingPasswordChanged: {
+        if (askingPassword) {
+            expanded = true;
+            Qt.callLater(() => passwordInput.focusInput());
+        }
+    }
 
     implicitHeight: contentColumn.implicitHeight + 16
 
@@ -187,6 +200,9 @@ Item {
                     onClicked: {
                         if (root.network?.active) {
                             NetworkService.disconnectWifiNetwork();
+                        } else if (root.askingPassword && passwordInput.text.length > 0) {
+                            NetworkService.changePassword(root.network, passwordInput.text);
+                            passwordInput.clear();
                         } else {
                             NetworkService.connectToWifiNetwork(root.network);
                         }

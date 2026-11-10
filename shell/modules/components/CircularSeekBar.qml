@@ -1,25 +1,26 @@
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Window
 import qs.config
 import qs.modules.theme
 
 Item {
     id: root
 
-    property real value: 0  // 0.0 to 1.0
-    property real startAngleDeg: 180  // 9 o'clock
-    property real spanAngleDeg: 180  // Clockwise sweep
-    
+    property real value: 0
+    property real startAngleDeg: 180
+    property real spanAngleDeg: 180
+
     property color accentColor: Colors.primary
     property color trackColor: Colors.outline
-    
+
     property real lineWidth: 6
-    property real ringPadding: 12  // Padding from edge
-    
+    property real ringPadding: 12
+
     property bool enabled: true
-    property bool dashed: false  // Enable dashed style for progress
-    property bool dashedActive: false// Animate dashes (breathing/marquee)
-    
+    property bool dashed: false
+    property bool dashedActive: false
+
     property bool wavy: false
     property real waveAmplitude: 0
     property real waveFrequency: 0
@@ -29,39 +30,39 @@ Item {
 
     readonly property bool isDragging: mouseArea.isDragging
     property real dragValue: 0
-    
+
     property real animatedHandleOffset: isDragging ? 9 : 6
     property real animatedHandleWidth: isDragging ? lineWidth * 0.5 : lineWidth
-    Behavior on animatedHandleOffset { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-    Behavior on animatedHandleWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+    Behavior on animatedHandleOffset { enabled: Styling.animDuration > 0; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+    Behavior on animatedHandleWidth { enabled: Styling.animDuration > 0; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     property real dotSize: lineWidth
     property real baseDashLength: dotSize * 2.5
     property real targetSpacing: 6
-    
+
     property real currentDashLen: dashedActive ? baseDashLength : (baseDashLength + targetSpacing)
     property real currentGapLen: dashedActive ? targetSpacing : 0
-    
-    Behavior on currentDashLen { NumberAnimation { duration: Styling.animDuration; easing.type: Easing.InOutQuad } }
-    Behavior on currentGapLen { NumberAnimation { duration: Styling.animDuration; easing.type: Easing.InOutQuad } }
+
+    Behavior on currentDashLen { enabled: Styling.animDuration > 0; NumberAnimation { duration: Styling.animDuration; easing.type: Easing.InOutQuad } }
+    Behavior on currentGapLen { enabled: Styling.animDuration > 0; NumberAnimation { duration: Styling.animDuration; easing.type: Easing.InOutQuad } }
 
     property real phase: 0
     readonly property real cycleLength: baseDashLength + targetSpacing
-    
+
     NumberAnimation on phase {
-        running: (root.dashedActive || root.wavy) && root.visible && root.window !== null && root.window.visible
+        running: (root.dashedActive || root.wavy) && Styling.animDuration > 0 && root.visible && root.Window.window !== null && root.Window.window.visible
         from: 0
-        to: -root.cycleLength  // Move forward along path
-        duration: 1000  // Adjust speed
+        to: -root.cycleLength
+        duration: 1000
         loops: Animation.Infinite
     }
 
     property real wavePhase: 0
-    
+
     Timer {
         id: waveTimer
         interval: 32
-        running: root.wavy && root.visible && root.window !== null && root.window.visible && (root.value > 0 || root.isDragging)
+        running: root.wavy && Styling.animDuration > 0 && root.visible && root.Window.window !== null && root.Window.window.visible && (root.value > 0 || root.isDragging)
         repeat: true
         onTriggered: {
             root.wavePhase = (root.wavePhase + 0.1) % (Math.PI * 2)
@@ -82,11 +83,11 @@ Item {
 
     function generateWavyArcPoints(startDeg, endDeg, phase) {
         if (phase === undefined) phase = 0;
-        
-        if (startDeg >= endDeg - 0.1) return [];  // Too small or invalid
+
+        if (startDeg >= endDeg - 0.1) return [];
 
         let points = [];
-        let step = 0.5;  // Smooth enough for static
+        let step = 1.5;
         
         let centerX = root.width / 2;
         let centerY = root.height / 2;
@@ -224,29 +225,11 @@ Item {
         }
 
         ShapePath {
-            strokeColor: (!root.wavy) ? root.trackColor : "transparent"
+            strokeColor: root.trackColor
             strokeWidth: root.lineWidth
             strokeStyle: ShapePath.SolidLine
             capStyle: ShapePath.RoundCap
-            
-            fillColor: "transparent"
-            
-            PathAngleArc {
-                centerX: root.width / 2
-                centerY: root.height / 2
-                radiusX: root.radius
-                radiusY: root.radius
-                startAngle: root.startAngleDeg + (root.spanAngleDeg * root.effectiveValue) + root.gapAngleDeg
-                sweepAngle: Math.max(0, (root.spanAngleDeg * (1.0 - root.effectiveValue)) - root.gapAngleDeg)
-            }
-        }
 
-        ShapePath {
-            strokeColor: root.wavy ? root.trackColor : "transparent"
-            strokeWidth: root.lineWidth
-            strokeStyle: ShapePath.SolidLine
-            capStyle: ShapePath.RoundCap
-            
             fillColor: "transparent"
 
             PathAngleArc {

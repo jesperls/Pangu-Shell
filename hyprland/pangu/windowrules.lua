@@ -34,7 +34,7 @@ end
 require("pangu.shell_rules")
 
 hl.window_rule({
-  match = { title = "^(Picture-in-Picture)$" },
+  match = { title = "^(Picture-in-Picture|Picture in [Pp]icture)$" },
   float = true,
   pin = true,
   size = { 640, 360 },
@@ -59,7 +59,9 @@ if state.tearing.enable then
   end
 end
 
-hl.window_rule({ match = { title = "Sharing your screen" }, opacity = "1.0 override 1.0 override" })
-hl.window_rule({ match = { title = "sharing indicator" }, opacity = "1.0 override 1.0 override" })
+hl.window_rule({
+  match = { title = "(?i).*(sharing your screen|sharing indicator).*" },
+  opacity = "1.0 override 1.0 override",
+})
 
 return true

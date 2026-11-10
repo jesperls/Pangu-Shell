@@ -40,9 +40,9 @@ Item {
         tooltip: false
         updateOnRelease: true
 
-        onValueChanged: {
-            if (isDragging && root.player && root.player.canSeek) {
-                root.player.position = value * root.length;
+        onMoved: newValue => {
+            if (root.player && root.player.canSeek) {
+                root.player.position = newValue * root.length;
             }
         }
     }

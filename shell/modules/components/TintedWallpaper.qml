@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import qs.modules.theme
@@ -8,7 +9,7 @@ Item {
     property real radius: 0
     property bool tintEnabled: false
     property size sourceSize: Qt.size(0, 0)
-    
+
     readonly property var optimizedPalette: [
         "background", "overBackground", "shadow",
         "surface", "surfaceBright", "surfaceDim",
@@ -24,16 +25,17 @@ Item {
 
     Item {
         id: paletteSourceItem
-        visible: true 
+        visible: root.tintEnabled
         width: root.optimizedPalette.length
         height: 1
         opacity: 0
-        
+
         Row {
             anchors.fill: parent
             Repeater {
-                model: root.optimizedPalette
+                model: root.tintEnabled ? root.optimizedPalette : []
                 Rectangle {
+                    required property string modelData
                     width: 1
                     height: 1
                     color: Colors[modelData]
@@ -44,11 +46,12 @@ Item {
 
     ShaderEffectSource {
         id: paletteTextureSource
-        sourceItem: paletteSourceItem
+        sourceItem: root.tintEnabled ? paletteSourceItem : null
         hideSource: true
         visible: false
         smooth: false
         recursive: false
+        live: root.tintEnabled
     }
 
     Item {

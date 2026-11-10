@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import qs.config
 import qs.modules.theme
 
 Canvas {
@@ -14,7 +15,9 @@ Canvas {
 
     property bool animationsEnabled: true
 
-    readonly property bool shouldAnimate: running && animationsEnabled && 
+    readonly property bool shouldAnimate: running && animationsEnabled &&
+                                          (Config.performance?.wavyLine ?? true) &&
+                                          Styling.animDuration > 0 &&
                                           visible && width > 0 && opacity > 0 &&
                                           (root.Window.window?.visible ?? false)
 
@@ -41,12 +44,16 @@ Canvas {
         ctx.lineCap = "round";
         ctx.beginPath();
 
-        for (var x = ctx.lineWidth / 2; x <= root.width - ctx.lineWidth / 2; x += 1) {
+        const endX = root.width - ctx.lineWidth / 2;
+        for (var x = ctx.lineWidth / 2; x <= endX; x += 2) {
             var waveY = centerY + amp * Math.sin(freq * 2 * Math.PI * x / root.fullLength + phase);
             if (x === ctx.lineWidth / 2)
                 ctx.moveTo(x, waveY);
             else
                 ctx.lineTo(x, waveY);
+        }
+        if (endX > ctx.lineWidth / 2) {
+            ctx.lineTo(endX, centerY + amp * Math.sin(freq * 2 * Math.PI * endX / root.fullLength + phase));
         }
 
         ctx.stroke();

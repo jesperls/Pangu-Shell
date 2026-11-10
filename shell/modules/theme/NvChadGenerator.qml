@@ -11,17 +11,7 @@ QtObject {
         if (!Colors) return
 
         const fmt = (c) => c.toString()
-        const isDark = (c) => {
-            const hex = fmt(c).replace("#", "")
-            if (hex.length < 6) return true
-
-            const red = parseInt(hex.slice(0, 2), 16)
-            const green = parseInt(hex.slice(2, 4), 16)
-            const blue = parseInt(hex.slice(4, 6), 16)
-            if (Number.isNaN(red) || Number.isNaN(green) || Number.isNaN(blue)) return true
-
-            return ((red * 299 + green * 587 + blue * 114) / 1000) < 128
-        }
+        const isDark = (c) => (c.r * 299 + c.g * 587 + c.b * 114) < 500
 
         const onBackground = fmt(Colors.overBackground)
         const background = fmt(Colors.background)

@@ -247,17 +247,7 @@ Item {
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         drag.target: parent
 
-        onEntered: {
-            root.hovered = true;
-            if (root.windowData) {
-                let currentWorkspace = Compositor.focusedMonitor?.activeWorkspace?.id;
-                let windowWorkspace = root.windowData?.workspace?.id;
-
-                if (currentWorkspace && windowWorkspace && currentWorkspace === windowWorkspace) {
-                    Compositor.dispatch(`focuswindow address:${windowData.address}`);
-                }
-            }
-        }
+        onEntered: root.hovered = true
         onExited: root.hovered = false
 
         onPressed: mouse => {
@@ -356,26 +346,8 @@ Item {
         }
     }
 
-    Rectangle {
-        visible: dragArea.containsMouse && !root.Drag.active && root.windowData
-        anchors.bottom: parent.top
-        anchors.bottomMargin: 8
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: tooltipText.implicitWidth + 16
-        height: tooltipText.implicitHeight + 8
-        color: Colors.inverseSurface
-        radius: Styling.radius(0) / 2
-        opacity: 0.9
-        z: 1000
-
-        Text {
-            id: tooltipText
-            anchors.centerIn: parent
-            text: `${root.windowData?.title || ""}\n[${root.windowData?.class || ""}]${root.windowData?.xwayland ? " [XWayland]" : ""}`
-            font.family: Config.theme.font
-            font.pixelSize: 10
-            color: Colors.inverseOnSurface
-            horizontalAlignment: Text.AlignHCenter
-        }
+    StyledToolTip {
+        show: dragArea.containsMouse && !root.Drag.active && Boolean(root.windowData)
+        tooltipText: `${root.windowData?.title || ""}\n[${root.windowData?.class || ""}]${root.windowData?.xwayland ? " [XWayland]" : ""}`
     }
 }

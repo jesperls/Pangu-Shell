@@ -51,7 +51,7 @@ Item {
     readonly property bool splitSquare: splitActive && (centerGap.square ?? false)
     readonly property real stripRadius: splitSquare ? 0 : Math.min(innerRadius, stripSize / 2)
     readonly property real stripFilletSize: splitSquare ? 0 : Math.max(1, Math.min(innerRadius, stripSize))
-    readonly property color stripColor: Colors.resolve(Config.theme.srBg.gradient[0][0])
+    readonly property color stripColor: Colors.resolve((Config.theme?.srBg?.gradient?.length ?? 0) > 0 ? Config.theme.srBg.gradient[0][0] : "background")
 
     property real _barAnimProgress: barReveal ? 1.0 : 0.0
     Behavior on _barAnimProgress {
@@ -114,7 +114,7 @@ Item {
         radius: 0
         enableBorder: false
         visible: root.frameEnabled
-        layer.enabled: true
+        layer.enabled: root.frameEnabled
         layer.effect: MultiEffect {
             maskEnabled: true
             maskSource: frameMask
@@ -128,7 +128,7 @@ Item {
         id: frameMask
         anchors.fill: parent
         visible: false
-        layer.enabled: true
+        layer.enabled: root.frameEnabled
 
         readonly property real topInset: root.splitActive && root.barPos === "top" ? -root.innerRadius : root.topThickness
         readonly property real bottomInset: root.splitActive && root.barPos === "bottom" ? -root.innerRadius : root.bottomThickness

@@ -349,16 +349,11 @@ Item {
                     resizeParent: false
                     scroll: false
                     tooltip: true
-                    tooltipText: Math.round(value * 360) + "°"
-
-                    readonly property real configValue: root.variantConfig ? root.variantConfig.gradientAngle / 360 : 0
-                    onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                        value = configValue
-                    Component.onCompleted: value = configValue
-
-                    onValueChanged: {
+                    value: root.variantConfig ? root.variantConfig.gradientAngle / 360 : 0
+                    tooltipText: Math.round(effectiveValue * 360) + "°"
+                    onMoved: newValue => {
                         if (root.variantConfig) {
-                            const newAngle = Math.round(value * 360);
+                            const newAngle = Math.round(newValue * 360);
                             if (newAngle !== root.variantConfig.gradientAngle) {
                                 root.updateProp("gradientAngle", newAngle);
                             }
@@ -400,16 +395,11 @@ Item {
                         resizeParent: false
                         scroll: false
                         tooltip: true
-                        tooltipText: (value * 100).toFixed(0) + "%"
-
-                        readonly property real configValue: root.variantConfig ? root.variantConfig.gradientCenterX : 0.5
-                        onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                            value = configValue
-                        Component.onCompleted: value = configValue
-
-                        onValueChanged: {
-                            if (root.variantConfig && Math.abs(value - root.variantConfig.gradientCenterX) > 0.001) {
-                                root.updateProp("gradientCenterX", value);
+                        value: root.variantConfig ? root.variantConfig.gradientCenterX : 0.5
+                        tooltipText: (effectiveValue * 100).toFixed(0) + "%"
+                        onMoved: newValue => {
+                            if (root.variantConfig && Math.abs(newValue - root.variantConfig.gradientCenterX) > 0.001) {
+                                root.updateProp("gradientCenterX", newValue);
                             }
                         }
                     }
@@ -445,16 +435,11 @@ Item {
                         resizeParent: false
                         scroll: false
                         tooltip: true
-                        tooltipText: (value * 100).toFixed(0) + "%"
-
-                        readonly property real configValue: root.variantConfig ? root.variantConfig.gradientCenterY : 0.5
-                        onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                            value = configValue
-                        Component.onCompleted: value = configValue
-
-                        onValueChanged: {
-                            if (root.variantConfig && Math.abs(value - root.variantConfig.gradientCenterY) > 0.001) {
-                                root.updateProp("gradientCenterY", value);
+                        value: root.variantConfig ? root.variantConfig.gradientCenterY : 0.5
+                        tooltipText: (effectiveValue * 100).toFixed(0) + "%"
+                        onMoved: newValue => {
+                            if (root.variantConfig && Math.abs(newValue - root.variantConfig.gradientCenterY) > 0.001) {
+                                root.updateProp("gradientCenterY", newValue);
                             }
                         }
                     }
@@ -564,15 +549,10 @@ Item {
                             resizeParent: false
                             scroll: false
                             tooltip: false
-
-                            readonly property real configValue: root.variantConfig ? root.variantConfig.gradientAngle / 360 : 0
-                            onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                                value = configValue
-                            Component.onCompleted: value = configValue
-
-                            onValueChanged: {
+                            value: root.variantConfig ? root.variantConfig.gradientAngle / 360 : 0
+                            onMoved: newValue => {
                                 if (root.variantConfig) {
-                                    const newAngle = Math.round(value * 360);
+                                    const newAngle = Math.round(newValue * 360);
                                     if (newAngle !== root.variantConfig.gradientAngle) {
                                         root.updateProp("gradientAngle", newAngle);
                                     }
@@ -627,15 +607,10 @@ Item {
                             resizeParent: false
                             scroll: false
                             tooltip: false
-
-                            readonly property real configValue: root.variantConfig ? root.variantConfig.halftoneDotMin / 20 : 0.1
-                            onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                                value = configValue
-                            Component.onCompleted: value = configValue
-
-                            onValueChanged: {
+                            value: root.variantConfig ? root.variantConfig.halftoneDotMin / 20 : 0.1
+                            onMoved: newValue => {
                                 if (root.variantConfig) {
-                                    const newVal = value * 20;
+                                    const newVal = newValue * 20;
                                     if (Math.abs(newVal - root.variantConfig.halftoneDotMin) > 0.01) {
                                         root.updateProp("halftoneDotMin", newVal);
                                     }
@@ -658,15 +633,10 @@ Item {
                             resizeParent: false
                             scroll: false
                             tooltip: false
-
-                            readonly property real configValue: root.variantConfig ? root.variantConfig.halftoneDotMax / 20 : 0.4
-                            onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                                value = configValue
-                            Component.onCompleted: value = configValue
-
-                            onValueChanged: {
+                            value: root.variantConfig ? root.variantConfig.halftoneDotMax / 20 : 0.4
+                            onMoved: newValue => {
                                 if (root.variantConfig) {
-                                    const newVal = value * 20;
+                                    const newVal = Math.max(0.5, newValue * 20);
                                     if (Math.abs(newVal - root.variantConfig.halftoneDotMax) > 0.01) {
                                         root.updateProp("halftoneDotMax", newVal);
                                     }
@@ -719,15 +689,10 @@ Item {
                             resizeParent: false
                             scroll: false
                             tooltip: false
-
-                            readonly property real configValue: root.variantConfig ? root.variantConfig.halftoneStart : 0
-                            onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                                value = configValue
-                            Component.onCompleted: value = configValue
-
-                            onValueChanged: {
-                                if (root.variantConfig && Math.abs(value - root.variantConfig.halftoneStart) > 0.001) {
-                                    root.updateProp("halftoneStart", value);
+                            value: root.variantConfig ? root.variantConfig.halftoneStart : 0
+                            onMoved: newValue => {
+                                if (root.variantConfig && Math.abs(newValue - root.variantConfig.halftoneStart) > 0.001) {
+                                    root.updateProp("halftoneStart", newValue);
                                 }
                             }
                         }
@@ -747,15 +712,10 @@ Item {
                             resizeParent: false
                             scroll: false
                             tooltip: false
-
-                            readonly property real configValue: root.variantConfig ? root.variantConfig.halftoneEnd : 1
-                            onConfigValueChanged: if (Math.abs(value - configValue) > 0.001)
-                                value = configValue
-                            Component.onCompleted: value = configValue
-
-                            onValueChanged: {
-                                if (root.variantConfig && Math.abs(value - root.variantConfig.halftoneEnd) > 0.001) {
-                                    root.updateProp("halftoneEnd", value);
+                            value: root.variantConfig ? root.variantConfig.halftoneEnd : 1
+                            onMoved: newValue => {
+                                if (root.variantConfig && Math.abs(newValue - root.variantConfig.halftoneEnd) > 0.001) {
+                                    root.updateProp("halftoneEnd", newValue);
                                 }
                             }
                         }

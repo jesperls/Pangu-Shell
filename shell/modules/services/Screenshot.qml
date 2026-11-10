@@ -19,7 +19,7 @@ QtObject {
 
     property string tempPathBase: Paths.runtimePath("freeze")
     property string lensPath: Paths.runtimePath("lens.png")
-    
+
     property string captureMode: "normal"
     property string processingMode: "normal"
     property string savedScreenName: ""
@@ -46,17 +46,33 @@ QtObject {
         captureTimer.stop();
         captureMode = "normal";
     }
-    
+
+    function cleanFrozenFrames() {
+        if (typeof freezeCleanupProcess === "undefined" || !freezeCleanupProcess || root.monitors.length === 0)
+            return;
+        const files = root.monitors.map(m => root.tempPathBase + "_" + m.name + ".png");
+        freezeCleanupProcess.command = ["rm", "-f", "--"].concat(files);
+        freezeCleanupProcess.running = true;
+    }
+
+    property Connections visibilityCleanup: Connections {
+        target: GlobalStates
+        function onScreenshotToolVisibleChanged() {
+            if (!GlobalStates.screenshotToolVisible && !cropProcess.running && !root._freezing)
+                root.cleanFrozenFrames();
+        }
+    }
+
     property string screenshotsDir: ""
     property string finalPath: ""
-    
+
     property var monitors: []
-    
+
     property int selectionX: 0
     property int selectionY: 0
     property int selectionW: 0
     property int selectionH: 0
-    
+
     property real monitorScale: 1.0
 
     property bool _initialized: false
@@ -87,21 +103,26 @@ QtObject {
 
     property Process freezeProcess: Process {
         id: freezeProcess
-        command: [] 
+        command: []
         onExited: exitCode => {
             root._freezing = false;
             if (exitCode === 0) {
-                for (var i = 0; i < root.monitors.length; i++) {
-                    var m = root.monitors[i];
-                    var path = root.tempPathBase + "_" + m.name + ".png";
+                for (let i = 0; i < root.monitors.length; i++) {
+                    const m = root.monitors[i];
+                    const path = root.tempPathBase + "_" + m.name + ".png";
                     root.monitorScreenshotReady(m.name, path);
                 }
             } else {
-                root.errorOccurred("Failed to capture screen (grim)")
+                root.errorOccurred("Failed to capture screen (grim)");
             }
         }
     }
-    
+
+    property Process freezeCleanupProcess: Process {
+        id: freezeCleanupProcess
+        running: false
+    }
+
     property Process cropProcess: Process {
         id: cropProcess
         onExited: exitCode => root.finishCrop(exitCode)
@@ -110,6 +131,8 @@ QtObject {
     function finishCrop(exitCode) {
         const mode = processingMode;
         processingMode = "normal";
+        if (typeof root.cleanFrozenFrames === "function")
+            root.cleanFrozenFrames();
         if (exitCode !== 0) {
             root.errorOccurred("Failed to save image");
             return;
@@ -143,12 +166,12 @@ QtObject {
         command: ["bash", "-c", 'wl-copy --type image/png < "$1"', "pangu-copy", root.finalPath]
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) console.warn("Screenshot Copy Error: " + text)
+                if (text.length > 0) console.warn("Screenshot Copy Error:", text);
             }
         }
         onExited: exitCode => {
             if (exitCode !== 0) {
-                console.warn("Failed to copy to clipboard (Exit code: " + exitCode + ")")
+                console.warn("Failed to copy to clipboard (exit " + exitCode + ")");
             }
         }
     }
@@ -159,9 +182,10 @@ QtObject {
         stderr: StdioCollector {}
         onExited: exitCode => {
             if (exitCode === 0) {
-                console.log("Screenshot: Google Lens script executed successfully")
+                cleanupProcess.command = ["rm", "-f", "--", root.lensPath];
+                cleanupProcess.running = true;
             } else {
-                root.errorOccurred("Failed to open Google Lens: " + lensProcess.stderr.text)
+                root.errorOccurred("Failed to open Google Lens: " + lensProcess.stderr.text);
             }
         }
     }
@@ -172,36 +196,42 @@ QtObject {
         if (_freezing) return;
         _freezing = true;
 
-        var qsScreens = Quickshell.screens;
-        var mappedMonitors = [];
-        for (var i = 0; i < qsScreens.length; i++) {
-             var s = qsScreens[i];
-             var scale = s.devicePixelRatio || 1; // ShellScreen has no `scale`; reading it yields NaN geometry
-             mappedMonitors.push({
-                 id: i,
-                 name: s.name,
-                 x: s.x,
-                 y: s.y,
-                 logicalWidth: s.width,
-                 logicalHeight: s.height,
-                 width: s.width * scale,
-                 height: s.height * scale,
-                 scale: scale
-             });
+        const qsScreens = Quickshell.screens;
+        const mappedMonitors = [];
+        for (let i = 0; i < qsScreens.length; i++) {
+            const s = qsScreens[i];
+            const scale = s.devicePixelRatio || 1; // ShellScreen has no `scale`; reading it yields NaN geometry
+            mappedMonitors.push({
+                id: i,
+                name: s.name,
+                x: s.x,
+                y: s.y,
+                logicalWidth: s.width,
+                logicalHeight: s.height,
+                width: s.width * scale,
+                height: s.height * scale,
+                scale: scale
+            });
         }
         root.monitors = mappedMonitors;
-        
+
         root.executeFreezeBatch();
         Qt.callLater(root.fetchWindows);
     }
-    
+
     function fetchWindows() {
         const monitors = Compositor.monitors.values;
         root.monitorsListReady(monitors);
 
-        const visible = monitors.map(m => m.activeWorkspace ? m.activeWorkspace.id : -1);
+        const visible = [];
+        for (const m of monitors) {
+            if (m.activeWorkspace)
+                visible.push(m.activeWorkspace.id);
+            if (m.activeSpecialWorkspace)
+                visible.push(m.activeSpecialWorkspace.id);
+        }
         root.windowListReady(Compositor.clients.values
-            .filter(c => c.pinned || visible.includes(c.workspace.id))
+            .filter(c => c.pinned || (c.workspace && visible.includes(c.workspace.id)))
             .map(c => ({
                 id: c.address,
                 app_id: c.class,
@@ -210,21 +240,21 @@ QtObject {
                 is_focused: c.is_focused,
                 is_fullscreen: c.fullscreen,
                 is_hidden: c.hidden,
-                workspace_id: c.workspace.id,
+                workspace_id: c.workspace?.id ?? 0,
                 pinned: c.pinned,
                 workspace: c.workspace,
                 at: c.at,
                 size: c.size
             })));
     }
-    
+
     function executeFreezeBatch() {
         if (root.monitors.length === 0) {
             console.warn("Screenshot: No monitors found to freeze");
             _freezing = false;
             return;
         }
-        
+
         const captures = [];
         for (const monitor of root.monitors)
             captures.push(monitor.name, root.tempPathBase + "_" + monitor.name + ".png");
@@ -237,14 +267,14 @@ QtObject {
     }
 
     function getTimestamp() {
-        var d = new Date()
-        var pad = (n) => n < 10 ? '0' + n : n;
-        return d.getFullYear() + '-' + 
-               pad(d.getMonth() + 1) + '-' + 
-               pad(d.getDate()) + '-' + 
-               pad(d.getHours()) + '-' + 
-               pad(d.getMinutes()) + '-' + 
-               pad(d.getSeconds()) + '-' + d.getMilliseconds();
+        const d = new Date();
+        const pad = n => n < 10 ? "0" + n : n;
+        return d.getFullYear() + "-"
+            + pad(d.getMonth() + 1) + "-"
+            + pad(d.getDate()) + "-"
+            + pad(d.getHours()) + "-"
+            + pad(d.getMinutes()) + "-"
+            + pad(d.getSeconds()) + "-" + d.getMilliseconds();
     }
 
     function prepareOutput() {
@@ -255,10 +285,9 @@ QtObject {
             root.finalPath = Paths.runtimePath(processingMode + "_" + getTimestamp() + ".png");
         } else {
             if (root.screenshotsDir === "") {
-                root.screenshotsDir = Paths.picturesDir + "/Screenshots"
+                root.screenshotsDir = Paths.picturesDir + "/Screenshots";
             }
-            var filename = "Screenshot_" + getTimestamp() + ".png"
-            root.finalPath = root.screenshotsDir + "/" + filename
+            root.finalPath = root.screenshotsDir + "/Screenshot_" + getTimestamp() + ".png";
         }
     }
 
@@ -273,38 +302,38 @@ QtObject {
     function processRegion(x, y, w, h) {
         if (w <= 0 || h <= 0 || cropProcess.running)
             return;
-        var m = null;
+        let m = null;
         if (root.monitors.length > 0) {
             m = root.monitors.find(mon => {
-                var logicalW = mon.logicalWidth ?? (mon.width / mon.scale);
-                var logicalH = mon.logicalHeight ?? (mon.height / mon.scale);
-
-                return x >= mon.x && x < (mon.x + logicalW) &&
-                       y >= mon.y && y < (mon.y + logicalH);
+                const logicalW = mon.logicalWidth ?? (mon.width / mon.scale);
+                const logicalH = mon.logicalHeight ?? (mon.height / mon.scale);
+                return x >= mon.x && x < (mon.x + logicalW) && y >= mon.y && y < (mon.y + logicalH);
             });
         }
-        
+
         if (!m) {
             console.warn("Screenshot: Could not find monitor for region " + x + "," + y);
             root.errorOccurred("Could not find monitor for the selected region");
             return;
         }
         savedScreenName = m.name;
-        
-        var localX = x - m.x;
-        var localY = y - m.y;
-        
-        var physX = Math.round(localX * m.scale);
-        var physY = Math.round(localY * m.scale);
-        var physW = Math.round(w * m.scale);
-        var physH = Math.round(h * m.scale);
-        
-        console.log(`Screenshot: Cropping on monitor ${m.name} (Scale ${m.scale})`);
-        console.log(`Screenshot: Logical Local: ${localX},${localY} ${w}x${h} -> Physical: ${physX},${physY} ${physW}x${physH}`);
-        
-        var srcPath = root.tempPathBase + "_" + m.name + ".png";
-        
-        var geom = `${physW}x${physH}+${physX}+${physY}`;
+
+        const scale = m.scale || 1;
+        const logicalW = m.logicalWidth ?? (m.width / scale);
+        const logicalH = m.logicalHeight ?? (m.height / scale);
+        const maxPhysW = Math.round(logicalW * scale);
+        const maxPhysH = Math.round(logicalH * scale);
+
+        const localX = Math.max(0, x - m.x);
+        const localY = Math.max(0, y - m.y);
+
+        const physX = Math.min(Math.max(0, maxPhysW - 1), Math.round(localX * scale));
+        const physY = Math.min(Math.max(0, maxPhysH - 1), Math.round(localY * scale));
+        const physW = Math.max(1, Math.min(maxPhysW - physX, Math.round(w * scale)));
+        const physH = Math.max(1, Math.min(maxPhysH - physY, Math.round(h * scale)));
+
+        const srcPath = root.tempPathBase + "_" + m.name + ".png";
+        const geom = `${physW}x${physH}+${physX}+${physY}`;
         saveCapture(["magick", srcPath, "-crop", geom, "+repage"]);
     }
 
@@ -312,7 +341,7 @@ QtObject {
         if (cropProcess.running || !root.monitors.some(m => m.name === monitorName))
             return;
         savedScreenName = monitorName;
-        var srcPath = root.tempPathBase + "_" + monitorName + ".png";
+        const srcPath = root.tempPathBase + "_" + monitorName + ".png";
         saveCapture(["cp", "--", srcPath]);
     }
 
@@ -320,16 +349,15 @@ QtObject {
         verifyImageProcess.command = ["test", "-f", root.lensPath];
         verifyImageProcess.running = true;
     }
-    
+
     property Process verifyImageProcess: Process {
         id: verifyImageProcess
         onExited: exitCode => {
             if (exitCode === 0) {
-                var scriptPath = Paths.script("google_lens.sh");
-                lensProcess.command = ["bash", scriptPath, root.lensPath];
+                lensProcess.command = ["bash", Paths.script("google_lens.sh"), root.lensPath];
                 lensProcess.running = true;
             } else {
-                root.errorOccurred("Image file not ready for Google Lens")
+                root.errorOccurred("Image file not ready for Google Lens");
             }
         }
     }

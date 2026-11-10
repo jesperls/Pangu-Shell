@@ -1,6 +1,7 @@
 local state = require("pangu.generated")
 
 local apps = state.apps
+local binds_cfg = state.binds or {}
 local mainMod = "SUPER"
 
 local function combo(mods, key)
@@ -32,14 +33,7 @@ bind_exec(mainMod, "C", apps.editor, "Apps: editor")
 for _, shortcut in ipairs(apps.shortcuts or {}) do
   bind_exec(shortcut.mods or mainMod, shortcut.key, shortcut.command, shortcut.description)
 end
-bind(mainMod .. " SHIFT", "W", function()
-  local win = hl.get_windows({ class = "Linux Wallpaper Engine" })[1]
-  if win then
-    hl.dispatch(hl.dsp.focus({ window = win }))
-  else
-    hl.exec_cmd("linux-wallpaperengine")
-  end
-end, "Apps: wallpaper engine (focus or launch)")
+bind_exec(mainMod .. " SHIFT", "W", "pangu run wallpapers", "Shell: wallpapers")
 bind_exec(mainMod, "Super_L", "pangu run launcher", "Shell: launcher", { release = true })
 
 bind_exec(mainMod, "A", "pangu run dashboard", "Shell: dashboard")
@@ -60,17 +54,18 @@ local fullscreen = require("pangu.fullscreen")
 local real_fullscreen = hl.dsp.window.fullscreen({ mode = "fullscreen" })
 local real_maximize = hl.dsp.window.fullscreen({ mode = "maximized" })
 bind(mainMod, "F", function()
-  fullscreen.dispatch_real(real_fullscreen) -- Suppress automatic demotion for explicit fullscreen.
+  fullscreen.dispatch_real(real_fullscreen) -- suppress automatic demotion for explicit fullscreen
 end, "Window: fullscreen")
 bind(mainMod .. " SHIFT", "F", function()
   fullscreen.dispatch_real(real_maximize)
 end, "Window: maximize")
-bind(
-  mainMod .. " CTRL",
-  "F",
-  hl.dsp.window.fullscreen_state({ internal = 0, client = 2, action = "toggle" }),
-  "Window: fake fullscreen"
-)
+bind(mainMod .. " CTRL", "F", function()
+  hl.dispatch(hl.dsp.window.fullscreen_state({ internal = 0, client = 2, action = "toggle" }))
+  local window = hl.get_active_window()
+  if window then
+    hl.dispatch(hl.dsp.window.set_prop({ prop = "sync_fullscreen", value = "1", window = window }))
+  end
+end, "Window: fake fullscreen")
 bind(mainMod, "J", hl.dsp.layout("togglesplit"), "Window: toggle split direction")
 bind("ALT", "Tab", hl.dsp.focus({ last = true }), "Window: focus last")
 
@@ -102,26 +97,25 @@ end
 
 local layouts = require("pangu.layouts")
 
-bind(mainMod, "mouse:272", hl.dsp.window.drag(), "Mouse: drag window")
-bind(mainMod, "mouse:273", function()
+local function resize_or_weight_drag()
   local window = hl.get_active_window()
-  if not in_centered() or (window and window.floating) then
+  if in_centered() and window and not window.floating then
+    layouts.start_drag()
+  else
     hl.dispatch(hl.dsp.window.resize())
   end
-end, "Mouse: resize window")
-bind(mainMod, "mouse:273", layouts.start_drag, "Centered: start weight drag")
+end
+
+bind(mainMod, "mouse:272", hl.dsp.window.drag(), "Mouse: drag window", { drag = true })
+bind(mainMod, "mouse:273", resize_or_weight_drag, "Mouse: resize window", { drag = true })
 bind(mainMod, "mouse:273", layouts.end_drag, "Centered: end weight drag", { release = true })
 
-bind("", "mouse:275", hl.dsp.window.drag(), "Mouse: drag window (side button)")
-bind("", "mouse:276", function()
-  local window = hl.get_active_window()
-  if not in_centered() or (window and window.floating) then
-    hl.dispatch(hl.dsp.window.resize())
-  end
-end, "Mouse: resize window (side button)")
-bind("", "mouse:276", layouts.start_drag, "Centered: start weight drag")
-bind("", "mouse:276", layouts.end_drag, "Centered: end weight drag", { release = true })
-bind("", "mouse:277", hl.dsp.window.close(), "Mouse: close window (side button)")
+if binds_cfg.mouse_side_buttons ~= false then
+  bind("", "mouse:275", hl.dsp.window.drag(), "Mouse: drag window (side button)", { drag = true })
+  bind("", "mouse:276", resize_or_weight_drag, "Mouse: resize window (side button)", { drag = true })
+  bind("", "mouse:276", layouts.end_drag, "Centered: end weight drag", { release = true })
+  bind("", "mouse:277", hl.dsp.window.close(), "Mouse: close window (side button)")
+end
 
 local layout_modes = require("pangu.layout_modes")
 
@@ -167,17 +161,29 @@ bind(mainMod, "comma", hl.dsp.focus({ workspace = "r-1" }), "Workspace: previous
 bind(mainMod .. " SHIFT", "mouse_up", hl.dsp.window.move({ workspace = "r-1" }), "Workspace: move window back (scroll)")
 bind(mainMod .. " SHIFT", "mouse_down", hl.dsp.window.move({ workspace = "r+1" }), "Workspace: move window forward (scroll)")
 
-bind(mainMod, "S", hl.dsp.workspace.toggle_special("scratchpad"), "Special: toggle scratchpad")
-bind(
-  mainMod .. " SHIFT",
-  "S",
-  hl.dsp.window.move({ workspace = "special:scratchpad" }),
-  "Special: move window to scratchpad"
-)
 local popout = require("pangu.popout")
+
+bind(mainMod, "S", function()
+  popout.toggle_special("scratchpad")
+end, "Special: toggle scratchpad")
+bind(mainMod .. " SHIFT", "S", function()
+  popout.toggle_scratchpad(nil, "scratchpad")
+end, "Special: stash or restore scratchpad window")
 bind(mainMod, "P", function()
   popout.toggle()
 end, "Special: toggle popout pin (sticky on all workspaces)")
+
+for _, scratch in ipairs(apps.scratchpads or {}) do
+  local spec = scratch
+  bind(
+    spec.mods or mainMod,
+    spec.key,
+    function()
+      popout.toggle_app_scratchpad(spec)
+    end,
+    spec.description or ("Scratchpad: " .. tostring(spec.name))
+  )
+end
 
 bind(mainMod .. " CTRL", "period", hl.dsp.focus({ monitor = "-1" }), "Monitor: focus previous")
 bind(mainMod .. " CTRL", "comma", hl.dsp.focus({ monitor = "+1" }), "Monitor: focus next")
@@ -195,14 +201,10 @@ bind_exec(
   "Tools: full-screen screenshot to clipboard"
 )
 
-for key, spec in pairs({
-  XF86AudioRaiseVolume = { "pamixer -i 5", "Media: volume up" },
-  XF86AudioLowerVolume = { "pamixer -d 5", "Media: volume down" },
-  XF86AudioMute = { "pamixer -t", "Media: mute" },
-  XF86AudioMicMute = { "pamixer --default-source -t", "Media: mic mute" },
-}) do
-  bind_exec("", key, spec[1], spec[2], { repeating = true })
-end
+bind_exec("", "XF86AudioRaiseVolume", "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+", "Media: volume up", { repeating = true, locked = true })
+bind_exec("", "XF86AudioLowerVolume", "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-", "Media: volume down", { repeating = true, locked = true })
+bind_exec("", "XF86AudioMute", "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", "Media: mute", { locked = true })
+bind_exec("", "XF86AudioMicMute", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", "Media: mic mute", { locked = true })
 
 for key, spec in pairs({
   XF86AudioPlay = { "playerctl play-pause", "Media: play/pause" },
@@ -214,8 +216,8 @@ for key, spec in pairs({
   bind_exec("", key, spec[1], spec[2], { locked = true })
 end
 
-bind_exec("", "XF86MonBrightnessUp", "brightnessctl set 5%+", "Media: brightness up", { repeating = true })
-bind_exec("", "XF86MonBrightnessDown", "brightnessctl set 5%-", "Media: brightness down", { repeating = true })
+bind_exec("", "XF86MonBrightnessUp", "pangu brightness +5", "Media: brightness up", { repeating = true, locked = true })
+bind_exec("", "XF86MonBrightnessDown", "pangu brightness -5", "Media: brightness down", { repeating = true, locked = true })
 
 local dataHome = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 local macroChunk = loadfile(dataHome .. "/pangu/macros.lua")

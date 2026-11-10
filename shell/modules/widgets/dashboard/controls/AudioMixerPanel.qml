@@ -18,7 +18,7 @@ Item {
     readonly property int contentWidth: Math.min(width, maxContentWidth)
     readonly property real sideMargin: (width - contentWidth) / 2
 
-    property bool showOutput: true  // true = output, false = input
+    property bool showOutput: true
 
     Flickable {
         id: flickable

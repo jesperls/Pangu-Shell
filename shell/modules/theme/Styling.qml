@@ -19,27 +19,31 @@ QtObject {
         return Math.max(Config.theme.monoFontSize + offset, 8);
     }
 
+    readonly property var transparentConfig: {
+        const bgConfig = Config.theme?.srBg;
+        return {
+            gradient: bgConfig?.gradient ?? [],
+            gradientType: bgConfig?.gradientType ?? "linear",
+            gradientAngle: bgConfig?.gradientAngle ?? 0,
+            gradientCenterX: bgConfig?.gradientCenterX ?? 0.5,
+            gradientCenterY: bgConfig?.gradientCenterY ?? 0.5,
+            halftoneDotMin: bgConfig?.halftoneDotMin ?? 0,
+            halftoneDotMax: bgConfig?.halftoneDotMax ?? 0,
+            halftoneStart: bgConfig?.halftoneStart ?? 0,
+            halftoneEnd: bgConfig?.halftoneEnd ?? 1,
+            halftoneDotColor: bgConfig?.halftoneDotColor ?? "transparent",
+            halftoneBackgroundColor: bgConfig?.halftoneBackgroundColor ?? "transparent",
+            itemColor: bgConfig?.itemColor ?? "overBackground",
+            opacity: 0,
+            border: [bgConfig?.border ? bgConfig.border[0] : "transparent", 0],
+            radius: 0
+        };
+    }
+
     function getStyledRectConfig(variant) {
         switch (variant) {
         case "transparent":
-            const bgConfig = Config.theme.srBg;
-            return {
-                gradient: bgConfig.gradient,
-                gradientType: bgConfig.gradientType,
-                gradientAngle: bgConfig.gradientAngle,
-                gradientCenterX: bgConfig.gradientCenterX,
-                gradientCenterY: bgConfig.gradientCenterY,
-                halftoneDotMin: bgConfig.halftoneDotMin,
-                halftoneDotMax: bgConfig.halftoneDotMax,
-                halftoneStart: bgConfig.halftoneStart,
-                halftoneEnd: bgConfig.halftoneEnd,
-                halftoneDotColor: bgConfig.halftoneDotColor,
-                halftoneBackgroundColor: bgConfig.halftoneBackgroundColor,
-                itemColor: bgConfig.itemColor,
-                opacity: 0,
-                border: [bgConfig.border[0], 0],
-                radius: 0
-            };
+            return transparentConfig;
         case "bg":
             return Config.theme.srBg;
         case "popup":
@@ -49,6 +53,7 @@ QtObject {
         case "pane":
             return Config.theme.srPane;
         case "common":
+        case "surface":
             return Config.theme.srCommon;
         case "focus":
             return Config.theme.srFocus;

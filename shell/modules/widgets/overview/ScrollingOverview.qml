@@ -115,7 +115,7 @@ Item {
         const win = matchingWindows[selectedMatchIndex];
         if (!win)
             return;
-        Visibilities.setActiveModule("", true);
+        Visibilities.setActiveModule("");
         Qt.callLater(() => {
             Compositor.dispatch(`focuswindow address:${win.address}`);
         });
@@ -152,7 +152,7 @@ Item {
         if (barPosition === "left" || barPosition === "right") {
             scaledWidth -= barReserved * scale;
         }
-        return Math.max(0, Math.round(scaledWidth * 3));  // Triple width
+        return Math.max(0, Math.round(scaledWidth * 3));
     }
 
     readonly property real workspaceHeight: {
@@ -174,7 +174,7 @@ Item {
 
         const wsIndex = Math.floor(contentY / workspaceRowHeight);
         if (wsIndex >= 0 && wsIndex < totalWorkspaces) {
-            return wsIndex + 1;  // Workspace IDs are 1-based
+            return wsIndex + 1;
         }
         return -1;
     }

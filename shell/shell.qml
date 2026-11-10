@@ -32,7 +32,6 @@ ShellRoot {
 
     ContextMenu {
         id: contextMenu
-        screen: Quickshell.screens.find(s => Compositor.focusedMonitor && s.name === Compositor.focusedMonitor.name) ?? Quickshell.screens[0]
         Component.onCompleted: Visibilities.setContextMenu(contextMenu)
     }
 
@@ -61,7 +60,7 @@ ShellRoot {
             }
 
             Loader {
-                active: screenShellContainer.modelData !== null && Config.theme.enableCorners && Config.roundness > 0
+                active: screenShellContainer.modelData !== null && Config.theme.enableCorners && Config.roundness > 0 && !(Config.bar?.frameEnabled ?? false)
                 sourceComponent: ScreenCorners {
                     screen: screenShellContainer.modelData
                 }
@@ -254,6 +253,7 @@ ShellRoot {
         void AutoThemeService.enabled;
         void ReplayService.active;
         void MacroService.enabled;
+        void PomodoroService.isRunning;
     })
 
     function overviewEnabledFor(screenName) {

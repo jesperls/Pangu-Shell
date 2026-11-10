@@ -157,16 +157,6 @@ Item {
                     duration: Styling.animDuration / 2
                 }
             }
-
-            Connections {
-                target: Battery
-                function onIsPluggedInChanged() {
-                    batteryIcon.text = Battery.available ? (Battery.isPluggedIn ? Icons.plug : Icons.lightning) : PowerProfile.getProfileIcon(PowerProfile.currentProfile);
-                }
-                function onAvailableChanged() {
-                    batteryIcon.text = Battery.available ? (Battery.isPluggedIn ? Icons.plug : Icons.lightning) : PowerProfile.getProfileIcon(PowerProfile.currentProfile);
-                }
-            }
         }
 
         MouseArea {
@@ -176,7 +166,7 @@ Item {
         }
 
         StyledToolTip {
-            visible: root.isHovered && !root.popupOpen
+            show: root.isHovered && !root.popupOpen
             tooltipText: Battery.available ? ("Battery: " + Math.round(Battery.percentage) + "%" + (Battery.isCharging ? " (Charging)" : "")) : ("Power Profile: " + PowerProfile.getProfileDisplayName(PowerProfile.currentProfile))
         }
     }

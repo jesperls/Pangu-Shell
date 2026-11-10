@@ -23,13 +23,16 @@ PanelWindow {
 
     color: "transparent"
 
+    readonly property bool isPrimaryGrabScreen: screenshotPopup.targetScreen?.name === (Compositor.focusedMonitor?.name || Quickshell.screens[0]?.name)
+
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: screenshotPopup.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.namespace: "pangu:screenshot"
+    WlrLayershell.keyboardFocus: screenshotPopup.visible && screenshotPopup.isPrimaryGrabScreen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     visible: state !== "idle"
     exclusionMode: ExclusionMode.Ignore
 
-    property string state: "idle" // idle, loading, active, processing
+    property string state: "idle"
     
     Component.onCompleted: {
         if (GlobalStates.screenshotToolVisible) {
@@ -156,7 +159,8 @@ PanelWindow {
     FocusGrab {
         id: focusGrab
         windows: [screenshotPopup]
-        active: screenshotPopup.visible
+        active: screenshotPopup.visible && screenshotPopup.isPrimaryGrabScreen
+        onCleared: screenshotPopup.close()
     }
 
     FocusScope {
@@ -325,6 +329,7 @@ PanelWindow {
                 id: modeGrid
                 anchors.centerIn: parent
                 actions: screenshotPopup.modes
+                selectOnHover: false
                 buttonSize: 48
                 iconSize: 24
                 spacing: 10

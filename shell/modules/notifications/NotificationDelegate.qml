@@ -11,7 +11,6 @@ import qs.config
 import "./NotificationAnimation.qml"
 import "./NotificationAppIcon.qml"
 import "./NotificationDismissButton.qml"
-import "./NotificationActionButtons.qml"
 import "./notification_utils.js" as NotificationUtils
 
 Item {
@@ -33,6 +32,10 @@ Item {
     signal destroyRequested
 
     implicitHeight: mainNotificationColumn.implicitHeight
+
+    ListView.onReused: {
+        notificationAnimation.reset();
+    }
 
     function destroyWithAnimation() {
         notificationAnimation.startDestroy();
@@ -162,6 +165,7 @@ Item {
                                             return leftTextsContainer.width - (appNameText.visible ? appNameText.width + parent.spacing : 0);
                                         }
                                         text: latestNotification ? latestNotification.summary : ""
+                                        textFormat: Text.PlainText
                                         font.family: Config.theme.font
                                         font.pixelSize: Config.theme.fontSize
                                         font.weight: Font.Bold
@@ -183,6 +187,7 @@ Item {
                                             return Math.min(implicitWidth, Math.max(60, availableWidth, leftTextsContainer.width * 0.3));
                                         }
                                         text: latestNotification ? "• " + latestNotification.appName : ""
+                                        textFormat: Text.PlainText
                                         font.family: Config.theme.font
                                         font.pixelSize: Styling.fontSize(-2)
                                         font.weight: Font.Bold
@@ -198,6 +203,7 @@ Item {
                                 Text {
                                     id: timestampText
                                     text: latestNotification ? NotificationUtils.getFriendlyNotifTimeString(latestNotification.time) : ""
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize
                                     font.weight: Font.Bold
@@ -211,6 +217,7 @@ Item {
                             Text {
                                 width: parent.width
                                 text: latestNotification ? NotificationUtils.processNotificationBody(latestNotification.body, latestNotification.appName) : ""
+                                textFormat: Text.PlainText
                                 font.family: Config.theme.font
                                 font.pixelSize: Config.theme.fontSize
                                 font.weight: latestNotification && latestNotification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -280,6 +287,7 @@ Item {
                                         Text {
                                             Layout.maximumWidth: parent.width * 0.7
                                             text: root.summary || (latestNotification ? latestNotification.summary : "")
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Config.theme.fontSize
                                             font.weight: Font.Bold
@@ -290,6 +298,7 @@ Item {
 
                                         Text {
                                             text: latestNotification ? NotificationUtils.getFriendlyNotifTimeString(latestNotification.time) : ""
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Config.theme.fontSize
                                             font.weight: Font.Bold
@@ -309,6 +318,7 @@ Item {
                                             Text {
                                                 width: parent.width
                                                 text: NotificationUtils.processNotificationBody(modelData.body || "", modelData.appName)
+                                                textFormat: Text.PlainText
                                                 font.family: Config.theme.font
                                                 font.pixelSize: root.fontSize
                                                 font.weight: modelData.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -332,6 +342,7 @@ Item {
                                 Text {
                                     Layout.maximumWidth: parent.width * 0.4
                                     text: root.summary || (latestNotification ? latestNotification.summary : "")
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize
                                     font.weight: Font.Bold
@@ -349,7 +360,8 @@ Item {
                                 }
 
                                 Text {
-                                    text: latestNotification ? NotificationUtils.processNotificationBody(latestNotification.body || "").replace(/\n/g, ' ') : ""
+                                    text: latestNotification ? NotificationUtils.processNotificationBody(latestNotification.body || "", latestNotification.appName).replace(/\n/g, ' ') : ""
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: root.fontSize
                                     font.weight: latestNotification && latestNotification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -433,6 +445,7 @@ Item {
 
                         contentItem: Text {
                             text: parent.text
+                            textFormat: Text.PlainText
                             font: parent.font
                             color: parent.background.textColor
                             horizontalAlignment: Text.AlignHCenter

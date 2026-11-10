@@ -12,7 +12,7 @@ def generate(source_path, cache):
     source = Path(source_path).expanduser()
     if source.suffix.lower() not in {'.mp4', '.webm', '.mov', '.avi', '.mkv', '.gif'}:
         return
-    destination = Path(cache) / 'lockscreen' / (hashlib.md5(source_path.encode()).hexdigest() + '.jpg')
+    destination = Path(cache) / 'lockscreen' / (hashlib.md5(str(source).encode()).hexdigest() + '.jpg')
     if not current(source, destination):
         render_atomic(frame_command(source), destination, 30)
 

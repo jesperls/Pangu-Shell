@@ -169,6 +169,46 @@ Button {
         }
     }
 
+    function openDockContextMenu() {
+        const appId = root.appToplevel?.appId ?? "";
+        if (!appId)
+            return;
+        if (!Visibilities.contextMenu) {
+            TaskbarApps.togglePin(appId);
+            return;
+        }
+        const pinned = TaskbarApps.isPinned(appId);
+        const items = [
+            {
+                text: pinned ? "Unpin from Dock" : "Pin to Dock",
+                icon: pinned ? Icons.unpin : Icons.pin,
+                onTriggered: () => TaskbarApps.togglePin(appId)
+            }
+        ];
+        if (root.desktopEntry) {
+            items.push({
+                text: "New Window",
+                icon: Icons.launch,
+                onTriggered: () => AppSearch.launchApp(root.desktopEntry)
+            });
+        }
+        if (root.appIsRunning) {
+            items.push({ isSeparator: true });
+            const wins = (root.appToplevel?.toplevels ?? []).slice();
+            items.push({
+                text: wins.length > 1 ? `Close All (${wins.length})` : "Close",
+                icon: Icons.cancel,
+                onTriggered: () => {
+                    for (const win of wins) {
+                        if (win && typeof win.close === "function")
+                            win.close();
+                    }
+                }
+            });
+        }
+        Visibilities.contextMenu.openCustomMenu(items, 180, 32, "dock");
+    }
+
     onClicked: {
         if (isSeparator)
             return;
@@ -180,7 +220,14 @@ Button {
             return;
         }
 
-        lastFocused = (lastFocused + 1) % appToplevel.toplevelCount;
+        if (appToplevel.toplevelCount === 1) {
+            appToplevel.toplevels[0].activate();
+            return;
+        }
+
+        const activeIdx = appToplevel.toplevels.findIndex(t => t.activated === true);
+        const baseIdx = activeIdx >= 0 ? activeIdx : lastFocused;
+        lastFocused = (baseIdx + 1) % appToplevel.toplevelCount;
         appToplevel.toplevels[lastFocused].activate();
     }
 
@@ -197,7 +244,7 @@ Button {
                     AppSearch.launchApp(root.desktopEntry);
                 }
             } else if (mouse.button === Qt.RightButton) {
-                TaskbarApps.togglePin(root.appToplevel?.appId ?? "");
+                root.openDockContextMenu();
             }
         }
     }

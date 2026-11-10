@@ -56,20 +56,27 @@ Item {
         return srName.substring(2).toLowerCase();
     }
 
-    readonly property var allVariants: {
-        let variants = [];
-        let theme = Config.theme;
+    readonly property var variantKeys: [
+        "srBg", "srPopup", "srInternalBg", "srBarBg", "srPane", "srCommon", "srFocus",
+        "srPrimary", "srPrimaryFocus", "srOverPrimary",
+        "srSecondary", "srSecondaryFocus", "srOverSecondary",
+        "srTertiary", "srTertiaryFocus", "srOverTertiary",
+        "srError", "srErrorFocus", "srOverError"
+    ]
 
-        for (let prop in theme) {
-            if (prop.startsWith("sr") && theme[prop] && typeof theme[prop] === "object") {
-                let label = theme[prop].label || prop.substring(2);
+    readonly property var allVariants: {
+        const variants = [];
+        const theme = Config.theme;
+        for (let i = 0; i < variantKeys.length; i++) {
+            const prop = variantKeys[i];
+            const entry = theme ? theme[prop] : null;
+            if (entry && typeof entry === "object") {
                 variants.push({
                     id: srNameToId(prop),
-                    label: label
+                    label: entry.label || prop.substring(2)
                 });
             }
         }
-
         return variants;
     }
 
@@ -264,139 +271,25 @@ Item {
                                 }
                             }
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-
-                                Text {
-                                    text: "Tint Icons"
-                                    font.family: Config.theme.font
-                                    font.pixelSize: Styling.fontSize(0)
-                                    color: Colors.overBackground
-                                    Layout.fillWidth: true
-                                }
-
-                                Switch {
-                                    id: tintIconsSwitch
-                                    checked: Config.theme.tintIcons
-
-                                    readonly property bool configValue: Config.theme.tintIcons
-
-                                    onConfigValueChanged: {
-                                        if (checked !== configValue) {
-                                            checked = configValue;
-                                        }
+                            ToggleRow {
+                                label: "Tint Icons"
+                                checked: Config.theme.tintIcons
+                                onToggled: value => {
+                                    if (value !== Config.theme.tintIcons) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.tintIcons = value;
                                     }
-
-                                    onCheckedChanged: {
-                                        if (checked !== Config.theme.tintIcons) {
-                                            GlobalStates.markThemeChanged();
-                                            Config.theme.tintIcons = checked;
-                                        }
-                                    }
-
-                                    indicator: Rectangle {
-                                        implicitWidth: 40
-                                        implicitHeight: 20
-                                        x: tintIconsSwitch.leftPadding
-                                        y: parent.height / 2 - height / 2
-                                        radius: height / 2
-                                        color: tintIconsSwitch.checked ? Styling.srItem("overprimary") : Colors.surfaceBright
-                                        border.color: tintIconsSwitch.checked ? Styling.srItem("overprimary") : Colors.outline
-
-                                        Behavior on color {
-                                            enabled: Styling.animDuration > 0
-                                            ColorAnimation {
-                                                duration: Styling.animDuration / 2
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            x: tintIconsSwitch.checked ? parent.width - width - 2 : 2
-                                            y: 2
-                                            width: parent.height - 4
-                                            height: width
-                                            radius: width / 2
-                                            color: tintIconsSwitch.checked ? Colors.background : Colors.overSurfaceVariant
-
-                                            Behavior on x {
-                                                enabled: Styling.animDuration > 0
-                                                NumberAnimation {
-                                                    duration: Styling.animDuration / 2
-                                                    easing.type: Easing.OutCubic
-                                                }
-                                            }
-                                        }
-                                    }
-                                    background: null
                                 }
                             }
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-
-                                Text {
-                                    text: "Enable Corners"
-                                    font.family: Config.theme.font
-                                    font.pixelSize: Styling.fontSize(0)
-                                    color: Colors.overBackground
-                                    Layout.fillWidth: true
-                                }
-
-                                Switch {
-                                    id: enableCornersSwitch
-                                    checked: Config.theme.enableCorners
-
-                                    readonly property bool configValue: Config.theme.enableCorners
-
-                                    onConfigValueChanged: {
-                                        if (checked !== configValue) {
-                                            checked = configValue;
-                                        }
+                            ToggleRow {
+                                label: "Enable Corners"
+                                checked: Config.theme.enableCorners
+                                onToggled: value => {
+                                    if (value !== Config.theme.enableCorners) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.enableCorners = value;
                                     }
-
-                                    onCheckedChanged: {
-                                        if (checked !== Config.theme.enableCorners) {
-                                            GlobalStates.markThemeChanged();
-                                            Config.theme.enableCorners = checked;
-                                        }
-                                    }
-
-                                    indicator: Rectangle {
-                                        implicitWidth: 40
-                                        implicitHeight: 20
-                                        x: enableCornersSwitch.leftPadding
-                                        y: parent.height / 2 - height / 2
-                                        radius: height / 2
-                                        color: enableCornersSwitch.checked ? Styling.srItem("overprimary") : Colors.surfaceBright
-                                        border.color: enableCornersSwitch.checked ? Styling.srItem("overprimary") : Colors.outline
-
-                                        Behavior on color {
-                                            enabled: Styling.animDuration > 0
-                                            ColorAnimation {
-                                                duration: Styling.animDuration / 2
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            x: enableCornersSwitch.checked ? parent.width - width - 2 : 2
-                                            y: 2
-                                            width: parent.height - 4
-                                            height: width
-                                            radius: width / 2
-                                            color: enableCornersSwitch.checked ? Colors.background : Colors.overSurfaceVariant
-
-                                            Behavior on x {
-                                                enabled: Styling.animDuration > 0
-                                                NumberAnimation {
-                                                    duration: Styling.animDuration / 2
-                                                    easing.type: Easing.OutCubic
-                                                }
-                                            }
-                                        }
-                                    }
-                                    background: null
                                 }
                             }
 
@@ -440,24 +333,14 @@ Item {
                                     id: animDurationSlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: Config.theme.animDuration / 1000
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${Math.round(value * 1000)}ms`
+                                    tooltipText: `${Math.round(effectiveValue * 1000)}ms`
                                     scroll: true
                                     stepSize: 0.01
                                     snapMode: "always"
-
-                                    readonly property real configValue: Config.theme.animDuration / 1000
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        let newDuration = Math.round(value * 1000);
+                                    onMoved: newValue => {
+                                        const newDuration = Math.round(newValue * 1000);
                                         if (newDuration !== Config.theme.animDuration) {
                                             GlobalStates.markThemeChanged();
                                             Config.theme.animDuration = newDuration;
@@ -673,24 +556,14 @@ Item {
                                     id: roundnessSlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: Config.theme.roundness / 20
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${Math.round(value * 20)}`
+                                    tooltipText: `${Math.round(effectiveValue * 20)}`
                                     scroll: true
                                     stepSize: 0.05
                                     snapMode: "always"
-
-                                    readonly property real configValue: Config.theme.roundness / 20
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        let newRoundness = Math.round(value * 20);
+                                    onMoved: newValue => {
+                                        const newRoundness = Math.round(newValue * 20);
                                         if (newRoundness !== Config.theme.roundness) {
                                             GlobalStates.markThemeChanged();
                                             Config.theme.roundness = newRoundness;
@@ -699,12 +572,91 @@ Item {
                                 }
 
                                 Text {
-                                    text: Math.round(roundnessSlider.value * 20)
+                                    text: Config.theme.roundness
                                     font.family: Config.theme.font
                                     font.pixelSize: Styling.fontSize(0)
                                     color: Colors.overBackground
                                     horizontalAlignment: Text.AlignRight
                                     Layout.preferredWidth: 24
+                                }
+                            }
+
+                            Separator {
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: "Theme Exports"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-1)
+                                font.weight: Font.Medium
+                                color: Colors.overSurfaceVariant
+                                Layout.bottomMargin: -4
+                            }
+
+                            ToggleRow {
+                                label: "GTK Theme Export"
+                                checked: Config.theme.exports.gtk ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.gtk) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.gtk = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Qt Theme Export"
+                                checked: Config.theme.exports.qt ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.qt) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.qt = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Kitty Theme Export"
+                                checked: Config.theme.exports.kitty ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.kitty) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.kitty = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Discord Theme Export"
+                                checked: Config.theme.exports.discord ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.discord) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.discord = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "NvChad Theme Export"
+                                checked: Config.theme.exports.nvchad ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.nvchad) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.nvchad = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Pywal Export"
+                                checked: Config.theme.exports.pywal ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.pywal) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.pywal = value;
+                                    }
                                 }
                             }
                         }
@@ -748,32 +700,22 @@ Item {
                                     id: shadowOpacitySlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: Config.theme.shadowOpacity
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${Math.round(value * 100)}%`
+                                    tooltipText: `${Math.round(effectiveValue * 100)}%`
                                     scroll: true
                                     stepSize: 0.01
                                     snapMode: "always"
-
-                                    readonly property real configValue: Config.theme.shadowOpacity
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        if (Math.abs(value - Config.theme.shadowOpacity) > 0.001) {
+                                    onMoved: newValue => {
+                                        if (Math.abs(newValue - Config.theme.shadowOpacity) > 0.001) {
                                             GlobalStates.markThemeChanged();
-                                            Config.theme.shadowOpacity = value;
+                                            Config.theme.shadowOpacity = newValue;
                                         }
                                     }
                                 }
 
                                 Text {
-                                    text: Math.round(shadowOpacitySlider.value * 100) + "%"
+                                    text: Math.round(Config.theme.shadowOpacity * 100) + "%"
                                     font.family: Config.theme.font
                                     font.pixelSize: Styling.fontSize(0)
                                     color: Colors.overBackground
@@ -798,24 +740,14 @@ Item {
                                     id: shadowBlurSlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: Config.theme.shadowBlur / 4
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${(value * 4).toFixed(1)}`
+                                    tooltipText: `${(effectiveValue * 4).toFixed(1)}`
                                     scroll: true
                                     stepSize: 0.01
                                     snapMode: "always"
-
-                                    readonly property real configValue: Config.theme.shadowBlur / 4
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        let newBlur = value * 4;
+                                    onMoved: newValue => {
+                                        const newBlur = newValue * 4;
                                         if (Math.abs(newBlur - Config.theme.shadowBlur) > 0.01) {
                                             GlobalStates.markThemeChanged();
                                             Config.theme.shadowBlur = newBlur;
@@ -849,24 +781,14 @@ Item {
                                     id: shadowXOffsetSlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: (Config.theme.shadowXOffset + 20) / 40
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${Math.round((value - 0.5) * 40)}`
+                                    tooltipText: `${Math.round((effectiveValue - 0.5) * 40)}`
                                     scroll: true
                                     stepSize: 0.025
                                     snapMode: "always"
-
-                                    readonly property real configValue: (Config.theme.shadowXOffset + 20) / 40
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        let newOffset = Math.round((value - 0.5) * 40);
+                                    onMoved: newValue => {
+                                        const newOffset = Math.round((newValue - 0.5) * 40);
                                         if (newOffset !== Config.theme.shadowXOffset) {
                                             GlobalStates.markThemeChanged();
                                             Config.theme.shadowXOffset = newOffset;
@@ -900,24 +822,14 @@ Item {
                                     id: shadowYOffsetSlider
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 20
+                                    value: (Config.theme.shadowYOffset + 20) / 40
                                     progressColor: Styling.srItem("overprimary")
-                                    tooltipText: `${Math.round((value - 0.5) * 40)}`
+                                    tooltipText: `${Math.round((effectiveValue - 0.5) * 40)}`
                                     scroll: true
                                     stepSize: 0.025
                                     snapMode: "always"
-
-                                    readonly property real configValue: (Config.theme.shadowYOffset + 20) / 40
-
-                                    onConfigValueChanged: {
-                                        if (Math.abs(value - configValue) > 0.001) {
-                                            value = configValue;
-                                        }
-                                    }
-
-                                    Component.onCompleted: value = configValue
-
-                                    onValueChanged: {
-                                        let newOffset = Math.round((value - 0.5) * 40);
+                                    onMoved: newValue => {
+                                        const newOffset = Math.round((newValue - 0.5) * 40);
                                         if (newOffset !== Config.theme.shadowYOffset) {
                                             GlobalStates.markThemeChanged();
                                             Config.theme.shadowYOffset = newOffset;

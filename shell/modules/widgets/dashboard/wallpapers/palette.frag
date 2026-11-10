@@ -21,34 +21,22 @@ void main() {
     float totalWeight = 0.0;
     
     int size = int(ubuf.paletteSize);
-    
-    // "Sharpness" factor. 
-    // Higher value = colors stick closer to the palette (more posterized).
-    // Lower value = colors blend more (more washed out/grey).
-    // 15.0 - 20.0 is a good sweet spot for keeping identity while allowing gradients.
-    float distributionSharpness = 20.0; 
+    float distributionSharpness = 20.0;
 
     for (int i = 0; i < 128; i++) {
         if (i >= size) break;
-        
+
         float u = (float(i) + 0.5) / ubuf.paletteSize;
         vec3 pColor = texture(paletteTexture, vec2(u, 0.5)).rgb;
-        
-        vec3 diff = color - pColor;
-        // Euclidean squared distance
-        float distSq = dot(diff, diff); 
-        
-        // Gaussian Weighting function: e^(-k * d^2)
-        // This creates a smooth bell curve of influence around each palette color.
+
+        vec3 weightedDiff = (color - pColor) * vec3(0.55, 0.77, 0.34);
+        float distSq = dot(weightedDiff, weightedDiff);
         float weight = exp(-distributionSharpness * distSq);
-        
+
         accumulatedColor += pColor * weight;
         totalWeight += weight;
     }
 
-    // Normalize
-    vec3 finalColor = accumulatedColor / (totalWeight + 0.00001); // Avoid div by zero
-
-    // Pre-multiply alpha for proper blending in Qt Quick
+    vec3 finalColor = accumulatedColor / (totalWeight + 0.00001);
     fragColor = vec4(finalColor * tex.a, tex.a) * ubuf.qt_Opacity;
 }

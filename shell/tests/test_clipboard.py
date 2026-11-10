@@ -114,6 +114,17 @@ class ClipboardTest(unittest.TestCase):
         clipboard.initialize(self.db, SHELL / 'modules/services/clipboard_init.sql')
         self.assertEqual(self.db.execute('PRAGMA user_version').fetchone()[0], 1)
 
+    def test_max_items_prunes_unpinned_and_cleans_images(self):
+        clipboard.insert(self.db, b'pinned', 'text/plain', self.data, max_items=2)
+        self.db.execute('UPDATE clipboard_items SET pinned = 1, display_index = 0')
+        self.db.commit()
+        clipboard.insert(self.db, b'img-old', 'image/png', self.data, max_items=2)
+        clipboard.insert(self.db, b'text-1', 'text/plain', self.data, max_items=2)
+        clipboard.insert(self.db, b'text-2', 'text/plain', self.data, max_items=2)
+        rows = self.db.execute('SELECT preview, pinned FROM clipboard_items ORDER BY pinned DESC, display_index ASC').fetchall()
+        self.assertEqual([(r['preview'], r['pinned']) for r in rows], [('pinned', 1), ('text-2', 0), ('text-1', 0)])
+        self.assertEqual(list(self.data.iterdir()), [])
+
 
 if __name__ == '__main__':
     unittest.main()

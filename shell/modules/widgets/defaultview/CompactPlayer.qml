@@ -18,12 +18,6 @@ Item {
     required property var player
     required property bool notchHovered
 
-    onPlayerChanged: {
-        if (!player) {
-            positionSlider.value = 0;
-        }
-    }
-
     property bool isPlaying: player?.playbackState === MprisPlaybackState.Playing
     property real position: player?.position ?? 0.0
     property real length: player?.length ?? 1.0
@@ -90,21 +84,7 @@ Item {
         running: compactPlayer.isPlaying && compactPlayer.visible
         interval: 1000
         repeat: true
-        onTriggered: {
-            if (!positionSlider.isDragging) {
-                positionSlider.value = compactPlayer.length > 0 ? Math.min(1.0, compactPlayer.position / compactPlayer.length) : 0;
-            }
-            compactPlayer.player?.positionChanged();
-        }
-    }
-
-    Connections {
-        target: compactPlayer.player
-        function onPositionChanged() {
-            if (!positionSlider.isDragging && compactPlayer.player) {
-                positionSlider.value = compactPlayer.length > 0 ? Math.min(1.0, compactPlayer.position / compactPlayer.length) : 0;
-            }
-        }
+        onTriggered: compactPlayer.player?.positionChanged()
     }
 
     StyledRect {
@@ -117,6 +97,7 @@ Item {
             anchors.centerIn: parent
             width: parent.width - 32
             text: compactPlayer.displayedTitle
+            textFormat: Text.PlainText
             font.family: Config.theme.font
             font.pixelSize: Styling.fontSize(0)
             font.bold: true
@@ -645,6 +626,7 @@ Item {
 
                         Text {
                             text: playerItem.modelData.trackTitle || playerItem.modelData.identity || "Unknown Player"
+                            textFormat: Text.PlainText
                             font.family: Styling.defaultFont
                             font.pixelSize: Styling.fontSize(0)
                             color: playerItem.item

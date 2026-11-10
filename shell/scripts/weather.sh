@@ -3,8 +3,11 @@
 LOCATION="${1:-}"
 MAX_RETRIES=3
 RETRY_DELAY=2
-GEOIP_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pangu/geoip"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/pangu"
+GEOIP_CACHE="$CACHE_DIR/geoip"
+GEOCODE_CACHE_DIR="$CACHE_DIR/geocode"
 GEOIP_TTL=86400
+GEOCODE_TTL=604800
 
 http_get() {
 	local url="$1"
@@ -14,7 +17,7 @@ http_get() {
 	while [[ $attempt -le $MAX_RETRIES ]]; do
 		response=$(curl -sf --max-time 15 "$url" 2>/dev/null)
 		if [[ -n "$response" && "$response" != "null" ]]; then
-			echo "$response"
+			printf '%s\n' "$response"
 			return 0
 		fi
 		attempt=$((attempt + 1))
@@ -34,47 +37,58 @@ get_geoip_coords() {
 	response=$(http_get "https://ipapi.co/json/")
 
 	if [[ -z "$response" ]]; then
-		echo '{"error": "GeoIP request failed"}'
+		printf '%s\n' '{"error": "GeoIP request failed"}'
 		return 1
 	fi
 
 	local lat lon
-	lat=$(echo "$response" | jq -r '.latitude // empty')
-	lon=$(echo "$response" | jq -r '.longitude // empty')
+	lat=$(printf '%s' "$response" | jq -r '.latitude // empty')
+	lon=$(printf '%s' "$response" | jq -r '.longitude // empty')
 
 	if [[ -z "$lat" || -z "$lon" ]]; then
-		echo '{"error": "Could not determine location from GeoIP"}'
+		printf '%s\n' '{"error": "Could not determine location from GeoIP"}'
 		return 1
 	fi
 
-	mkdir -p "$(dirname "$GEOIP_CACHE")"
+	mkdir -p "$CACHE_DIR"
 	printf '%s' "$lat,$lon" >"$GEOIP_CACHE"
-	echo "$lat,$lon"
+	printf '%s\n' "$lat,$lon"
 }
 
 geocode_city() {
 	local city="$1"
+	local cache_key cache_file
+	cache_key=$(printf '%s' "$city" | sha256sum | cut -d' ' -f1)
+	cache_file="$GEOCODE_CACHE_DIR/$cache_key"
+
+	if [[ -f "$cache_file" ]] && (($(date +%s) - $(stat -c %Y "$cache_file") < GEOCODE_TTL)); then
+		cat "$cache_file"
+		return 0
+	fi
+
 	local encoded_city
-	encoded_city=$(echo -n "$city" | jq -sRr @uri)
+	encoded_city=$(printf '%s' "$city" | jq -sRr @uri)
 
 	local response
 	response=$(http_get "https://geocoding-api.open-meteo.com/v1/search?name=${encoded_city}")
 
 	if [[ -z "$response" ]]; then
-		echo '{"error": "Geocoding request failed"}'
+		printf '%s\n' '{"error": "Geocoding request failed"}'
 		return 1
 	fi
 
 	local lat lon
-	lat=$(echo "$response" | jq -r '.results[0].latitude // empty')
-	lon=$(echo "$response" | jq -r '.results[0].longitude // empty')
+	lat=$(printf '%s' "$response" | jq -r '.results[0].latitude // empty')
+	lon=$(printf '%s' "$response" | jq -r '.results[0].longitude // empty')
 
 	if [[ -z "$lat" || -z "$lon" ]]; then
-		echo '{"error": "City not found"}'
+		printf '%s\n' '{"error": "City not found"}'
 		return 1
 	fi
 
-	echo "$lat,$lon"
+	mkdir -p "$GEOCODE_CACHE_DIR"
+	printf '%s' "$lat,$lon" >"$cache_file"
+	printf '%s\n' "$lat,$lon"
 }
 
 fetch_weather() {

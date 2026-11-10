@@ -295,6 +295,10 @@ end`, reply => {
                 activeWorkspace: monitor.activeWorkspace ? {
                     id: monitor.activeWorkspace.id,
                     name: monitor.activeWorkspace.name
+                } : null,
+                activeSpecialWorkspace: raw.specialWorkspace && raw.specialWorkspace.name ? {
+                    id: raw.specialWorkspace.id,
+                    name: raw.specialWorkspace.name
                 } : null
             };
         });
@@ -332,11 +336,24 @@ end`, reply => {
         onTriggered: root.rebuild()
     }
 
+    readonly property var ignoredRawEvents: ({
+        activelayout: true,
+        bell: true,
+        ignoregrouplock: true,
+        keymap: true,
+        lockgroups: true,
+        screencast: true,
+        submap: true
+    })
+
     Connections {
         target: Hyprland
 
         function onRawEvent(event) {
-            if (!root.handleRawEvent(event)) root.scheduleRefresh();
+            if (root.handleRawEvent(event))
+                return;
+            if (!root.ignoredRawEvents[event.name])
+                root.scheduleRefresh();
         }
         function onFocusedMonitorChanged() {
             root.scheduleSnapshot();
@@ -371,7 +388,25 @@ end`, reply => {
     }
 
     Variants {
-        model: Hyprland.toplevels.values.concat(Hyprland.monitors.values, Hyprland.workspaces.values)
+        model: Hyprland.toplevels
+        Connections {
+            required property var modelData
+            target: modelData
+            function onLastIpcObjectChanged() { root.scheduleSnapshot(); }
+        }
+    }
+
+    Variants {
+        model: Hyprland.monitors
+        Connections {
+            required property var modelData
+            target: modelData
+            function onLastIpcObjectChanged() { root.scheduleSnapshot(); }
+        }
+    }
+
+    Variants {
+        model: Hyprland.workspaces
         Connections {
             required property var modelData
             target: modelData

@@ -89,7 +89,7 @@ RowLayout {
             }
 
             StyledToolTip {
-                visible: actionButton.hovered && actionButton.modelData.tooltip
+                show: actionButton.hovered && Boolean(actionButton.modelData.tooltip)
                 tooltipText: actionButton.modelData.tooltip || ""
             }
         }
@@ -99,7 +99,13 @@ RowLayout {
         id: toggleSwitch
         visible: root.showToggle
         checked: root.toggleChecked
-        onCheckedChanged: root.toggleChanged(checked)
+        onToggled: root.toggleChanged(checked)
+
+        Binding {
+            target: toggleSwitch
+            property: "checked"
+            value: root.toggleChecked
+        }
 
         indicator: Rectangle {
             implicitWidth: 40

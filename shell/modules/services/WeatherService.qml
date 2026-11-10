@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 import qs.modules.globals
+import qs.modules.services
 
 Singleton {
     id: root
@@ -20,16 +21,21 @@ Singleton {
 
     property var forecast: []
 
-    property string sunrise: ""  // HH:MM
-    property string sunset: ""   // HH:MM
-    property real sunProgress: 0.0  // Arc position (0.0-1.0)
+    property string sunrise: ""
+    property string sunset: ""
+    property real sunProgress: 0.0
     property bool isDay: true
-    property string timeOfDay: "Day"  // "Day", "Evening", "Night"
+    property string timeOfDay: "Day"
     property string weatherDescription: ""
 
     property bool debugMode: false
-    property real debugHour: 12.0  // 0-24 hour (e.g. 14.5 = 2:30 PM)
+    property real debugHour: 12.0
     property int debugWeatherCode: 0
+
+    property real _rawCurrentTempC: 0
+    property real _rawMaxTempC: 0
+    property real _rawMinTempC: 0
+    property var _rawForecastC: []
 
     readonly property string scriptPath: Paths.script("weather.sh")
 
@@ -62,14 +68,14 @@ Singleton {
     }
 
     property Timer refreshTimer: Timer {
-        interval: 600000  // 10 minutes
+        interval: 600000
         running: !SuspendManager.isSuspending
         repeat: true
         onTriggered: root.updateWeather()
     }
 
     property Timer sunPositionTimer: Timer {
-        interval: 60000  // 1 minute
+        interval: 60000
         running: !SuspendManager.isSuspending && (GlobalStates.dashboardOpen || GlobalStates.launcherOpen || GlobalStates.overviewOpen)
         repeat: true
         onTriggered: root.calculateSunPosition()
@@ -85,23 +91,30 @@ Singleton {
         if (!timeStr)
             return 0;
         var parts = timeStr.split(":");
-        return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+        if (parts.length < 2)
+            return 0;
+        var h = parseInt(parts[0], 10);
+        var m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m))
+            return 0;
+        return h + m / 60;
     }
 
     readonly property real visualSunriseHour: 6.0
     readonly property real visualSunsetHour: 18.0
 
     function calculateSunProgress(hour, sunriseH, sunsetH) {
+        var dayDuration = sunsetH - sunriseH;
+        if (dayDuration <= 0 || dayDuration >= 24)
+            return 0.5;
         if (hour >= sunriseH && hour <= sunsetH) {
-            return (hour - sunriseH) / (sunsetH - sunriseH);
-        } else {
-            var nightDuration = 24 - (sunsetH - sunriseH);
-            if (hour > sunsetH) {
-                return (hour - sunsetH) / nightDuration;
-            } else {
-                return (hour + (24 - sunsetH)) / nightDuration;
-            }
+            return (hour - sunriseH) / dayDuration;
         }
+        var nightDuration = 24 - dayDuration;
+        if (hour > sunsetH) {
+            return (hour - sunsetH) / nightDuration;
+        }
+        return (hour + (24 - sunsetH)) / nightDuration;
     }
 
     readonly property real debugSunProgress: calculateSunProgress(debugHour, visualSunriseHour, visualSunsetHour)
@@ -349,10 +362,24 @@ Singleton {
     }
 
     function convertTemp(temp) {
-        if (Config.weather.unit === "F") {
+        if (Config.weather?.unit === "F") {
             return (temp * 9 / 5) + 32;
         }
         return temp;
+    }
+
+    function applyConvertedTemps() {
+        root.currentTemp = convertTemp(root._rawCurrentTempC);
+        root.maxTemp = convertTemp(root._rawMaxTempC);
+        root.minTemp = convertTemp(root._rawMinTempC);
+        root.forecast = root._rawForecastC.map(entry => ({
+            date: entry.date,
+            dayName: entry.dayName,
+            weatherCode: entry.weatherCode,
+            emoji: entry.emoji,
+            maxTemp: convertTemp(entry.maxTempC),
+            minTemp: convertTemp(entry.minTempC)
+        }));
     }
 
     function handleError() {
@@ -383,45 +410,47 @@ Singleton {
                     var weather = data.current_weather;
                     var daily = data.daily;
 
-                    root.weatherCode = parseInt(weather.weathercode);
-                    root.currentTemp = convertTemp(parseFloat(weather.temperature));
-                    root.windSpeed = parseFloat(weather.windspeed);
+                    root.weatherCode = parseInt(weather.weathercode, 10) || 0;
+                    root._rawCurrentTempC = parseFloat(weather.temperature) || 0;
+                    root.windSpeed = parseFloat(weather.windspeed) || 0;
 
                     if (daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
-                        root.maxTemp = convertTemp(parseFloat(daily.temperature_2m_max[0]));
+                        root._rawMaxTempC = parseFloat(daily.temperature_2m_max[0]) || 0;
                     }
                     if (daily.temperature_2m_min && daily.temperature_2m_min.length > 0) {
-                        root.minTemp = convertTemp(parseFloat(daily.temperature_2m_min[0]));
+                        root._rawMinTempC = parseFloat(daily.temperature_2m_min[0]) || 0;
                     }
 
                     if (daily.sunrise && daily.sunrise.length > 0) {
-                        root.sunrise = daily.sunrise[0].split("T")[1];
+                        root.sunrise = daily.sunrise[0].split("T")[1] || "";
                     }
                     if (daily.sunset && daily.sunset.length > 0) {
-                        root.sunset = daily.sunset[0].split("T")[1];
+                        root.sunset = daily.sunset[0].split("T")[1] || "";
                     }
 
-                    var forecastData = [];
+                    var rawForecast = [];
                     var dayCount = Math.min(7, daily.time ? daily.time.length : 0);
                     for (var i = 0; i < dayCount; i++) {
                         var dateParts = daily.time[i].split("-");
-                        var year = parseInt(dateParts[0]);
-                        var month = parseInt(dateParts[1]) - 1;  // 0-indexed months
-                        var day = parseInt(dateParts[2]);
+                        var year = parseInt(dateParts[0], 10);
+                        var month = parseInt(dateParts[1], 10) - 1;
+                        var day = parseInt(dateParts[2], 10);
 
                         var dayDate = new Date(year, month, day);
                         var rawDayName = i === 0 ? "Today" : dayDate.toLocaleDateString(Qt.locale(), "ddd");
                         var dayName = rawDayName.charAt(0).toUpperCase() + rawDayName.slice(1);
-                        forecastData.push({
+                        var code = daily.weathercode ? daily.weathercode[i] : 0;
+                        rawForecast.push({
                             date: daily.time[i],
                             dayName: dayName,
-                            weatherCode: daily.weathercode ? daily.weathercode[i] : 0,
-                            emoji: getWeatherCodeEmoji(daily.weathercode ? daily.weathercode[i] : 0),
-                            maxTemp: convertTemp(daily.temperature_2m_max ? daily.temperature_2m_max[i] : 0),
-                            minTemp: convertTemp(daily.temperature_2m_min ? daily.temperature_2m_min[i] : 0)
+                            weatherCode: code,
+                            emoji: getWeatherCodeEmoji(code),
+                            maxTempC: daily.temperature_2m_max ? (parseFloat(daily.temperature_2m_max[i]) || 0) : 0,
+                            minTempC: daily.temperature_2m_min ? (parseFloat(daily.temperature_2m_min[i]) || 0) : 0
                         });
                     }
-                    root.forecast = forecastData;
+                    root._rawForecastC = rawForecast;
+                    root.applyConvertedTemps();
 
                     root.weatherSymbol = getWeatherCodeEmoji(root.weatherCode);
                     root.weatherDescription = getWeatherDescription(root.weatherCode);
@@ -478,14 +507,15 @@ Singleton {
     property bool _initialized: false
 
     onConfigLocationChanged: {
-        if (!_initialized) return;
-        console.log("WeatherService: Location changed to '" + configLocation + "'");
-        Qt.callLater(() => { updateWeather(); });
+        if (!_initialized || !Config.initialLoadComplete) return;
+        Qt.callLater(root.updateWeather);
     }
     onConfigUnitChanged: {
         if (!_initialized) return;
-        console.log("WeatherService: Unit changed to '" + configUnit + "'");
-        Qt.callLater(() => { updateWeather(); });
+        if (root.dataAvailable)
+            root.applyConvertedTemps();
+        else if (Config.initialLoadComplete)
+            Qt.callLater(root.updateWeather);
     }
 
     function updateWeather() {
@@ -498,27 +528,23 @@ Singleton {
         root.wasCancelled = false;
 
         if (!Config.weather) {
-            console.warn("WeatherService: Config.weather is null");
             return;
         }
 
         root.isLoading = true;
         root.hasFailed = false;
 
-        var locationStr = Config.weather.location || "";
-        var location = locationStr.trim();
-
-        console.log("WeatherService: Fetching weather for '" + location + "'");
-
+        var location = String(Config.weather.location || "").trim();
         weatherProcess.command = ["timeout", "-k", "5s", "60s", scriptPath, location];
         weatherProcess.running = true;
     }
 
     Timer {
         id: startupDelay
-        interval: 2000
-        running: true
-        onTriggered: updateWeather()
+        interval: 1500
+        running: Config.initialLoadComplete
+        repeat: false
+        onTriggered: root.updateWeather()
     }
 
     Component.onCompleted: {

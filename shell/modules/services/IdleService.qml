@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 import qs.modules.components
+import qs.modules.services
 
 Singleton {
     id: root
@@ -19,6 +20,7 @@ Singleton {
     property bool writing: false
     property bool configReady: false
     property string writtenSettings: ""
+    property int restartFailures: 0
 
     readonly property var effectiveListeners: {
         const idle = Config.system.idle;
@@ -122,6 +124,7 @@ Singleton {
             root.activeListeners = root.pendingListeners;
             root.generation++;
             root.configReady = true;
+            root.restartFailures = 0;
             if (daemon.running) daemon.running = false;
             else daemon.running = true;
         }
@@ -132,8 +135,16 @@ Singleton {
         command: ["hypridle", "-q", "-c", configFile.path]
         onExited: {
             root.resumeAll();
+            root.restartFailures++;
+            restartTimer.interval = Math.min(30000, 1000 * Math.pow(2, Math.min(5, root.restartFailures - 1)));
             restartTimer.restart();
         }
+    }
+    Timer {
+        id: healthyTimer
+        interval: 15000
+        running: daemon.running
+        onTriggered: root.restartFailures = 0
     }
     Timer {
         id: restartTimer

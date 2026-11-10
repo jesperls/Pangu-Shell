@@ -111,10 +111,15 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s shell/tests -v
 ```
 
 Always compile shaders before running the checkout's full QML or shader tests.
-The wrapper accepts `PANGU_SHELL_DIR` for development; ordinary startup uses its
-immutable packaged source. `pangu run`, `lock` and `brightness` use IPC, while
-`pangu reload` and `quit` control the installed service. Do not use service
-restart commands to reload a manual development instance.
+The wrapper captures `PANGU_USER_PATH`, `PANGU_USER_QT_PLUGIN_PATH`,
+`PANGU_USER_QML2_IMPORT_PATH` and `PANGU_USER_QML_IMPORT_PATH` before prepending
+internal runtime dependencies so `ApplicationLauncher` spawns user applications
+with their clean session environment. It accepts `PANGU_SHELL_DIR` for
+development; ordinary startup uses its immutable packaged source. `pangu run`,
+`lock` and `brightness` use IPC, `pangu screen on|off` dispatches Hyprland DPMS
+directly for `after_sleep_cmd`, and `pangu reload` and `quit` control the
+installed service. Do not use service restart commands to reload a manual
+development instance.
 
 ```sh
 systemctl --user status pangu.service

@@ -19,7 +19,7 @@ QtObject {
         const linkcolor = toRGB(Colors.blue)
         const mentioncolor = toRGB(Colors.yellow)
         
-        const font = Config.theme.font || "gg sans"
+        const font = String(Config.theme.font || "gg sans").replace(/[;"'\n\r{}]/g, "").trim() || "gg sans"
 
         const isLight = Config.theme.lightMode
         

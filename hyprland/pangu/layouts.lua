@@ -218,11 +218,17 @@ local function monitor_box(mon)
   return { x = mon.x, y = mon.y, w = w / scale, h = h / scale }
 end
 
-local function full_master_box(mon)
+local function full_master_box(mon, has_sides)
   local box = monitor_box(mon)
   local w = box.h * aspect
   if w >= box.w then
     return nil
+  end
+  if has_sides and box.w - w < 200 then
+    w = math.max(200, box.w - 200)
+    if w >= box.w then
+      return nil
+    end
   end
   return { x = box.x + (box.w - w) / 2, y = box.y, w = w, h = box.h }
 end
@@ -266,12 +272,21 @@ local function update_gap(mon)
   end
 end
 
+local drag = nil
+
 local function prune_session()
   local live_ws = {}
   local live_windows = {}
   for _, ws in ipairs(hl.get_workspaces()) do
     live_ws[ws.id] = true
-    for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
+    if not hl.get_windows then
+      for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
+        live_windows[window.stable_id] = true
+      end
+    end
+  end
+  if hl.get_windows then
+    for _, window in ipairs(hl.get_windows()) do
       live_windows[window.stable_id] = true
     end
   end
@@ -295,7 +310,9 @@ local function scan()
     end
   end
   prune_session()
-  session.save()
+  if not drag then
+    session.save()
+  end
 end
 
 local scan_timer
@@ -314,6 +331,7 @@ end
 
 for _, event in ipairs({
   "workspace.active",
+  "workspace.special_active",
   "workspace.move_to_monitor",
   "window.open",
   "window.close",
@@ -345,8 +363,6 @@ local function ctx_monitor(ctx)
     end
   end
 end
-
-local drag = nil
 
 local function drag_apply(ctx, s, _, ddy)
   local area = ctx.area
@@ -381,21 +397,38 @@ end
 
 local drag_timer = nil
 
+local function stop_drag()
+  if not drag then
+    return
+  end
+  drag = nil
+  if drag_timer then
+    drag_timer:set_enabled(false)
+  end
+  session.save()
+end
+
 local function drag_tick()
   if not drag then
     return
   end
   local workspace = hl.get_active_workspace()
-  if not workspace or workspace.tiled_layout ~= "lua:centered" then
-    drag = nil
-    if drag_timer then
-      drag_timer:set_enabled(false)
-    end
+  local active_win = hl.get_active_window()
+  if
+    not workspace
+    or workspace.tiled_layout ~= "lua:centered"
+    or not active_win
+    or active_win.stable_id ~= drag.id
+  then
+    stop_drag()
     return
   end
   if drag.super and not (hl.is_key_down("Super_L") or hl.is_key_down("Super_R")) then
-    drag = nil
-    drag_timer:set_enabled(false)
+    stop_drag()
+    return
+  end
+  if not drag.super and os.clock() - drag.started_at > 15 then
+    stop_drag()
     return
   end
   local pos = hl.get_cursor_pos()
@@ -453,6 +486,7 @@ function M.start_drag()
     y = pos.y,
     grab_top = at and size and pos.y < at.y + size.y / 2 or false,
     super = hl.is_key_down("Super_L") or hl.is_key_down("Super_R"),
+    started_at = os.clock(),
   }
 
   if drag_timer then
@@ -463,12 +497,8 @@ function M.start_drag()
 end
 
 function M.end_drag()
-  drag = nil
-  if drag_timer then
-    drag_timer:set_enabled(false)
-  end
+  stop_drag()
 end
-
 
 hl.layout.register("centered", {
   recalculate = function(ctx)
@@ -483,7 +513,7 @@ hl.layout.register("centered", {
     local master_box
     if full_height then
       local mon = ctx_monitor(ctx)
-      master_box = mon and full_master_box(mon)
+      master_box = mon and full_master_box(mon, n > 1)
       if master_box then
         master_w = master_box.w
       end

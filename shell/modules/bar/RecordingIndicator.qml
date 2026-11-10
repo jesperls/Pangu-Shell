@@ -73,9 +73,15 @@ Item {
     }
 
     MouseArea {
+        id: indicatorMouse
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: root.recording ? ScreenRecorder.toggleRecording() : ReplayService.saveClip()
+    }
+
+    StyledToolTip {
+        show: indicatorMouse.containsMouse
+        tooltipText: root.recording ? "Stop screen recording" : "Save replay clip"
     }
 }

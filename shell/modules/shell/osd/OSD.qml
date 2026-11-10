@@ -32,11 +32,53 @@ PanelWindow {
 
     color: "transparent"
 
-    visible: GlobalStates.osdVisible && (Quickshell.screens.length === 1 || (Compositor.focusedMonitor && Compositor.focusedMonitor.name === targetScreen.name))
+    readonly property bool isTargetScreen: {
+        if (!targetScreen)
+            return false;
+        if (Quickshell.screens.length === 1)
+            return true;
+        if (GlobalStates.osdScreenName !== "")
+            return GlobalStates.osdScreenName === targetScreen.name;
+        if (Compositor.focusedMonitor)
+            return Compositor.focusedMonitor.name === targetScreen.name;
+        return targetScreen === Quickshell.screens[0];
+    }
 
-    property real osdValue: 0
-    property bool osdMuted: false
-    property bool shown: GlobalStates.osdVisible
+    property bool closing: false
+    readonly property real osdValue: GlobalStates.osdValue
+    readonly property bool osdMuted: GlobalStates.osdMuted
+    readonly property bool shown: GlobalStates.osdVisible && isTargetScreen
+
+    visible: targetScreen !== null && (shown || closing) && isTargetScreen
+
+    onShownChanged: {
+        if (shown) {
+            closing = false;
+            closeTimer.stop();
+        } else if (visible && Styling.animDuration > 0) {
+            closing = true;
+            closeTimer.restart();
+        } else {
+            closing = false;
+        }
+    }
+
+    Timer {
+        id: closeTimer
+        interval: Math.max(50, Math.round(Styling.animDuration / 2) + 30)
+        onTriggered: root.closing = false
+    }
+
+    Item {
+        id: emptyMaskItem
+        width: 0
+        height: 0
+        visible: false
+    }
+
+    mask: Region {
+        item: root.shown ? osdRect : emptyMaskItem
+    }
 
     Item {
         anchors.fill: parent
@@ -214,55 +256,11 @@ PanelWindow {
         easing.type: Easing.OutBack
     }
 
-    MouseArea {
-        anchors.fill: parent
-        onEntered: hideTimer.restart()
-        hoverEnabled: true
-    }
-
-    Timer {
-        id: hideTimer
-        interval: 2500
-        onTriggered: GlobalStates.osdVisible = false
-    }
-
-    Connections {
-        target: GlobalStates
-        function onOsdVisibleChanged() {
-            if (GlobalStates.osdVisible) {
-                hideTimer.restart();
-            }
-        }
-    }
-
-    Connections {
-        target: Audio
-        function onVolumeChanged(volume, muted, node) {
-            root.osdValue = volume;
-            root.osdMuted = muted;
-            GlobalStates.osdIndicator = "volume";
-            GlobalStates.osdVisible = true;
-            hideTimer.restart();
-        }
-        function onMicVolumeChanged(volume, muted, node) {
-            root.osdValue = volume;
-            root.osdMuted = muted;
-            GlobalStates.osdIndicator = "mic";
-            GlobalStates.osdVisible = true;
-            hideTimer.restart();
-        }
-    }
-
-    Connections {
-        target: Brightness
-        function onBrightnessChanged(value, screen) {
-            if (!screen || !root.targetScreen || screen.name === root.targetScreen.name || Brightness.syncBrightness) {
-                root.osdValue = value;
-                root.osdMuted = false;
-                GlobalStates.osdIndicator = "brightness";
-                GlobalStates.osdVisible = true;
-                hideTimer.restart();
-            }
+    HoverHandler {
+        target: osdRect
+        onHoveredChanged: {
+            if (hovered)
+                GlobalStates.restartOsdTimer();
         }
     }
 }

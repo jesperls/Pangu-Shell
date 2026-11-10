@@ -2,27 +2,31 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 
 Singleton {
     id: root
 
     property bool isSuspending: false
-    
     property bool wakeReady: true
 
-    property var wakeReadyTimer: Timer {
+    Timer {
         id: wakeReadyTimer
-        interval: 3000  // 3s delay for stability
+        interval: 3000
         repeat: false
         onTriggered: root.wakeReady = true
+    }
+
+    Timer {
+        id: suspendWatchdog
+        interval: 30000
+        running: root.isSuspending
+        onTriggered: root.onWakingUp()
     }
 
     signal preparingForSleep()
     signal wakingUp()
 
     function onPrepareForSleep() {
-        console.log("SuspendManager: Preparing for sleep...");
         wakeReadyTimer.stop();
         root.isSuspending = true;
         root.wakeReady = false;
@@ -30,10 +34,8 @@ Singleton {
     }
 
     function onWakingUp() {
-        console.log("SuspendManager: Waking up...");
         root.isSuspending = false;
         root.wakingUp();
-        
         wakeReadyTimer.restart();
     }
 }

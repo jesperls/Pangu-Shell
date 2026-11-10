@@ -137,12 +137,24 @@ Singleton {
         barPopupGroups = groups;
     }
 
-    function setActiveModule(moduleName) {
-        const focusedMonitor = Compositor.focusedMonitor;
-        if (!focusedMonitor)
-            return;
+    function hasOpenBarPopup(screenName) {
+        if (!screenName) return false;
+        for (const groupId in barPopupGroups) {
+            const list = barPopupGroups[groupId] || [];
+            for (let i = 0; i < list.length; i++) {
+                const p = list[i];
+                if (p && p.isOpen && p.bar?.screenName === screenName)
+                    return true;
+            }
+        }
+        return false;
+    }
 
-        const focusedScreenName = focusedMonitor.name;
+    function setActiveModule(moduleName, targetScreenName) {
+        const explicitScreen = (typeof targetScreenName === "string" && targetScreenName.length > 0) ? targetScreenName : "";
+        const focusedScreenName = explicitScreen || Compositor.focusedMonitor?.name || Quickshell.screens[0]?.name || "";
+        if (!focusedScreenName)
+            return;
 
         clearAll();
 

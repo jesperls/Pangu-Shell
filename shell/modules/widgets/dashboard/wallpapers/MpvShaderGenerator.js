@@ -3,28 +3,28 @@
 function generate(paletteColors) {
     if (!paletteColors || paletteColors.length === 0) {
         return `//!HOOK MAIN
-void main() {
-    HOOKED_col = HOOKED_tex(HOOKED_pos);
+//!BIND HOOKED
+vec4 hook() {
+    return HOOKED_texOff(0);
 }`;
     }
 
     let unrolledLogic = "";
-    
+
     for (let i = 0; i < paletteColors.length; i++) {
         let color = paletteColors[i];
-        
+
         let r = (typeof color.r === 'number' ? color.r : 0.0).toFixed(5);
         let g = (typeof color.g === 'number' ? color.g : 0.0).toFixed(5);
         let b = (typeof color.b === 'number' ? color.b : 0.0).toFixed(5);
-        
+
         unrolledLogic += `
     {
         vec3 pColor = vec3(${r}, ${g}, ${b});
         vec3 diff = color - pColor;
-        
-        vec3 weightedDiff = diff * vec3(0.55, 0.77, 0.34);  // Sqrt of standard luma weights roughly
-        float distSq = dot(weightedDiff, weightedDiff); 
-        
+        vec3 weightedDiff = diff * vec3(0.55, 0.77, 0.34);
+        float distSq = dot(weightedDiff, weightedDiff);
+
         if (distSq < minDistSq) {
             minDistSq = distSq;
             closestColor = pColor;
@@ -38,6 +38,7 @@ void main() {
     }
 
     return `//!HOOK MAIN
+//!BIND HOOKED
 
 float noise_random(vec2 uv) {
     return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);

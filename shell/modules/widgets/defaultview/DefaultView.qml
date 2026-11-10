@@ -115,12 +115,6 @@ Item {
         }
     }
 
-    Column {
-        anchors.fill: parent
-        spacing: 0
-
-    }
-
     Item {
         anchors.fill: parent
 

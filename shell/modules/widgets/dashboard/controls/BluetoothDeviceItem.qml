@@ -18,6 +18,10 @@ Item {
 
     property bool expanded: false
 
+    function resetState() {
+        expanded = false;
+    }
+
     implicitHeight: contentColumn.implicitHeight + 16
 
     Behavior on implicitHeight {

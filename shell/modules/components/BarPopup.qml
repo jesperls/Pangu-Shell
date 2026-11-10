@@ -18,9 +18,9 @@ PopupWindow {
     default property alias contentData: contentContainer.data
 
     property int popupPadding: 8
-    property int visualMargin: 8  // Distance from bar
-    property int shadowMargin: 16  // Extra margin for shadow
-    property string variant: "popup"  // StyledRect variant for background
+    property int visualMargin: 8
+    property int shadowMargin: 16
+    property string variant: "popup"
 
     property bool closeOnFocusLost: true
     property var parentPopup: null
@@ -103,6 +103,16 @@ PopupWindow {
         }
     }
 
+    Connections {
+        target: Visibilities
+        function onCurrentActiveModuleChanged() {
+            if (Visibilities.currentActiveModule !== "" && root.isOpen) {
+                root.closedExternally();
+                root.close();
+            }
+        }
+    }
+
     Behavior on popupOpacity {
         enabled: Styling.animDuration > 0
         NumberAnimation {
@@ -119,10 +129,11 @@ PopupWindow {
         }
     }
 
-    Item {
+    FocusScope {
         id: popupContainer
         anchors.fill: parent
         anchors.margins: root.shadowMargin
+        focus: root.isOpen
         opacity: root.popupOpacity
         scale: root.popupScale
         transformOrigin: {
@@ -135,6 +146,11 @@ PopupWindow {
             if (root.barAtRight)
                 return Item.Right;
             return Item.Center;
+        }
+
+        Keys.onEscapePressed: {
+            root.closedExternally();
+            root.close();
         }
 
         StyledRect {

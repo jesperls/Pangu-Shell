@@ -47,7 +47,7 @@ Item {
         required property string edge
 
         screen: root.screen
-        visible: true
+        visible: root.screen !== null && exclusiveZone > 0
         implicitHeight: (edge === "top" || edge === "bottom") ? Math.max(1, exclusiveZone) : 0
         implicitWidth: (edge === "left" || edge === "right") ? Math.max(1, exclusiveZone) : 0
         color: "transparent"

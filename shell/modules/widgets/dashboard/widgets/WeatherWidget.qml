@@ -12,8 +12,7 @@ ClippingRectangle {
     id: root
 
     property bool showDebugControls: false
-    
-    property bool animationsEnabled: true
+    property bool animationsEnabled: Styling.animDuration > 0
 
 
     radius: Styling.radius(0)
@@ -83,9 +82,9 @@ ClippingRectangle {
         gradient: Gradient {
             GradientStop {
                 position: 0.0
-                color: root.blend.night > 0.5 ? Qt.rgba(0.15, 0.15, 0.2, 0.9)  // Dark gray-blue at night
-                : root.blend.evening > 0.3 ? Qt.rgba(0.3, 0.25, 0.3, 0.85)  // Purple-gray at evening
-                : Qt.rgba(0.5, 0.52, 0.55, 0.8)  // Light gray during day
+                color: root.blend.night > 0.5 ? Qt.rgba(0.15, 0.15, 0.2, 0.9)
+                : root.blend.evening > 0.3 ? Qt.rgba(0.3, 0.25, 0.3, 0.85)
+                : Qt.rgba(0.5, 0.52, 0.55, 0.8)
             }
             GradientStop {
                 position: 0.6
@@ -93,11 +92,12 @@ ClippingRectangle {
             }
             GradientStop {
                 position: 1.0
-                color: Qt.rgba(0.5, 0.5, 0.5, 0.2)  // Fade out at bottom
+                color: Qt.rgba(0.5, 0.5, 0.5, 0.2)
             }
         }
 
         Behavior on opacity {
+            enabled: root.animationsEnabled
             NumberAnimation {
                 duration: 500
                 easing.type: Easing.InOutQuad
@@ -112,6 +112,7 @@ ClippingRectangle {
         visible: opacity > 0
 
         Behavior on opacity {
+            enabled: root.animationsEnabled
             NumberAnimation {
                 duration: 1000
                 easing.type: Easing.InOutQuad
@@ -124,7 +125,7 @@ ClippingRectangle {
             Rectangle {
                 id: star
                 property real baseX: Math.random() * starsEffect.width
-                property real baseY: Math.random() * (starsEffect.height * 0.7)  // Upper 70%
+                property real baseY: Math.random() * (starsEffect.height * 0.7)
                 property real baseSize: 1 + Math.random() * 2
                 property real twinkleSpeed: 1500 + Math.random() * 2000
                 property real baseOpacity: 0.4 + Math.random() * 0.4
@@ -168,6 +169,7 @@ ClippingRectangle {
         visible: opacity > 0
 
         Behavior on opacity {
+            enabled: root.animationsEnabled
             NumberAnimation {
                 duration: 800
                 easing.type: Easing.InOutQuad
@@ -231,10 +233,10 @@ ClippingRectangle {
 
         property bool isStormy: root.weatherEffect === "rain" || root.weatherEffect === "thunderstorm" || root.weatherEffect === "drizzle"
 
-        property color cloudColorDark: root.blend.night > 0.5 ? Qt.rgba(0.2, 0.2, 0.25, 1)  // Dark blue-gray at night
-        : root.blend.evening > 0.3 ? Qt.rgba(0.35, 0.3, 0.35, 1)  // Purple-gray at evening
-        : isStormy ? Qt.rgba(0.4, 0.42, 0.45, 1)  // Dark gray for storms during day
-        : Qt.rgba(0.85, 0.87, 0.9, 1)  // Light gray-white for fair clouds
+        property color cloudColorDark: root.blend.night > 0.5 ? Qt.rgba(0.2, 0.2, 0.25, 1)
+        : root.blend.evening > 0.3 ? Qt.rgba(0.35, 0.3, 0.35, 1)
+        : isStormy ? Qt.rgba(0.4, 0.42, 0.45, 1)
+        : Qt.rgba(0.85, 0.87, 0.9, 1)
 
         property color cloudColorLight: root.blend.night > 0.5 ? Qt.rgba(0.3, 0.3, 0.35, 1) : root.blend.evening > 0.3 ? Qt.rgba(0.45, 0.4, 0.45, 1) : isStormy ? Qt.rgba(0.5, 0.52, 0.55, 1) : Qt.rgba(0.92, 0.94, 0.96, 1)
 
@@ -246,7 +248,7 @@ ClippingRectangle {
                 required property int index
                 property real speed: 0.15 + (index * 0.05)
                 property real totalDistance: cloudEffect.width + width + 100
-                property real cycleDuration: 40000 / speed  // 40 seconds base, adjusted by speed
+                property real cycleDuration: 40000 / speed
 
                 x: (index * totalDistance / 4) % (cloudEffect.width + width) - width
                 y: 5 + (index * 15)
@@ -289,7 +291,7 @@ ClippingRectangle {
 
                     NumberAnimation {
                         to: -bgCloud.width - 50
-                        duration: 0  // Instant reset when off-screen
+                        duration: 0
                     }
                 }
 
@@ -311,7 +313,7 @@ ClippingRectangle {
                 required property int index
                 property real speed: 0.25 + (index * 0.1)
                 property real totalDistance: cloudEffect.width + width + 100
-                property real cycleDuration: 25000 / speed  // 25 seconds base, adjusted by speed
+                property real cycleDuration: 25000 / speed
 
                 x: (index * totalDistance / 6) % (cloudEffect.width + width) - width
                 y: 20 + (index * 15)
@@ -354,7 +356,7 @@ ClippingRectangle {
 
                     NumberAnimation {
                         to: -fgCloud.width - 50
-                        duration: 0  // Instant reset when off-screen
+                        duration: 0
                     }
                 }
 
@@ -432,7 +434,7 @@ ClippingRectangle {
         visible: root.weatherEffect === "rain" || root.weatherEffect === "drizzle"
 
         property int dropCount: Math.round(20 * root.weatherIntensity)
-        property real angle: 15  // degrees from vertical
+        property real angle: 15
         property real angleRad: angle * Math.PI / 180
 
         Repeater {
@@ -556,7 +558,7 @@ ClippingRectangle {
         anchors.fill: parent
         visible: root.weatherEffect === "thunderstorm"
 
-        property real angle: 20  // degrees from vertical (stronger wind)
+        property real angle: 20
         property real angleRad: angle * Math.PI / 180
 
         Repeater {
@@ -662,10 +664,10 @@ ClippingRectangle {
         id: arcContainer
         anchors.fill: parent
 
-        property real arcWidth: width - 40  // Horizontal span
-        property real arcHeight: Math.min(70, height * 0.5)  // Vertical height of the arc
+        property real arcWidth: width - 40
+        property real arcHeight: Math.min(70, height * 0.5)
         property real arcCenterX: width / 2
-        property real arcCenterY: height - 12  // Position at bottom edge
+        property real arcCenterY: height - 12
 
         Canvas {
             id: arcCanvas
@@ -681,7 +683,7 @@ ClippingRectangle {
                 var cy = arcContainer.arcCenterY;
                 var rx = arcContainer.arcWidth / 2;
                 var ry = arcContainer.arcHeight;
-                var lineWidth = 20;  // Same as celestialBody diameter
+                var lineWidth = 20;
 
                 var gradient = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
                 gradient.addColorStop(0, Qt.rgba(arcColor.r, arcColor.g, arcColor.b, 0));
@@ -738,12 +740,14 @@ ClippingRectangle {
             y: posY
 
             Behavior on x {
+                enabled: root.animationsEnabled
                 NumberAnimation {
                     duration: 300
                     easing.type: Easing.OutQuad
                 }
             }
             Behavior on y {
+                enabled: root.animationsEnabled
                 NumberAnimation {
                     duration: 300
                     easing.type: Easing.OutQuad
@@ -802,7 +806,7 @@ ClippingRectangle {
             visible: WeatherService.dataAvailable
             text: Math.round(WeatherService.currentTemp) + "°" + Config.weather.unit
             color: "#FFFFFF"
-            font.family: "Noto Sans"
+            font.family: Config.theme.font
             font.pixelSize: Config.theme.fontSize + 10
             font.weight: Font.Bold
         }
@@ -837,7 +841,7 @@ ClippingRectangle {
             id: descText
             text: WeatherService.dataAvailable ? WeatherService.effectiveWeatherDescription : "Error"
             color: Qt.rgba(1, 1, 1, 0.85)
-            font.family: "Noto Sans"
+            font.family: Config.theme.font
             font.pixelSize: Config.theme.fontSize - 2
             font.weight: Font.Bold
         }
@@ -865,6 +869,7 @@ ClippingRectangle {
         visible: root.showDebugControls
 
         Behavior on opacity {
+            enabled: root.animationsEnabled
             NumberAnimation {
                 duration: 150
                 easing.type: Easing.InOutQuad

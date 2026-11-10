@@ -102,11 +102,11 @@ Menu {
                 if (root.hoveredIndex === -1 || root.hoveredIndex >= root.items.length)
                     return false;
                 let item = root.items[root.hoveredIndex];
-                return item && !item.isSeparator;
+                return item && !item.isSeparator && (item.enabled !== false);
             }
             opacity: visible ? 1.0 : 0
 
-            x: 8  // Padding offset
+            x: 8
             y: {
                 if (root.hoveredIndex === -1 || root.hoveredIndex >= root.items.length)
                     return 8;
@@ -159,8 +159,9 @@ Menu {
 
             text: itemData.text || ""
             width: root.menuWidth
-            height: isSeparatorItem ? 10 : root.itemHeight  // 2px separator + 4px margins
-            enabled: !isSeparatorItem
+            height: isSeparatorItem ? 10 : root.itemHeight
+            enabled: !isSeparatorItem && (itemData.enabled !== false)
+            opacity: isSeparatorItem || enabled ? 1.0 : 0.45
 
             background: Rectangle {
                 anchors.fill: parent
@@ -171,7 +172,7 @@ Menu {
             }
 
             onHoveredChanged: {
-                if (isSeparatorItem)
+                if (isSeparatorItem || !menuItem.enabled)
                     return;
 
                 if (hovered) {
@@ -228,7 +229,7 @@ Menu {
                                 font.pixelSize: 14
                                 font.weight: Font.Bold
                                 anchors.centerIn: parent
-                                textFormat: Text.RichText
+                                textFormat: iconLoader.iconSource.startsWith("<") ? Text.RichText : Text.PlainText
 
                                 Behavior on color {
                                     enabled: Styling.animDuration > 0
@@ -250,18 +251,13 @@ Menu {
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
                                 anchors.centerIn: parent
-
-                                onStatusChanged: {
-                                    if (status === Image.Error) {
-                                        console.log("Failed to load icon:", source);
-                                    }
-                                }
                             }
                         }
                     }
 
                     Text {
                         text: menuItem.itemData.text || ""
+                        textFormat: Text.PlainText
                         color: {
                             if (root.hoveredIndex === menuItem.itemIndex) {
                                 return menuItem.itemData.textColor !== undefined ? menuItem.itemData.textColor : root.defaultTextColor;

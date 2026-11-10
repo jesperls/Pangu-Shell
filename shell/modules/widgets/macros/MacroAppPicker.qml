@@ -189,14 +189,17 @@ Item {
                 boundsBehavior: Flickable.StopAtBounds
                 keyNavigationEnabled: false
 
-                delegate: Rectangle {
+                delegate: StyledRect {
                     id: row
                     required property var modelData
                     required property int index
+                    readonly property bool isCurrent: appList.currentIndex === index
                     width: appList.width
                     height: 40
                     radius: Styling.radius(-4)
-                    color: appList.currentIndex === index ? Styling.srItem("primary") : "transparent"
+                    variant: isCurrent ? "primary" : "common"
+                    backgroundOpacity: isCurrent ? -1 : 0.0
+                    enableBorder: isCurrent
 
                     RowLayout {
                         anchors.fill: parent
@@ -221,9 +224,10 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: row.modelData.label
+                                textFormat: Text.PlainText
                                 font.family: Config.theme.font
                                 font.pixelSize: Styling.fontSize(0)
-                                color: appList.currentIndex === row.index ? Styling.srItem("overprimary") : Colors.overBackground
+                                color: row.isCurrent ? row.item : Colors.overBackground
                                 elide: Text.ElideRight
                             }
 
@@ -231,9 +235,10 @@ Item {
                                 Layout.fillWidth: true
                                 visible: !!row.modelData.detail && row.modelData.detail !== row.modelData.label
                                 text: row.modelData.detail || ""
+                                textFormat: Text.PlainText
                                 font.family: Config.theme.monoFont
                                 font.pixelSize: Styling.fontSize(-2)
-                                color: appList.currentIndex === row.index ? Styling.srItem("overprimary") : Colors.overSurfaceVariant
+                                color: row.isCurrent ? row.item : Colors.overSurfaceVariant
                                 elide: Text.ElideRight
                             }
                         }

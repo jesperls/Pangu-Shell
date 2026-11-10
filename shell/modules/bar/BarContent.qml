@@ -42,10 +42,9 @@ Item {
     property bool pinned: (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true)
 
     readonly property var compositorMonitor: Compositor.monitorFor(screen)
-    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace.id === compositorMonitor.activeWorkspace.id)
 
     readonly property bool activeWindowFullscreen: Compositor.hasFullscreenWindow(screen)
-
+    readonly property bool barPopupOpen: Visibilities.hasOpenBarPopup(screenName)
 
     readonly property bool shouldAutoHide: !pinned || activeWindowFullscreen
 
@@ -84,7 +83,7 @@ Item {
     readonly property real innerRadius: (Config.bar && Config.bar.pillStyle === "squished") ? Styling.radius(0) / 2 : Styling.radius(0)
 
     readonly property bool reveal: {
-        if (!shouldAutoHide)
+        if (!shouldAutoHide || barPopupOpen)
             return true;
 
         if (activeWindowFullscreen && !(Config.bar && Config.bar.availableOnFullscreen !== undefined ? Config.bar.availableOnFullscreen : false)) {
@@ -355,6 +354,7 @@ Item {
 
                         LauncherButton {
                             id: launcherButton
+                            screenName: root.screenName
                             visible: root.launcherPosition !== "end"
                             startRadius: root.outerRadius
                             endRadius: root.innerRadius
@@ -485,6 +485,7 @@ Item {
 
                         ToolsButton {
                             id: toolsButton
+                            screenName: root.screenName
                             startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -536,6 +537,7 @@ Item {
 
                         PowerButton {
                             id: powerButton
+                            screenName: root.screenName
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             enableShadow: root.shadowsEnabled
@@ -544,6 +546,7 @@ Item {
 
                         LauncherButton {
                             id: launcherButtonEnd
+                            screenName: root.screenName
                             visible: root.launcherPosition === "end"
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
@@ -562,6 +565,7 @@ Item {
 
                         LauncherButton {
                             id: launcherButtonVert
+                            screenName: root.screenName
                             visible: root.launcherPosition !== "end"
                             Layout.preferredHeight: 36
                             startRadius: root.outerRadius
@@ -589,6 +593,7 @@ Item {
 
                         ToolsButton {
                             id: toolsButtonVert
+                            screenName: root.screenName
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             vertical: true
@@ -701,18 +706,21 @@ Item {
                                         }
                                     }
                                 }
-                            }
 
-                            Bar.IntegratedDock {
-                                bar: root
-                                orientation: root.orientation
-                                visible: integratedDockEnabled
-                                Layout.fillHeight: true
-                                Layout.fillWidth: true
-                                enableShadow: root.shadowsEnabled
-                                
-                                startRadius: root.innerRadius
-                                endRadius: root.outerRadius
+                                Bar.IntegratedDock {
+                                    bar: root
+                                    orientation: root.orientation
+                                    visible: integratedDockEnabled
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.minimumHeight: 36
+                                    Layout.preferredHeight: implicitHeight
+                                    Layout.maximumHeight: implicitHeight
+                                    Layout.fillHeight: true
+                                    enableShadow: root.shadowsEnabled
+
+                                    startRadius: root.innerRadius
+                                    endRadius: root.outerRadius
+                                }
                             }
                         }
 
@@ -745,6 +753,7 @@ Item {
 
                         PowerButton {
                             id: powerButtonVert
+                            screenName: root.screenName
                             Layout.preferredHeight: 36
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
@@ -755,6 +764,7 @@ Item {
 
                         LauncherButton {
                             id: launcherButtonVertEnd
+                            screenName: root.screenName
                             visible: root.launcherPosition === "end"
                             Layout.preferredHeight: 36
                             startRadius: root.innerRadius

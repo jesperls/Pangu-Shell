@@ -76,10 +76,10 @@ existing username:
 Rebuild your configuration and log into Hyprland. Pangu starts with the session
 through `pangu.service`. Log out and back in for new group memberships to apply.
 
-The NixOS module provides fonts, recording helpers, input automation, power
-profiles and brightness permissions. The Home Manager module installs and
-starts the shell, loads its Hyprland integration and connects GTK/Qt palettes.
-No overlay or extra module arguments are needed.
+The NixOS module configures lockscreen PAM, fonts, recording helpers, input
+automation, power profiles and brightness permissions. The Home Manager module
+installs and starts the shell, loads its Hyprland integration and connects
+GTK/Qt palettes. No overlay or extra module arguments are needed.
 
 To update an installed copy, run `nix flake update pangu-shell` in your NixOS
 configuration and rebuild.

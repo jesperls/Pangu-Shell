@@ -11,6 +11,13 @@
     repeat_delay = 300;
     numlock = true;
   };
+  binds = {
+    mouse_side_buttons = true;
+  };
+  scratchpad = {
+    width = 900;
+    height = 700;
+  };
   render.direct_scanout = 2;
   apps = {
     terminal = "xdg-terminal-exec";
@@ -18,6 +25,7 @@
     file_manager = "xdg-open .";
     editor = "xdg-terminal-exec vi";
     shortcuts = [ ];
+    scratchpads = [ ];
   };
   tearing = {
     enable = false;

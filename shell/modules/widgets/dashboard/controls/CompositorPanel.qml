@@ -125,8 +125,8 @@ Item {
                     }
 
                     StyledToolTip {
-                        text: parent.modelData.toString()
-                        visible: parent.containsMouse && !contextMenu.visible
+                        tooltipText: parent.modelData.toString()
+                        show: parent.containsMouse
                     }
 
                     onClicked: mouse => {
@@ -570,6 +570,46 @@ Item {
                                 }
                             }
 
+                            ColorButton {
+                                Layout.fillWidth: true
+                                colorNames: root.colorNames
+                                currentColor: Config.compositor.shadowColor || "shadow"
+                                label: "Shadow Color"
+                                dialogTitle: "Select Shadow Color"
+                                enabled: !Config.compositor.syncShadowColor
+                                opacity: enabled ? 1.0 : 0.5
+                                onColorSelected: color => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.shadowColor = color;
+                                }
+                                onOpenColorPicker: (names, current, title) => {
+                                    root.openColorPicker(names, current, title, function (color) {
+                                        GlobalStates.markCompositorChanged();
+                                        Config.compositor.shadowColor = color;
+                                    });
+                                }
+                            }
+
+                            ColorButton {
+                                Layout.fillWidth: true
+                                colorNames: root.colorNames
+                                currentColor: Config.compositor.shadowColorInactive || "shadow"
+                                label: "Inactive Shadow Color"
+                                dialogTitle: "Select Inactive Shadow Color"
+                                enabled: !Config.compositor.syncShadowColor
+                                opacity: enabled ? 1.0 : 0.5
+                                onColorSelected: color => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.shadowColorInactive = color;
+                                }
+                                onOpenColorPicker: (names, current, title) => {
+                                    root.openColorPicker(names, current, title, function (color) {
+                                        GlobalStates.markCompositorChanged();
+                                        Config.compositor.shadowColorInactive = color;
+                                    });
+                                }
+                            }
+
                             ToggleRow {
                                 label: "Sync Opacity"
                                 checked: Config.compositor.syncShadowOpacity ?? false
@@ -750,6 +790,39 @@ Item {
                                 }
                             }
 
+                            DecimalInputRow {
+                                label: "Popups Ignorealpha"
+                                value: Config.compositor.blurPopupsIgnorealpha ?? 0.2
+                                minValue: 0.0
+                                maxValue: 1.0
+                                enabled: Config.compositor.blurPopups ?? false
+                                onValueEdited: newValue => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.blurPopupsIgnorealpha = newValue;
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Blur Input Methods"
+                                checked: Config.compositor.blurInputMethods ?? false
+                                onToggled: value => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.blurInputMethods = value;
+                                }
+                            }
+
+                            DecimalInputRow {
+                                label: "Input Methods Ignorealpha"
+                                value: Config.compositor.blurInputMethodsIgnorealpha ?? 0.2
+                                minValue: 0.0
+                                maxValue: 1.0
+                                enabled: Config.compositor.blurInputMethods ?? false
+                                onValueEdited: newValue => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.blurInputMethodsIgnorealpha = newValue;
+                                }
+                            }
+
                             ToggleRow {
                                 label: "Ignore Opacity"
                                 checked: Config.compositor.blurIgnoreOpacity ?? true
@@ -821,6 +894,17 @@ Item {
                                 onValueEdited: newValue => {
                                     GlobalStates.markCompositorChanged();
                                     Config.compositor.blurVibrancy = newValue;
+                                }
+                            }
+
+                            DecimalInputRow {
+                                label: "Vibrancy Darkness"
+                                value: Config.compositor.blurVibrancyDarkness ?? 0.0
+                                minValue: 0.0
+                                maxValue: 1.0
+                                onValueEdited: newValue => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.blurVibrancyDarkness = newValue;
                                 }
                             }
                         }

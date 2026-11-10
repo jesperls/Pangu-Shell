@@ -175,7 +175,6 @@ FocusScope {
     onVisibleChanged: {
         if (visible) {
             if (GlobalStates.wallpaperManager) {
-                console.log("WallpapersTab became visible, updating subfolders");
                 GlobalStates.wallpaperManager.scanSubfolders();
             }
             revealTimer.restart();
@@ -241,7 +240,7 @@ FocusScope {
             Layout.fillWidth: true
             Layout.preferredHeight: 48
             spacing: 8
-            z: 1000  // keep the dropdown above the grid
+            z: 1000
 
             SearchInput {
                 id: wallpaperSearchInput
@@ -533,6 +532,11 @@ FocusScope {
                     property bool isHovered: false
                     property bool isSelected: selectedIndex === index
 
+                    GridView.onReused: {
+                        isHovered = false;
+                        scale = 1.0;
+                    }
+
                     readonly property bool isInViewport: {
                         var gridTop = wallpaperGrid.contentY;
                         var gridBottom = gridTop + wallpaperGrid.height;
@@ -656,14 +660,6 @@ FocusScope {
                         description: GlobalStates.wallpaperManager?.getFileType(wallpaperCard.modelData) === "wallpaperengine"
                             ? "Click to apply · Right-click for settings"
                             : wallpaperCard.isCurrentWallpaper ? "Current wallpaper" : "Click to apply"
-                    }
-
-                    Behavior on color {
-                        enabled: Styling.animDuration > 0
-                        ColorAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutCubic
-                        }
                     }
 
                     Behavior on scale {

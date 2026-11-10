@@ -143,9 +143,6 @@ PanelWindow {
         id: visualContent
         anchors.fill: parent
 
-        layer.enabled: true
-        layer.effect: Shadow {}
-
         ScreenFrameContent {
             id: frameContent
             anchors.fill: parent

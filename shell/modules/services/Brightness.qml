@@ -197,7 +197,7 @@ Singleton {
                 return;
             if (isDdc && !busNum)
                 return;
-            initProc.command = isDdc ? ["ddcutil", "-b", busNum, "getvcp", "10"] : ["sh", "-c", `echo "a b c $(brightnessctl g) $(brightnessctl m)"`];
+            initProc.command = isDdc ? ["ddcutil", "-b", busNum, "getvcp", "10"] : ["sh", "-c", "printf '%s %s\\n' \"$(brightnessctl g)\" \"$(brightnessctl m)\""];
             initProc.running = true;
         }
 
@@ -213,7 +213,6 @@ Singleton {
                             monitor.rawMaxBrightness = maxRaw;
                             monitor.brightness = currentRaw / monitor.rawMaxBrightness;
                             monitor.ready = true;
-                            root.brightnessChanged(monitor.brightness, monitor.screen);
                         }
                         return;
                     }
@@ -227,7 +226,6 @@ Singleton {
                     monitor.rawMaxBrightness = maxRaw;
                     monitor.brightness = currentRaw / monitor.rawMaxBrightness;
                     monitor.ready = true;
-                    root.brightnessChanged(monitor.brightness, monitor.screen);
                 }
             }
         }

@@ -84,6 +84,7 @@ Item {
             required property var modelData
             width: deviceList.width
             height: deviceItem.height
+            ListView.onReused: deviceItem.resetState()
 
             BluetoothDeviceItem {
                 id: deviceItem

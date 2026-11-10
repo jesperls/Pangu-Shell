@@ -2,9 +2,11 @@ pragma Singleton
 
 import QtQuick
 import qs.modules.components
+import qs.modules.services
 import Quickshell
 import qs.config
 import qs.modules.theme
+
 Singleton {
     id: root
 
@@ -40,12 +42,18 @@ Singleton {
         return format(Qt.rgba(c.r, c.g, c.b, c.a * Config.compositorShadowOpacity));
     }
 
+    function sanitizeOffset(value) {
+        const trimmed = String(value || "").trim();
+        return /^-?\d+(\.\d+)?\s+-?\d+(\.\d+)?$/.test(trimmed) ? trimmed : "0 0";
+    }
+
     readonly property real ignoreAlpha: {
         if (Config.compositor.blurExplicitIgnoreAlpha)
             return Config.compositor.blurIgnoreAlphaValue;
         const bar = Config.theme.srBarBg.opacity;
         const bg = Config.theme.srBg.opacity;
-        return bar > 0 ? Math.min(bar, bg) : bg;
+        const base = bar > 0 ? Math.min(bar, bg) : bg;
+        return Math.max(0.25, Math.min(0.95, base));
     }
 
     readonly property string lua: {
@@ -73,7 +81,7 @@ Singleton {
             sharp = ${c.shadowSharp},
             color = "${shadowSpec(Config.compositorShadowColor)}",
             color_inactive = "${shadowSpec(Config.compositorShadowColorInactive)}",
-            offset = "${c.shadowOffset}",
+            offset = "${sanitizeOffset(c.shadowOffset)}",
             scale = ${c.shadowScale.toFixed(2)},
         },
         blur = {
@@ -98,8 +106,12 @@ Singleton {
 })
 
 hl.layer_rule({
-    match = { namespace = "pangu" },
+    match = { namespace = "^pangu(:.*)?$" },
     no_anim = true,
+})
+
+hl.layer_rule({
+    match = { namespace = "^pangu(:(osd|cheatsheet|overview))?$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = ${ignoreAlpha.toFixed(2)},

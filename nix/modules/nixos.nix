@@ -36,6 +36,7 @@ in
   };
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
+      { security.pam.services.pangu = { }; }
       (lib.mkIf cfg.fonts.enable { fonts.packages = import ../fonts.nix { inherit pkgs; }; })
       (lib.mkIf cfg.recording.enable {
         programs.gpu-screen-recorder.enable = true;
@@ -49,11 +50,12 @@ in
       })
       {
         users.users = lib.genAttrs cfg.users (_: {
-          extraGroups = [
-            "video"
-          ]
-          ++ lib.optional cfg.brightness.enable "i2c"
-          ++ lib.optional cfg.inputAutomation.enable config.programs.ydotool.group;
+          extraGroups =
+            lib.optionals cfg.brightness.enable [
+              "video"
+              "i2c"
+            ]
+            ++ lib.optional cfg.inputAutomation.enable config.programs.ydotool.group;
         });
       }
     ]

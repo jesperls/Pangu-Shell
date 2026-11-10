@@ -15,7 +15,7 @@ done
 
 if [ -z "$TMP_IMG" ]; then
     if ! REGION=$(slurp) || [ -z "$REGION" ]; then
-        exit 0  # User cancelled
+        exit 0
     fi
     TMP_IMG=$(mktemp) || exit 1
     trap 'rm -f "$TMP_IMG"' EXIT
@@ -42,5 +42,5 @@ if [ -n "$RESULT" ]; then
     fi
     notify-send "QR/Barcode Result" "Content copied to clipboard" -i qr-code
 else
-    notify-send "QR/Barcode Result" "No code detected" -u low -i dialogue-error
+    notify-send "QR/Barcode Result" "No code detected" -u low -i dialog-error
 fi

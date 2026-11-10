@@ -11,18 +11,18 @@ StyledRect {
     property alias text: textField.text
     property alias placeholderText: textField.placeholderText
     property string iconText: ""
-    property string prefixText: ""  // Prefix indicator (e.g., "clip ")
-    property string prefixIcon: ""  // Prefix icon (e.g., Icons.clipboard)
+    property string prefixText: ""
+    property string prefixIcon: ""
     property bool clearOnEscape: true
-    property bool handleTabNavigation: false  // When true, Tab is captured and emitted as signals instead of navigating.
-    property bool passwordMode: false  // Show dots instead of the text.
-    property bool centerText: false  // Center the text horizontally.
-    property bool disableCursorNavigation: false  // Left/Right always emit signals without moving the cursor.
+    property bool handleTabNavigation: false
+    property bool passwordMode: false
+    property bool centerText: false
+    property bool disableCursorNavigation: false
 
     signal searchTextChanged(string text)
     signal accepted
     signal shiftAccepted
-    signal backspaceOnEmpty  // Signal when backspace is pressed on empty text
+    signal backspaceOnEmpty
     signal tabPressed
     signal shiftTabPressed
     signal ctrlRPressed
@@ -130,10 +130,11 @@ StyledRect {
                     root.ctrlDownPressed();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
-                    if (root.clearOnEscape) {
+                    if (root.clearOnEscape && textField.text.length > 0) {
                         clear();
+                    } else {
+                        root.escapePressed();
                     }
-                    root.escapePressed();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Down) {
                     root.downPressed();

@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 import qs.modules.components
+import qs.modules.services
 
 Singleton {
     id: root
@@ -16,7 +17,7 @@ Singleton {
     property bool available: true
     property bool retried: false
 
-    readonly property bool shouldRun: refCount > 0 && MprisController.isPlaying && !SuspendManager.isSuspending
+    readonly property bool shouldRun: Config.performance.audioVisualizer && refCount > 0 && MprisController.isPlaying && !SuspendManager.isSuspending
 
     function acquire() {
         refCount++;
@@ -45,6 +46,16 @@ Singleton {
         }
     }
 
+    Connections {
+        target: Audio
+        function onSinkChanged() {
+            if (cavaProc.running) {
+                root.retried = false;
+                cavaProc.running = false;
+            }
+        }
+    }
+
     GeneratedFile {
         id: configFile
         path: Paths.runtimePath("cava.conf")
@@ -54,7 +65,6 @@ Singleton {
 
     Process {
         id: cavaProc
-
         command: ["cava", "-p", configFile.path]
 
         stdout: SplitParser {
@@ -69,7 +79,7 @@ Singleton {
             }
         }
 
-        onExited: (exitCode, exitStatus) => {
+        onExited: {
             root.values = [];
             if (!root.shouldRun)
                 return;
@@ -80,6 +90,13 @@ Singleton {
                 retryTimer.restart();
             }
         }
+    }
+
+    Timer {
+        id: healthyTimer
+        interval: 10000
+        running: cavaProc.running
+        onTriggered: root.retried = false
     }
 
     Timer {

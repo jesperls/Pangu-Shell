@@ -6,8 +6,8 @@ import qs.config
 
 Item {
     id: root
-    property var sourceItem: null  // The icon item to tint
-    property bool fullTint: false  // If true, apply solid primary color instead of shader
+    property var sourceItem: null
+    property bool fullTint: false
 
     readonly property var optimizedPalette: [
         "background", "overBackground", "shadow",
@@ -22,37 +22,6 @@ Item {
         "magenta", "lightMagenta"
     ]
 
-    Item {
-        id: paletteSourceItem
-        visible: true 
-        width: root.optimizedPalette.length
-        height: 1
-        opacity: 0
-        
-        Row {
-            anchors.fill: parent
-            Repeater {
-                model: root.optimizedPalette
-                delegate: Rectangle {
-                    id: paletteRect
-                    required property string modelData
-                    width: 1
-                    height: 1
-                    color: Colors[modelData]
-                }
-            }
-        }
-    }
-
-    ShaderEffectSource {
-        id: paletteTextureSource
-        sourceItem: paletteSourceItem
-        hideSource: true
-        visible: false
-        smooth: false
-        recursive: false
-    }
-
     property bool active: Config.tintIcons
 
     Loader {
@@ -60,6 +29,38 @@ Item {
         anchors.fill: parent
         sourceComponent: Item {
             anchors.fill: parent
+
+            Item {
+                id: paletteSourceItem
+                visible: !root.fullTint
+                width: root.optimizedPalette.length
+                height: 1
+                opacity: 0
+
+                Row {
+                    anchors.fill: parent
+                    Repeater {
+                        model: root.optimizedPalette
+                        delegate: Rectangle {
+                            id: paletteRect
+                            required property string modelData
+                            width: 1
+                            height: 1
+                            color: Colors[modelData]
+                        }
+                    }
+                }
+            }
+
+            ShaderEffectSource {
+                id: paletteTextureSource
+                sourceItem: !root.fullTint ? paletteSourceItem : null
+                hideSource: true
+                visible: false
+                smooth: false
+                recursive: false
+                live: !root.fullTint
+            }
 
             ShaderEffectSource {
                 id: internalSource

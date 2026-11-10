@@ -47,6 +47,8 @@ programs.pangu.hyprland.preset = {
   settings = {
     monitors.primary = "DP-1";
     monitors.primary_workspaces = [ 1 2 3 4 5 ];
+    binds.mouse_side_buttons = true;
+    scratchpad = { width = 900; height = 700; };
     apps = {
       terminal = "kitty";
       browser = "firefox";
@@ -54,6 +56,17 @@ programs.pangu.hyprland.preset = {
       editor = "kitty nvim";
       shortcuts = [
         { key = "M"; command = "easyeffects"; description = "Apps: EasyEffects"; }
+      ];
+      scratchpads = [
+        {
+          key = "U";
+          name = "term";
+          command = "kitty --class scratch-term";
+          class = "scratch-term";
+          width = 1000;
+          height = 650;
+          description = "Scratchpad: terminal";
+        }
       ];
     };
     keyboard_layout = "se";
@@ -63,11 +76,24 @@ programs.pangu.hyprland.preset = {
 };
 ```
 
-The first live monitor is used when no primary monitor is specified. Monitor
-definitions and workspace-to-monitor assignments stay with the caller. The
-preset makes runtime commands available in the user environment for direct
-compositor bindings. Additional application shortcuts accept `mods`, defaulting
-to `SUPER`, plus `key`, `command` and `description`.
+The first live monitor is cached as primary when no primary monitor is
+specified; `desc:` prefixes match monitor descriptions. Monitor definitions and
+workspace-to-monitor assignments stay with the caller. Preset keys are validated
+against `hyprland/defaults.nix`, and Pangu's Hyprland snippet uses `lib.mkBefore`
+so user `extraConfig` runs afterward. The preset makes runtime commands
+available in the user environment for direct compositor bindings.
+
+`SUPER + S` toggles `special:scratchpad` on the active monitor, moving an open
+scratchpad from another monitor in one press and clamping floating windows into
+the active monitor's work area. `SUPER + SHIFT + S` stashes the active window
+into `special:scratchpad` or restores a scratchpad window to the active regular
+workspace, preserving tiled versus floating state. `apps.scratchpads` entries
+accept optional `mods` (default `SUPER`), `class`, `width`, `height` and
+`description`, plus `key`, `name` and `command` to spawn on first use and toggle
+their named special workspace thereafter. Additional `apps.shortcuts` entries
+accept `mods` (default `SUPER`), `key`, `command` and `description`. Set
+`binds.mouse_side_buttons = false` when mouse buttons `275`/`276`/`277` should
+remain browser navigation buttons instead of window drag, resize and close.
 
 ## Persistent settings
 
@@ -84,16 +110,24 @@ programs.pangu.settings = {
   bar.trayIconStyle = "theme";
   dashboard.wallpaperCardWidth = 160;
   dashboard.wallpaperShowNames = true;
+  theme.exports.discord = true;
+  system.clipboard.maxItems = 200;
+  system.audio.overAmplify = false;
   system.ocr.spa = false;
 };
 ```
 
 Only specified keys are merged before each service start; sibling settings
-survive. GUI edits to overridden keys last until the next service start.
-Removing an override leaves its last saved value. Arrays replace arrays.
-`pinnedapps` overrides target the data directory, matching the shell's storage.
-Unknown file names fail module validation; nested settings follow the QML
-schema. Override metadata lets the UI identify Nix-managed values.
+survive. Corrupt JSON files are backed up to `.json.corrupt` with a warning and
+rebuilt from `{}` so startup is not blocked. GUI edits to overridden keys last
+until the next service start. Removing an override leaves its last saved value.
+Arrays replace arrays. `pinnedapps` overrides target the data directory,
+matching the shell's storage. Unknown file names fail module validation; nested
+settings follow the QML schema. Override metadata lets the UI identify
+Nix-managed values. Theme exports (`theme.exports.{gtk,qt,kitty,discord,nvchad,pywal}`),
+clipboard history pruning (`system.clipboard.maxItems`), and audio volume
+over-amplification (`system.audio.overAmplify`) can be configured either here
+or in the Settings window.
 
 The Shell settings panel exposes tray icon size (16–32 pixels), spacing
 (0–24 pixels) and color style (`theme`, `original` or `monochrome`). `theme`
@@ -125,11 +159,18 @@ intact. These properties are shared across screens using the same wallpaper.
 
 `RuntimeDirectory=pangu` contains transient idle and audio configs. The separate
 `pangu-session-started` marker survives service restarts to distinguish them
-from the first login. The lockscreen's PAM configuration is packaged with QML.
+from the first login. The wrapper captures the user's clean session `PATH` and
+Qt/QML search paths before adding internal runtime dependencies so launched
+applications inherit the user environment without wrapper leakage.
 
 ## NixOS prerequisites
 
-The brightness integration installs backlight udev rules as well as I2C access.
+Enabling `programs.pangu.enable` registers `security.pam.services.pangu = { };`
+so the lockscreen honors system PAM policies such as `fprintd`, `u2f` and
+`faillock` (falling back to the PAM configuration packaged with QML on
+non-NixOS setups). The brightness integration installs backlight udev rules,
+enables I2C access and grants listed `users` the `video` and `i2c` groups when
+`brightness.enable` is true.
 
 The NixOS module has independent `fonts.enable`, `recording.enable`,
 `inputAutomation.enable`, `powerProfiles.enable` and `brightness.enable`

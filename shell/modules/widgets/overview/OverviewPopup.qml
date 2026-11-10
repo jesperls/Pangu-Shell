@@ -30,6 +30,21 @@ PanelWindow {
     readonly property var screenVisibilities: Visibilities.getForScreen(screen.name)
     readonly property bool overviewOpen: screenVisibilities ? screenVisibilities.overview : false
 
+    function stepWorkspace(delta) {
+        const mon = Compositor.monitorFor(overviewPopup.screen) ?? Compositor.focusedMonitor;
+        if (mon?.name && Compositor.focusedMonitor?.name !== mon.name)
+            Compositor.dispatch("focusmonitor " + mon.name);
+        const current = mon?.activeWorkspace?.id || 1;
+        const target = current + delta;
+        if (target > Config.workspaces.shown) {
+            Compositor.dispatch("workspace 1");
+        } else if (target < 1) {
+            Compositor.dispatch("workspace " + Config.workspaces.shown);
+        } else {
+            Compositor.dispatch(delta > 0 ? "workspace r+1" : "workspace r-1");
+        }
+    }
+
     visible: overviewOpen
     exclusionMode: ExclusionMode.Ignore
 
@@ -119,9 +134,6 @@ PanelWindow {
             height: 80
             radius: Styling.radius(24)
 
-            layer.enabled: true
-            layer.effect: Shadow {}
-
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 16
@@ -188,27 +200,15 @@ PanelWindow {
 
                     onTabPressed: {
                         if (searchInput.text.length === 0) {
-                            const current = Compositor.focusedWorkspace?.id || 1;
-                            const next = current + 1;
-                            if (next > Config.workspaces.shown) {
-                                Compositor.dispatch("workspace 1");
-                            } else {
-                                Compositor.dispatch("workspace r+1");
-                            }
+                            overviewPopup.stepWorkspace(1);
                         } else if (overviewLoader.item) {
                             overviewLoader.item.selectNextMatch();
                         }
                     }
-                    
+
                     onShiftTabPressed: {
                         if (searchInput.text.length === 0) {
-                            const current = Compositor.focusedWorkspace?.id || 1;
-                            const prev = current - 1;
-                            if (prev < 1) {
-                                Compositor.dispatch("workspace " + Config.workspaces.shown);
-                            } else {
-                                Compositor.dispatch("workspace r-1");
-                            }
+                            overviewPopup.stepWorkspace(-1);
                         } else if (overviewLoader.item) {
                             overviewLoader.item.selectPrevMatch();
                         }
@@ -239,13 +239,7 @@ PanelWindow {
 
                     onLeftPressed: {
                         if (searchInput.text.length === 0) {
-                            const current = Compositor.focusedWorkspace?.id || 1;
-                            const prev = current - 1;
-                            if (prev < 1) {
-                                Compositor.dispatch("workspace " + Config.workspaces.shown);
-                            } else {
-                                Compositor.dispatch("workspace r-1");
-                            }
+                            overviewPopup.stepWorkspace(-1);
                         } else if (overviewLoader.item) {
                             overviewLoader.item.selectPrevMatch();
                         }
@@ -253,13 +247,7 @@ PanelWindow {
 
                     onRightPressed: {
                         if (searchInput.text.length === 0) {
-                            const current = Compositor.focusedWorkspace?.id || 1;
-                            const next = current + 1;
-                            if (next > Config.workspaces.shown) {
-                                Compositor.dispatch("workspace 1");
-                            } else {
-                                Compositor.dispatch("workspace r+1");
-                            }
+                            overviewPopup.stepWorkspace(1);
                         } else if (overviewLoader.item) {
                             overviewLoader.item.selectNextMatch();
                         }
@@ -281,9 +269,6 @@ PanelWindow {
                 variant: "bg"
                 anchors.fill: parent
                 radius: Styling.radius(20)
-
-                layer.enabled: true
-                layer.effect: Shadow {}
             }
 
             Loader {
@@ -307,9 +292,6 @@ PanelWindow {
             width: 32
             height: Math.max(overviewContainer.height * 0.6, 200)
             radius: Styling.radius(0)
-
-            layer.enabled: true
-            layer.effect: Shadow {}
 
             MouseArea {
                 anchors.fill: parent

@@ -21,7 +21,7 @@ fi
 
 if [ -z "$TMP_IMG" ]; then
     if ! REGION=$(slurp) || [ -z "$REGION" ]; then
-        exit 0  # User cancelled
+        exit 0
     fi
     TMP_IMG=$(mktemp) || exit 1
     trap 'rm -f "$TMP_IMG"' EXIT
@@ -39,7 +39,8 @@ if ! TEXT=$(tesseract "$TMP_IMG" - -l "$LANGS" 2>/dev/null); then
     exit 1
 fi
 
-TEXT=$(printf '%s' "$TEXT" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+TEXT="${TEXT#"${TEXT%%[![:cntrl:]]*}"}"
+TEXT="${TEXT%"${TEXT##*[![:space:]]}"}"
 
 if [ -n "$TEXT" ]; then
     if ! printf '%s' "$TEXT" | wl-copy; then
@@ -48,5 +49,5 @@ if [ -n "$TEXT" ]; then
     fi
     notify-send "OCR Result" "Text copied to clipboard" -i edit-paste
 else
-    notify-send "OCR Result" "No text detected" -u low -i dialogue-error
+    notify-send "OCR Result" "No text detected" -u low -i dialog-error
 fi

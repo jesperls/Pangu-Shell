@@ -50,7 +50,7 @@ Item {
                     Image {
                         id: avatarImage
                         anchors.fill: parent
-                        source: GlobalStates.hasAvatar ? "file://" + Paths.avatar : ""
+                        source: GlobalStates.hasAvatar ? "file://" + Paths.avatar + (GlobalStates.avatarCacheBuster ? "?t=" + GlobalStates.avatarCacheBuster : "") : ""
                         fillMode: Image.PreserveAspectCrop
                         visible: status === Image.Ready
                     }

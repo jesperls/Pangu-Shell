@@ -521,7 +521,7 @@ Item {
                                         }
 
                                         StyledToolTip {
-                                            visible: removeDiskArea.containsMouse
+                                            show: removeDiskArea.containsMouse
                                             tooltipText: "Remove disk"
                                         }
                                     }
@@ -568,6 +568,31 @@ Item {
                                         Config.system.disks = newDisks;
                                     }
                                 }
+                            }
+                        }
+
+                        Separator {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 4
+                        }
+
+                        SettingsNumberInputRow {
+                            label: "Clipboard History Limit"
+                            value: Config.system.clipboard.maxItems ?? 200
+                            minValue: 20
+                            maxValue: 5000
+                            onValueEdited: newValue => {
+                                Config.system.clipboard.maxItems = newValue;
+                            }
+                        }
+
+                        ToggleRow {
+                            Layout.fillWidth: true
+                            label: "Volume Over-Amplification"
+                            description: "Allow raising audio volume up to 150%"
+                            checked: Config.system.audio.overAmplify ?? false
+                            onToggled: checked => {
+                                Config.system.audio.overAmplify = checked;
                             }
                         }
                     }

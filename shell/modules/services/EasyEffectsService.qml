@@ -1,15 +1,16 @@
 pragma Singleton
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.services
 
 Singleton {
     id: root
 
     property bool available: false
-
     property bool bypassed: false
 
     property var outputPresets: []
@@ -73,13 +74,25 @@ Singleton {
 
     Timer {
         id: queryTimeout
-        interval: 2000
+        interval: 5000
         onTriggered: socket.connected = false
+    }
+
+    Timer {
+        id: deviceChangeTimer
+        interval: 600
+        onTriggered: if (socket.connected) root._query()
+    }
+
+    Connections {
+        target: Audio
+        function onSinkChanged() { deviceChangeTimer.restart(); }
+        function onSourceChanged() { deviceChangeTimer.restart(); }
     }
 
     Socket {
         id: socket
-        path: Quickshell.env("XDG_RUNTIME_DIR") + "/EasyEffectsServer"
+        path: (Quickshell.env("XDG_RUNTIME_DIR") || Paths.cacheDir) + "/EasyEffectsServer"
         connected: false
         onConnectionStateChanged: {
             root.available = connected;
@@ -94,7 +107,7 @@ Singleton {
         parser: SplitParser {
             onRead: data => {
                 if (root._replyIndex === 0) {
-                    const m = data.match(/^([12])(.*)$/);  // get_global_bypass reply has no newline, fusing it to the next line
+                    const m = data.match(/^([12])(.*)$/); // get_global_bypass reply has no newline, fusing it to the next line
                     if (m) {
                         root.bypassed = (m[1] === "1");
                         root.activeInputPreset = m[2];
@@ -110,21 +123,36 @@ Singleton {
         }
     }
 
+    function parsePresetNames(text) {
+        const seen = new Set();
+        return text.split("\n")
+            .filter(n => n.endsWith(".json"))
+            .map(n => n.slice(0, -5))
+            .filter(n => {
+                if (!n || seen.has(n)) return false;
+                seen.add(n);
+                return true;
+            })
+            .sort();
+    }
+
     Process {
         id: outputPresetsProcess
-        command: ["ls", "-1", "--", Paths.dataHome + "/easyeffects/output"]
+        command: ["sh", "-c", "ls -1 -- \"$1\" \"$2\" 2>/dev/null || true", "sh",
+            Paths.dataHome + "/easyeffects/output", Paths.configHome + "/easyeffects/output"]
         running: false
         stdout: StdioCollector {
-            onStreamFinished: root.outputPresets = text.split("\n").filter(n => n.endsWith(".json")).map(n => n.slice(0, -5))
+            onStreamFinished: root.outputPresets = root.parsePresetNames(text)
         }
     }
 
     Process {
         id: inputPresetsProcess
-        command: ["ls", "-1", "--", Paths.dataHome + "/easyeffects/input"]
+        command: ["sh", "-c", "ls -1 -- \"$1\" \"$2\" 2>/dev/null || true", "sh",
+            Paths.dataHome + "/easyeffects/input", Paths.configHome + "/easyeffects/input"]
         running: false
         stdout: StdioCollector {
-            onStreamFinished: root.inputPresets = text.split("\n").filter(n => n.endsWith(".json")).map(n => n.slice(0, -5))
+            onStreamFinished: root.inputPresets = root.parsePresetNames(text)
         }
     }
 }

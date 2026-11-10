@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.modules.theme
+import qs.modules.components
 import qs.config
 
 Button {
@@ -28,16 +29,17 @@ Button {
     property int buttonType: 0
     property int checkState: 0
 
+    readonly property color fgColor: !root.isSeparator && root.hovered ? bgRect.item : Colors.overBackground
+
     implicitWidth: 200
     implicitHeight: isSeparator ? 10 : 36
     enabled: !isSeparator
 
     padding: 0
-    background: Rectangle {
-        color: {
-            if (root.isSeparator) return "transparent"
-            return root.hovered ? Styling.srItem("overprimary") : "transparent"
-        }
+    background: StyledRect {
+        id: bgRect
+        variant: !root.isSeparator && root.hovered ? "focus" : "transparent"
+        enableShadow: false
         radius: Styling.radius(0)
 
         Rectangle {
@@ -75,10 +77,10 @@ Button {
                 Text {
                     anchors.centerIn: parent
                     visible: root.checkState !== Qt.Unchecked
-                    text: root.checkState === Qt.PartiallyChecked ? "\u2212" : "\u2713"
+                    text: root.checkState === Qt.PartiallyChecked ? Icons.minus : Icons.accept
+                    font.family: Icons.font
                     color: Colors.overPrimary
                     font.pixelSize: 10
-                    font.bold: true
                 }
             }
 
@@ -115,7 +117,7 @@ Button {
                     text: root.iconSource
                     font.family: Icons.font
                     font.pixelSize: 14
-                    color: root.hovered ? Colors.overPrimary : Colors.overBackground
+                    color: root.fgColor
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -134,7 +136,8 @@ Button {
         Text {
             Layout.fillWidth: true
             text: root.cleanText
-            color: root.hovered ? Colors.overPrimary : Colors.overBackground
+            textFormat: Text.PlainText
+            color: root.fgColor
             font.family: Config.theme.font
             font.pixelSize: Styling.fontSize(0)
             elide: Text.ElideRight
@@ -143,9 +146,10 @@ Button {
 
         Text {
             visible: root.hasSubmenu
-            text: root.expanded ? "\u25BE" : "\u25B8"
-            color: root.hovered ? Colors.overPrimary : Colors.overBackground
-            font.pixelSize: Styling.fontSize(0)
+            text: root.expanded ? Icons.caretDown : Icons.caretRight
+            font.family: Icons.font
+            color: root.fgColor
+            font.pixelSize: 12
             verticalAlignment: Text.AlignVCenter
         }
     }

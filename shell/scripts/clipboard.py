@@ -30,7 +30,7 @@ def initialize(db, schema):
         ''')
 
 
-def insert(db, payload, mime, data_dir):
+def insert(db, payload, mime, data_dir, max_items=200):
     is_image = mime.startswith('image/')
     if not payload:
         return
@@ -39,6 +39,7 @@ def insert(db, payload, mime, data_dir):
     preview = '[Image]' if is_image else content if len(content) <= 100 else content[:97] + '...'
     binary_path = ''
     created = None
+    unreferenced_paths = []
     try:
         with db:
             db.execute('BEGIN IMMEDIATE')
@@ -79,6 +80,24 @@ def insert(db, payload, mime, data_dir):
                 UPDATE clipboard_items SET display_index = (SELECT idx FROM ranked WHERE ranked.id = clipboard_items.id)
                 WHERE pinned = 0
             ''')
+            if max_items > 0:
+                pruned = [
+                    row[0]
+                    for row in db.execute(
+                        'DELETE FROM clipboard_items WHERE pinned = 0 AND display_index >= ? RETURNING binary_path',
+                        (max_items,),
+                    )
+                    if row[0]
+                ]
+                for candidate in set(pruned):
+                    still_used = db.execute(
+                        'SELECT 1 FROM clipboard_items WHERE binary_path = ? LIMIT 1',
+                        (candidate,),
+                    ).fetchone()
+                    if not still_used:
+                        unreferenced_paths.append(Path(candidate))
+        for stale in unreferenced_paths:
+            stale.unlink(missing_ok=True)
     except BaseException:
         if created:
             created.unlink(missing_ok=True)
@@ -86,7 +105,10 @@ def insert(db, payload, mime, data_dir):
 
 
 def capture():
-    types = subprocess.run(['wl-paste', '--list-types'], capture_output=True, check=False)
+    try:
+        types = subprocess.run(['wl-paste', '--list-types'], capture_output=True, check=False, timeout=5)
+    except subprocess.TimeoutExpired:
+        return None
     if types.returncode:
         return None
     offered = types.stdout.decode().splitlines()
@@ -95,7 +117,10 @@ def capture():
     for mime in candidates:
         if mime not in offered:
             continue
-        result = subprocess.run(['wl-paste', '--no-newline', '--type', mime], capture_output=True, check=False)
+        try:
+            result = subprocess.run(['wl-paste', '--no-newline', '--type', mime], capture_output=True, check=False, timeout=5)
+        except subprocess.TimeoutExpired:
+            continue
         if result.returncode == 0:
             return result.stdout, mime
     return None
@@ -137,15 +162,17 @@ def main():
         elif args.operation == 'capture':
             captured = capture()
             if captured:
-                insert(db, *captured, args.arguments[0])
+                max_items = int(args.arguments[1]) if len(args.arguments) > 1 else 200
+                insert(db, *captured, args.arguments[0], max_items=max_items)
         elif args.operation == 'list':
+            limit = max(1, int(args.arguments[0])) if args.arguments else 200
             rows = db.execute("""
                 SELECT id, mime_type, preview, is_image, binary_path, content_hash,
                        size, created_at, pinned, alias, display_index,
                        CASE WHEN mime_type = 'text/uri-list' THEN full_content END AS full_content
                 FROM clipboard_items
-                ORDER BY pinned DESC, display_index ASC, updated_at DESC, id DESC LIMIT 100
-            """)
+                ORDER BY pinned DESC, display_index ASC, updated_at DESC, id DESC LIMIT ?
+            """, (limit,))
             print(json.dumps([dict(row) for row in rows]))
         elif args.operation == 'clear':
             db.execute('DELETE FROM clipboard_items WHERE pinned = 0')

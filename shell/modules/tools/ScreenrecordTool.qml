@@ -23,13 +23,14 @@ PanelWindow {
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "pangu:screenrecord"
     WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     visible: state !== "idle"
     exclusionMode: ExclusionMode.Ignore
 
-    property string state: "idle" // idle, loading, active, processing
-    property string currentMode: "region" // region, window, screen, portal
+    property string state: "idle"
+    property string currentMode: "region"
     property var activeWindows: []
 
     property bool replayMode: false
@@ -43,7 +44,7 @@ PanelWindow {
         return seconds < 60 ? seconds + "s" : (seconds / 60) + "m";
     }
 
-    property var focusedMonitor: null  // List of monitor objects from compositor
+    property var focusedMonitor: null
 
     function getModes() {
         return [
@@ -139,13 +140,8 @@ PanelWindow {
             if (selectionRect.width > 0) {
                 var w = Math.round(selectionRect.width);
                 var h = Math.round(selectionRect.height);
-                var x = Math.round(selectionRect.x);
-                var y = Math.round(selectionRect.y);
-
-                if (screenrecordPopup.focusedMonitor) {
-                    x = x + screenrecordPopup.focusedMonitor.x;
-                    y = y + screenrecordPopup.focusedMonitor.y;
-                }
+                var x = Math.round(selectionRect.x) + (screenrecordPopup.focusedMonitor?.x ?? screenrecordPopup.screen?.x ?? 0);
+                var y = Math.round(selectionRect.y) + (screenrecordPopup.focusedMonitor?.y ?? screenrecordPopup.screen?.y ?? 0);
 
                 startCapture("region", w + "x" + h + "+" + x + "+" + y);
             }
@@ -291,11 +287,8 @@ PanelWindow {
                 if (selectionRect.width > 5 && selectionRect.height > 5) {
                     var w = Math.round(selectionRect.width);
                     var h = Math.round(selectionRect.height);
-                    var x = Math.round(selectionRect.x);
-                    var y = Math.round(selectionRect.y);
-
-                    x = x + screenrecordPopup.focusedMonitor.x;
-                    y = y + screenrecordPopup.focusedMonitor.y;
+                    var x = Math.round(selectionRect.x) + (screenrecordPopup.focusedMonitor?.x ?? screenrecordPopup.screen?.x ?? 0);
+                    var y = Math.round(selectionRect.y) + (screenrecordPopup.focusedMonitor?.y ?? screenrecordPopup.screen?.y ?? 0);
 
                     screenrecordPopup.startCapture("region", w + "x" + h + "+" + x + "+" + y);
                 }
@@ -399,6 +392,7 @@ PanelWindow {
                     id: modeGrid
                     Layout.alignment: Qt.AlignHCenter
                     actions: screenrecordPopup.getModes()
+                    selectOnHover: false
                     buttonSize: 48
                     iconSize: 24
                     spacing: 10
@@ -420,9 +414,9 @@ PanelWindow {
                                 screenrecordPopup.currentMode = "region";
                                 modeGrid.currentIndex = 5;
                             }
-                        } else if (action.tooltip === "Toggle Audio Output") {
+                        } else if (action.name === "audio") {
                             screenrecordPopup.recordAudioOutput = !screenrecordPopup.recordAudioOutput;
-                        } else if (action.tooltip === "Toggle Microphone") {
+                        } else if (action.name === "mic") {
                             screenrecordPopup.recordAudioInput = !screenrecordPopup.recordAudioInput;
                         } else {
                             screenrecordPopup.executeCapture();

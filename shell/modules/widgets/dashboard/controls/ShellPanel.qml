@@ -127,7 +127,7 @@ Item {
     component SelectorRow: ColumnLayout {
         id: selectorRowRoot
         property string label: ""
-        property var options: []  // Array of { label: "...", value: "...", icon: "..." (optional) }
+        property var options: []
         property string value: ""
         signal valueSelected(string newValue)
 
@@ -211,7 +211,7 @@ Item {
     component ScreenListRow: ColumnLayout {
         id: screenListRowRoot
         property string label: "Screens"
-        property var selectedScreens: []  // Array of screen names
+        property var selectedScreens: []
         signal screensChanged(var newList)
 
         Layout.fillWidth: true
@@ -432,6 +432,10 @@ Item {
                         SectionButton {
                             text: "OSD"
                             sectionId: "osd"
+                        }
+                        SectionButton {
+                            text: "Macros"
+                            sectionId: "macros"
                         }
                         SectionButton {
                             text: "System"
@@ -1738,24 +1742,14 @@ Item {
                                 id: overviewScaleSlider
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 20
+                                value: (Config.overview.scale ?? 0.1) / 0.2
                                 progressColor: Styling.srItem("overprimary")
-                                tooltipText: `${(value * 0.2).toFixed(2)}`
+                                tooltipText: `${(effectiveValue * 0.2).toFixed(2)}`
                                 scroll: true
                                 stepSize: 0.05
                                 snapMode: "always"
-
-                                readonly property real configValue: (Config.overview.scale ?? 0.1) / 0.2
-
-                                onConfigValueChanged: {
-                                    if (Math.abs(value - configValue) > 0.001) {
-                                        value = configValue;
-                                    }
-                                }
-
-                                Component.onCompleted: value = configValue
-
-                                onValueChanged: {
-                                    let newScale = Math.round(value * 0.2 * 100) / 100;  // Round to 2 decimals
+                                onMoved: newValue => {
+                                    const newScale = Math.round(newValue * 0.2 * 100) / 100;
                                     if (Math.abs(newScale - (Config.overview.scale ?? 0.1)) > 0.001) {
                                         GlobalStates.markShellChanged();
                                         Config.overview.scale = newScale;
@@ -1903,10 +1897,18 @@ Item {
                             Layout.bottomMargin: -4
                         }
 
+                        readonly property int enabledDashboardTabCount: ((Config.dashboard.showWidgets ?? true) ? 1 : 0)
+                            + ((Config.dashboard.showWallpapers ?? true) ? 1 : 0)
+                            + ((Config.dashboard.showMetrics ?? true) ? 1 : 0)
+
                         ToggleRow {
                             label: "Show Widgets Tab"
                             checked: Config.dashboard.showWidgets ?? true
+                            enabled: !checked || parent.enabledDashboardTabCount > 1
+                            opacity: enabled ? 1.0 : 0.5
                             onToggled: value => {
+                                if (!value && parent.enabledDashboardTabCount <= 1)
+                                    return;
                                 if (value !== Config.dashboard.showWidgets) {
                                     GlobalStates.markShellChanged();
                                     Config.dashboard.showWidgets = value;
@@ -1917,7 +1919,11 @@ Item {
                         ToggleRow {
                             label: "Show Wallpapers Tab"
                             checked: Config.dashboard.showWallpapers ?? true
+                            enabled: !checked || parent.enabledDashboardTabCount > 1
+                            opacity: enabled ? 1.0 : 0.5
                             onToggled: value => {
+                                if (!value && parent.enabledDashboardTabCount <= 1)
+                                    return;
                                 if (value !== Config.dashboard.showWallpapers) {
                                     GlobalStates.markShellChanged();
                                     Config.dashboard.showWallpapers = value;
@@ -1928,7 +1934,11 @@ Item {
                         ToggleRow {
                             label: "Show Metrics Tab"
                             checked: Config.dashboard.showMetrics ?? true
+                            enabled: !checked || parent.enabledDashboardTabCount > 1
+                            opacity: enabled ? 1.0 : 0.5
                             onToggled: value => {
+                                if (!value && parent.enabledDashboardTabCount <= 1)
+                                    return;
                                 if (value !== Config.dashboard.showMetrics) {
                                     GlobalStates.markShellChanged();
                                     Config.dashboard.showMetrics = value;
@@ -2303,6 +2313,145 @@ Item {
                                 Config.dock.screenList = newList;
                             }
                         }
+
+                        Separator {
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: "Ignored Dock Apps (Regex)"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: Font.Medium
+                            color: Colors.overSurfaceVariant
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Repeater {
+                                id: ignoredAppsRepeater
+                                model: Config.dock.ignoredAppRegexes ?? []
+
+                                delegate: RowLayout {
+                                    id: ignoredRegexRow
+                                    required property string modelData
+                                    required property int index
+
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    StyledRect {
+                                        variant: "common"
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 36
+                                        radius: Styling.radius(-2)
+
+                                        TextInput {
+                                            id: ignoredRegexInput
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            font.family: Config.theme.monoFont
+                                            font.pixelSize: Styling.monoFontSize(0)
+                                            color: Colors.overBackground
+                                            selectByMouse: true
+                                            clip: true
+                                            verticalAlignment: TextInput.AlignVCenter
+                                            text: ignoredRegexRow.modelData
+
+                                            onEditingFinished: {
+                                                const trimmed = text.trim();
+                                                if (trimmed && trimmed !== ignoredRegexRow.modelData) {
+                                                    const next = (Config.dock.ignoredAppRegexes || []).slice();
+                                                    next[ignoredRegexRow.index] = trimmed;
+                                                    GlobalStates.markShellChanged();
+                                                    Config.dock.ignoredAppRegexes = next;
+                                                } else if (!trimmed) {
+                                                    text = ignoredRegexRow.modelData;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    StyledRect {
+                                        variant: removeRegexArea.containsMouse ? "focus" : "common"
+                                        Layout.preferredWidth: 36
+                                        Layout.preferredHeight: 36
+                                        radius: Styling.radius(-2)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: Icons.trash
+                                            font.family: Icons.font
+                                            font.pixelSize: 14
+                                            color: Colors.error
+                                        }
+
+                                        MouseArea {
+                                            id: removeRegexArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                const next = (Config.dock.ignoredAppRegexes || []).slice();
+                                                next.splice(ignoredRegexRow.index, 1);
+                                                GlobalStates.markShellChanged();
+                                                Config.dock.ignoredAppRegexes = next;
+                                            }
+                                        }
+
+                                        StyledToolTip {
+                                            show: removeRegexArea.containsMouse
+                                            tooltipText: "Remove pattern"
+                                        }
+                                    }
+                                }
+                            }
+
+                            StyledRect {
+                                id: addIgnoredRegexButton
+                                variant: addIgnoredRegexArea.containsMouse ? "primaryfocus" : "primary"
+                                Layout.preferredWidth: addIgnoredRegexContent.width + 24
+                                Layout.preferredHeight: 36
+                                radius: Styling.radius(-2)
+
+                                Row {
+                                    id: addIgnoredRegexContent
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    Text {
+                                        text: Icons.plus
+                                        font.family: Icons.font
+                                        font.pixelSize: 14
+                                        color: addIgnoredRegexButton.item
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+
+                                    Text {
+                                        text: "Add Pattern"
+                                        font.family: Config.theme.font
+                                        font.pixelSize: Styling.fontSize(0)
+                                        color: addIgnoredRegexButton.item
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: addIgnoredRegexArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const next = (Config.dock.ignoredAppRegexes || []).slice();
+                                        next.push("app-id.*");
+                                        GlobalStates.markShellChanged();
+                                        Config.dock.ignoredAppRegexes = next;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Separator {
@@ -2544,6 +2693,43 @@ Item {
                     Separator {
                         Layout.fillWidth: true
                         visible: false
+                    }
+
+                    ColumnLayout {
+                        visible: root.currentSection === "macros"
+                        property string settingsSection: "macros"
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            text: "Macros"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: Font.Medium
+                            color: Colors.overSurfaceVariant
+                            Layout.bottomMargin: -4
+                        }
+
+                        ToggleRow {
+                            label: "Macros Enabled"
+                            checked: Config.macros.enabled ?? true
+                            onToggled: value => {
+                                if (value !== Config.macros.enabled) {
+                                    GlobalStates.markShellChanged();
+                                    Config.macros.enabled = value;
+                                }
+                            }
+                        }
+
+                        ActionButton {
+                            text: "Open Macro Editor"
+                            icon: Icons.keyboard
+                            onClicked: {
+                                GlobalStates.macrosTargetWorkspaceId = Compositor.focusedMonitor?.activeWorkspace?.id || Compositor.focusedWorkspace?.id || 0;
+                                GlobalStates.macrosTargetScreenName = Compositor.focusedMonitor?.name || "";
+                                GlobalStates.macrosWindowVisible = true;
+                            }
+                        }
                     }
 
                     ColumnLayout {

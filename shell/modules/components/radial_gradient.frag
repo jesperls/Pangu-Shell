@@ -52,14 +52,19 @@ void main() {
     vec2 pos = qt_TexCoord0;
     vec2 center = vec2(ubuf.centerX, ubuf.centerY);
     vec2 d = pos - center;
+    if (ubuf.canvasWidth > 0.0 && ubuf.canvasHeight > 0.0) {
+        if (ubuf.canvasWidth >= ubuf.canvasHeight) {
+            d.x *= ubuf.canvasWidth / ubuf.canvasHeight;
+        } else {
+            d.y *= ubuf.canvasHeight / ubuf.canvasWidth;
+        }
+    }
 
     float dist = length(d);
     float t = clamp(dist, 0.0, 1.0);
 
-    // Antialiasing: pixel-width smoothing for sharp transitions
     float fw = fwidth(t) * 0.5;
 
-    // Procedural gradient: interpolate between stops with AA
     vec4 color = getStopColor(0);
     for (int i = 1; i < 8; i++) {
         if (i >= ubuf.numStops) break;

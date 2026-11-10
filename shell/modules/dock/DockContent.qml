@@ -80,7 +80,7 @@ Item {
     }
 
     readonly property var compositorMonitor: Compositor.monitorFor(screen)
-    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace.id === compositorMonitor.activeWorkspace.id)
+    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace?.id === compositorMonitor.activeWorkspace.id)
 
     readonly property bool hasWindows: toplevels.length > 0
 
@@ -101,14 +101,14 @@ Item {
 
     property bool reveal: {
         if (activeWindowFullscreen) {
-            return (Config.dock?.availableOnFullscreen ?? false) && (Config.dock?.hoverToReveal && dockMouseArea.containsMouse);
+            return (Config.dock?.availableOnFullscreen ?? false) && ((Config.dock?.hoverToReveal ?? true) && (dockMouseArea.containsMouse || root.hoverActive));
         }
 
         if (keepHidden) {
-            return (Config.dock?.hoverToReveal && (dockMouseArea.containsMouse || root.hoverActive));
+            return ((Config.dock?.hoverToReveal ?? true) && (dockMouseArea.containsMouse || root.hoverActive));
         }
 
-        return root.pinned || (Config.dock?.hoverToReveal && (dockMouseArea.containsMouse || root.hoverActive)) || !hasWindows
+        return root.pinned || ((Config.dock?.hoverToReveal ?? true) && (dockMouseArea.containsMouse || root.hoverActive)) || !hasWindows;
     }
 
     readonly property int totalMargin: root.windowSideMargin + root.edgeSideMargin
@@ -137,7 +137,7 @@ Item {
             root.hoverActive = true;
         }
         onExited: {
-            if (!root.pinned && root.hasWindows) {
+            if ((!root.pinned && root.hasWindows) || root.keepHidden || root.activeWindowFullscreen) {
                 hideDelayTimer.restart();
             } else {
                 root.hoverActive = false;
@@ -276,6 +276,7 @@ Item {
 
                     variant: "bg"
                     enableBorder: false
+                    enableShadow: false
 
                     readonly property int fullRadius: Styling.radius(4)
 
@@ -305,8 +306,9 @@ Item {
                     }
                 }
 
-                layer.enabled: true
-                layer.effect: MultiEffect {
+                layer.enabled: root.isDefault
+                layer.effect: Shadow {
+                    shadowEnabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
                     maskEnabled: true
                     maskSource: dockMask
                     maskThresholdMin: 0.5
@@ -319,7 +321,7 @@ Item {
                 visible: false
                 anchors.fill: parent
 
-                layer.enabled: true
+                layer.enabled: root.isDefault
                 layer.smooth: true
 
                 RoundCorner {
@@ -386,6 +388,7 @@ Item {
                 variant: "bg"
                 radius: Styling.radius(4)
                 enableBorder: true
+                enableShadow: Config.showBackground
             }
 
             RowLayout {
@@ -489,10 +492,11 @@ Item {
                         id: overviewButton
                         implicitWidth: 32
                         implicitHeight: 32
+                        readonly property bool isOpen: Visibilities.getForScreen(root.screenName)?.overview ?? false
 
                         background: StyledRect {
-                            visible: overviewButton.hovered
-                            variant: "focus"
+                            visible: overviewButton.isOpen || overviewButton.hovered
+                            variant: overviewButton.isOpen ? "primary" : "focus"
                             radius: Styling.radius(-2)
                             enableShadow: false
                             enableBorder: false
@@ -502,16 +506,13 @@ Item {
                             text: Icons.overview
                             font.family: Icons.font
                             font.pixelSize: 18
-                            color: Colors.overBackground
+                            color: overviewButton.isOpen ? Styling.srItem("primary") : Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         onClicked: {
-                            let visibilities = Visibilities.getForScreen(root.screenName);
-                            if (visibilities) {
-                                visibilities.overview = !visibilities.overview;
-                            }
+                            Visibilities.setActiveModule(overviewButton.isOpen ? "" : "overview", root.screenName);
                         }
 
                         StyledToolTip {
@@ -622,10 +623,11 @@ Item {
                         id: overviewButtonV
                         implicitWidth: 32
                         implicitHeight: 32
+                        readonly property bool isOpen: Visibilities.getForScreen(root.screenName)?.overview ?? false
 
                         background: StyledRect {
-                            visible: overviewButtonV.hovered
-                            variant: "focus"
+                            visible: overviewButtonV.isOpen || overviewButtonV.hovered
+                            variant: overviewButtonV.isOpen ? "primary" : "focus"
                             radius: Styling.radius(-2)
                             enableShadow: false
                             enableBorder: false
@@ -635,16 +637,13 @@ Item {
                             text: Icons.overview
                             font.family: Icons.font
                             font.pixelSize: 18
-                            color: Colors.overBackground
+                            color: overviewButtonV.isOpen ? Styling.srItem("primary") : Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         onClicked: {
-                            let visibilities = Visibilities.getForScreen(root.screenName);
-                            if (visibilities) {
-                                visibilities.overview = !visibilities.overview;
-                            }
+                            Visibilities.setActiveModule(overviewButtonV.isOpen ? "" : "overview", root.screenName);
                         }
 
                         StyledToolTip {

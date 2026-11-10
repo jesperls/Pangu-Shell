@@ -191,7 +191,7 @@ Rectangle {
             });
         }
         var initial = [];
-        for (var i = 0; i < Math.min(50, emojiData.length); i++) {
+        for (var i = 0; i < emojiData.length; i++) {
             var e = emojiData[i];
             emojisModel.append({
                 emojiId: e.search,
@@ -377,6 +377,7 @@ Rectangle {
                 activeFocusOnTab: true
 
                 Behavior on width {
+                    enabled: Styling.animDuration > 0
                     NumberAnimation {
                         duration: Styling.animDuration
                         easing.type: Easing.OutQuart
@@ -429,6 +430,7 @@ Rectangle {
                         visible: opacity > 0
                         verticalAlignment: Text.AlignVCenter
                         Behavior on opacity {
+                            enabled: Styling.animDuration > 0
                             NumberAnimation {
                                 duration: Styling.animDuration / 2
                                 easing.type: Easing.OutQuart
@@ -466,6 +468,7 @@ Rectangle {
             anchors.bottom: parent.bottom
             anchors.topMargin: 8
             clip: true
+            cacheBuffer: 192
             model: emojisModel
             currentIndex: root.selectedIndex
             spacing: 0
@@ -689,6 +692,7 @@ Rectangle {
                             visible: index === root.expandedItemIndex && emojiData.skin_tone_support
                             opacity: visible ? 1 : 0
                             Behavior on opacity {
+                                enabled: Styling.animDuration > 0
                                 NumberAnimation {
                                     duration: Styling.animDuration
                                     easing.type: Easing.OutQuart

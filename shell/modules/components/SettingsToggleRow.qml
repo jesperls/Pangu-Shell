@@ -38,6 +38,11 @@ import qs.config
             onCheckedChanged: {
                 if (!toggleRowRoot._updating && checked !== toggleRowRoot.checked) {
                     toggleRowRoot.toggled(checked);
+                    if (checked !== toggleRowRoot.checked) {
+                        toggleRowRoot._updating = true;
+                        checked = toggleRowRoot.checked;
+                        toggleRowRoot._updating = false;
+                    }
                 }
             }
 

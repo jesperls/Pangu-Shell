@@ -10,9 +10,11 @@ QtObject {
     function generate(Colors) {
         if (!Colors) return
 
-        const fmt = (c) => c.toString()
+        const fmt = (c) => "#" + [c.r, c.g, c.b]
+            .map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0"))
+            .join("")
 
-        const bg = Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, Config.theme.srBg.opacity).toString()
+        const bg = fmt(Colors.background)
         const fg = fmt(Colors.overBackground)
         const surface = fmt(Colors.surface)
         const primary = fmt(Colors.primary)

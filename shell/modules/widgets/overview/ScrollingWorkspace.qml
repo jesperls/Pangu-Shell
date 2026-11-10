@@ -54,7 +54,7 @@ Item {
     implicitHeight: workspaceHeight
 
     readonly property real viewportWidth: workspaceWidth / 3
-    readonly property real viewportOffset: viewportWidth  // Offset to center third
+    readonly property real viewportOffset: viewportWidth
 
     readonly property var workspaceWindows: {
         return windowList.filter(win => {
@@ -106,8 +106,8 @@ Item {
     }
 
     property real horizontalScrollOffset: 0
-    property bool isScrollDragging: false  // Track if any right-click drag is active
-    property bool isWheelScrolling: false  // Track if wheel is being used
+    property bool isScrollDragging: false
+    property bool isWheelScrolling: false
 
     Timer {
         id: wheelScrollTimer
@@ -245,7 +245,7 @@ Item {
                 acceptedButtons: Qt.LeftButton
                 onDoubleTapped: {
                     Compositor.dispatch(`workspace ${root.workspaceId}`);
-                    Visibilities.setActiveModule("", true);
+                    Visibilities.setActiveModule("");
                 }
             }
 
@@ -499,7 +499,7 @@ Item {
                                 if (windowDelegate.dragging) {
                                     windowDelegate.dragging = false;
 
-                                    let targetWs = root.workspaceId;  // Default to current workspace
+                                    let targetWs = root.workspaceId;
                                     if (root.overviewRoot && root.overviewRoot.getWorkspaceAtY) {
                                         const globalPos = dragArea.mapToItem(null, mouse.x, mouse.y);
                                         const calculatedWs = root.overviewRoot.getWorkspaceAtY(globalPos.y);
@@ -595,7 +595,7 @@ Item {
                             if (!windowDelegate.windowData)
                                 return;
                             if (mouse.button === Qt.LeftButton) {
-                                Visibilities.setActiveModule("", true);
+                                Visibilities.setActiveModule("");
                                 Qt.callLater(() => {
                                     Compositor.dispatch(`focuswindow address:${windowDelegate.windowData.address}`);
                                 });
@@ -603,27 +603,9 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        visible: dragArea.containsMouse && !windowDelegate.dragging && windowDelegate.windowData
-                        anchors.bottom: parent.top
-                        anchors.bottomMargin: 8
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: tooltipText.implicitWidth + 16
-                        height: tooltipText.implicitHeight + 8
-                        color: Colors.inverseSurface
-                        radius: Styling.radius(0) / 2
-                        opacity: 0.9
-                        z: 1000
-
-                        Text {
-                            id: tooltipText
-                            anchors.centerIn: parent
-                            text: `${(windowDelegate.windowData && windowDelegate.windowData.title !== undefined ? windowDelegate.windowData.title : "") || ""}\n[${(windowDelegate.windowData && windowDelegate.windowData.class !== undefined ? windowDelegate.windowData.class : "") || ""}]${(windowDelegate.windowData && windowDelegate.windowData.xwayland !== undefined ? windowDelegate.windowData.xwayland : false) ? " [XWayland]" : ""}`
-                            font.family: Config.theme.font
-                            font.pixelSize: 10
-                            color: Colors.inverseOnSurface
-                            horizontalAlignment: Text.AlignHCenter
-                        }
+                    StyledToolTip {
+                        show: dragArea.containsMouse && !windowDelegate.dragging && Boolean(windowDelegate.windowData)
+                        tooltipText: `${(windowDelegate.windowData && windowDelegate.windowData.title !== undefined ? windowDelegate.windowData.title : "") || ""}\n[${(windowDelegate.windowData && windowDelegate.windowData.class !== undefined ? windowDelegate.windowData.class : "") || ""}]${(windowDelegate.windowData && windowDelegate.windowData.xwayland !== undefined ? windowDelegate.windowData.xwayland : false) ? " [XWayland]" : ""}`
                     }
                 }
             }

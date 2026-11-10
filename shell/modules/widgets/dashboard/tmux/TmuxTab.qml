@@ -430,7 +430,6 @@ Item {
                                     root.attachToSession(selectedSession.name);
                                 }
                             }
-                        } else {
                         }
                     }
                 }
@@ -509,7 +508,7 @@ Item {
 
                 onPageDownPressed: {
                     if (!root.deleteMode && !root.renameMode && resultsList.count > 0) {
-                        let visibleItems = Math.floor(resultsList.height / 28);
+                        let visibleItems = Math.max(1, Math.floor(resultsList.height / 48));
                         let newIndex = Math.min(root.selectedIndex + visibleItems, resultsList.count - 1);
                         if (root.selectedIndex === -1) {
                             newIndex = Math.min(visibleItems - 1, resultsList.count - 1);
@@ -521,7 +520,7 @@ Item {
 
                 onPageUpPressed: {
                     if (!root.deleteMode && !root.renameMode && resultsList.count > 0) {
-                        let visibleItems = Math.floor(resultsList.height / 28);
+                        let visibleItems = Math.max(1, Math.floor(resultsList.height / 48));
                         let newIndex = Math.max(root.selectedIndex - visibleItems, 0);
                         if (root.selectedIndex === -1) {
                             newIndex = Math.max(resultsList.count - visibleItems, 0);
@@ -948,6 +947,7 @@ Item {
                                             return modelData.name;
                                         }
                                     }
+                                    textFormat: Text.PlainText
                                     color: textColor
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize
@@ -976,6 +976,10 @@ Item {
                                         root.newSessionName = text;
                                     }
 
+                                    onTextEdited: {
+                                        root.renameButtonIndex = 1;
+                                    }
+
                                     Component.onCompleted: {
                                         Qt.callLater(() => {
                                             forceActiveFocus();
@@ -985,16 +989,17 @@ Item {
 
                                     Keys.onPressed: event => {
                                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                            root.confirmRenameSession();
+                                            if (root.renameButtonIndex === 0) {
+                                                root.cancelRenameMode();
+                                            } else {
+                                                root.confirmRenameSession();
+                                            }
                                             event.accepted = true;
                                         } else if (event.key === Qt.Key_Escape) {
                                             root.cancelRenameMode();
                                             event.accepted = true;
-                                        } else if (event.key === Qt.Key_Left) {
-                                            root.renameButtonIndex = 0;
-                                            event.accepted = true;
-                                        } else if (event.key === Qt.Key_Right) {
-                                            root.renameButtonIndex = 1;
+                                        } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                                            root.renameButtonIndex = root.renameButtonIndex === 0 ? 1 : 0;
                                             event.accepted = true;
                                         }
                                     }
@@ -1211,6 +1216,7 @@ Item {
                                     Text {
                                         width: parent.width
                                         text: modelData.command
+                                        textFormat: Text.PlainText
                                         font.family: Config.theme.font
                                         font.pixelSize: Config.theme.fontSize
                                         font.weight: Font.Bold
@@ -1390,6 +1396,7 @@ Item {
                                         Text {
                                             id: windowText
                                             text: modelData.index + ": " + modelData.name
+                                            textFormat: Text.PlainText
                                             font.family: Config.theme.font
                                             font.pixelSize: Config.theme.fontSize
                                             font.weight: modelData.active ? Font.Bold : Font.Normal
@@ -1480,13 +1487,7 @@ Item {
                 event.accepted = true;
             }
         } else if (root.renameMode) {
-            if (event.key === Qt.Key_Left) {
-                root.renameButtonIndex = 0;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Right) {
-                root.renameButtonIndex = 1;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 if (root.renameButtonIndex === 0) {
                     root.cancelRenameMode();
                 } else {
@@ -1498,13 +1499,5 @@ Item {
                 event.accepted = true;
             }
         }
-    }
-
-    onDeleteModeChanged: {
-        if (!deleteMode) {}
-    }
-
-    onRenameModeChanged: {
-        if (!renameMode) {}
     }
 }

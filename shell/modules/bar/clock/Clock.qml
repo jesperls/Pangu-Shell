@@ -16,6 +16,7 @@ Item {
     property string currentDate: ""
     property string currentHours: ""
     property string currentMinutes: ""
+    property string currentSuffix: ""
 
     readonly property bool showDate: (Config.bar && Config.bar.showDate !== undefined) ? Config.bar.showDate : false
     readonly property bool showSeconds: (Config.bar && Config.bar.showSeconds !== undefined) ? Config.bar.showSeconds : false
@@ -151,6 +152,19 @@ Item {
                 wrapMode: Text.NoWrap
                 Layout.alignment: Qt.AlignHCenter
             }
+
+            Text {
+                id: suffixDisplayV
+                visible: root.currentSuffix !== ""
+                text: root.currentSuffix
+                color: root.popupOpen ? buttonBg.item : Colors.outline
+                font.pixelSize: Styling.fontSize(-2)
+                font.family: Config.theme.font
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.NoWrap
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
 
         MouseArea {
@@ -234,16 +248,6 @@ Item {
                             font.family: Config.theme.font
                             font.pixelSize: Styling.fontSize(0)
                             font.weight: Font.Medium
-                        }
-
-                        Text {
-                            anchors.right: parent.right
-                            anchors.rightMargin: 4
-                            text: ""
-                            color: Colors.outline
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            visible: text !== ""
                         }
                     }
 
@@ -432,11 +436,12 @@ Item {
                                     icon: Icons.clock
                                     value: WeatherService.debugHour / 24
                                     tooltipText: {
-                                        var hour = Math.floor(WeatherService.debugHour);
-                                        var minutes = Math.round((WeatherService.debugHour - hour) * 60);
+                                        const debugHr = sliderContent.effectiveValue * 24;
+                                        const hour = Math.floor(debugHr);
+                                        const minutes = Math.round((debugHr - hour) * 60) % 60;
                                         return hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
                                     }
-                                    onValueChanged: WeatherService.debugHour = value * 24
+                                    onMoved: newValue => WeatherService.debugHour = newValue * 24
                                 }
                             }
 
@@ -572,7 +577,7 @@ Item {
                                             }
 
                                             StyledToolTip {
-                                                visible: weatherBtn.buttonHovered
+                                                show: weatherBtn.buttonHovered
                                                 tooltipText: weatherBtn.modelData.name
                                             }
                                         }
@@ -589,13 +594,14 @@ Item {
                 variant: "popup"
                 radius: Styling.radius(8)
                 enableShadow: false
-                width: 300 + 16  // Match weather popup width
+                width: 300 + 16
                 height: pomodoroWidget.height + 16
 
                 Pomodoro {
                     id: pomodoroWidget
                     anchors.centerIn: parent
                     width: 300
+                    screenName: root.bar?.screenName ?? ""
                     onRequestPopupOpen: clockPopup.open()
                 }
             }
@@ -628,12 +634,14 @@ Item {
 
         if (use12h) {
             var match = formatted.match(/^(\d+):(\d+)(?::(\d+))?\s*(AM|PM)$/i);
-            root.currentHours = match ? match[1] + " " + match[4] : formatted;
-            root.currentMinutes = match ? match[2] + (match[3] ? ":" + match[3] : "") : "";
+            root.currentHours = match ? match[1] : formatted;
+            root.currentMinutes = match ? match[2] : "";
+            root.currentSuffix = match ? ((match[3] ? ":" + match[3] + "\n" : "") + match[4].toUpperCase()) : "";
         } else {
             var parts = formatted.split(":");
             root.currentHours = parts[0];
-            root.currentMinutes = parts.length > 2 ? parts[1] + ":" + parts[2] : parts[1];
+            root.currentMinutes = parts[1] ?? "";
+            root.currentSuffix = parts.length > 2 ? parts[2] : "";
         }
     }
 

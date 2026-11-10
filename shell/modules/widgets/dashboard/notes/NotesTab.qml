@@ -120,17 +120,7 @@ Item {
 
     function setFontSize(size) {
         if (hasSelection()) {
-            let start = noteEditor.selectionStart;
-            let end = noteEditor.selectionEnd;
-
-            for (let i = start; i < end; i++) {
-                noteEditor.select(i, i + 1);
-                let charFont = noteEditor.cursorSelection.font;
-                charFont.pixelSize = size;
-                noteEditor.cursorSelection.font = charFont;
-            }
-
-            noteEditor.select(start, end);
+            noteEditor.cursorSelection.font.pixelSize = size;
         } else {
             preFormatFontSize = size;
         }
@@ -719,10 +709,9 @@ Item {
                             if (note.isCreateButton) {
                                 let createOptions = [function () {
                                         createNewNote(note.noteNameToCreate || "", false);
-                                    }  // Rich Text
-                                    , function () {
+                                    }, function () {
                                         createNewNote(note.noteNameToCreate || "", true);
-                                    }  // Markdown
+                                    }
                                 ];
                                 if (root.selectedOptionIndex >= 0 && root.selectedOptionIndex < createOptions.length) {
                                     root.expandedItemIndex = -1;
@@ -1108,6 +1097,7 @@ Item {
                                 id: normalText
                                 Text {
                                     text: displayText
+                                    textFormat: Text.PlainText
                                     font.family: Config.theme.font
                                     font.pixelSize: Config.theme.fontSize
                                     font.weight: isInDeleteMode ? Font.Bold : (isSelected ? Font.Bold : Font.Normal)
@@ -1144,6 +1134,10 @@ Item {
                                         root.newNoteName = text;
                                     }
 
+                                    onTextEdited: {
+                                        root.renameButtonIndex = 1;
+                                    }
+
                                     Component.onCompleted: {
                                         Qt.callLater(() => {
                                             forceActiveFocus();
@@ -1153,16 +1147,17 @@ Item {
 
                                     Keys.onPressed: event => {
                                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                            root.confirmRenameNote();
+                                            if (root.renameButtonIndex === 0) {
+                                                root.cancelRenameMode();
+                                            } else {
+                                                root.confirmRenameNote();
+                                            }
                                             event.accepted = true;
                                         } else if (event.key === Qt.Key_Escape) {
                                             root.cancelRenameMode();
                                             event.accepted = true;
-                                        } else if (event.key === Qt.Key_Left) {
-                                            root.renameButtonIndex = 0;
-                                            event.accepted = true;
-                                        } else if (event.key === Qt.Key_Right) {
-                                            root.renameButtonIndex = 1;
+                                        } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                                            root.renameButtonIndex = root.renameButtonIndex === 0 ? 1 : 0;
                                             event.accepted = true;
                                         }
                                     }
@@ -1332,7 +1327,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -1358,7 +1354,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Decrease font size (Alt+Down)"
-                            visible: minusMouseArea.containsMouse
+                            show: minusMouseArea.containsMouse
                         }
                     }
 
@@ -1371,7 +1367,7 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: fontSizeField.activeFocus ? "primary" : "surface"
+                            variant: fontSizeField.activeFocus ? "primary" : "common"
                             radius: Styling.radius(-4)
                         }
 
@@ -1418,7 +1414,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -1444,7 +1441,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Increase font size (Alt+Up)"
-                            visible: plusMouseArea.containsMouse
+                            show: plusMouseArea.containsMouse
                         }
                     }
 
@@ -1466,9 +1463,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && !isBold() ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: !isBold()
+                            visible: parent.isHovered && !isBold()
                         }
 
                         Text {
@@ -1490,7 +1487,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Bold (Ctrl+B)"
-                            visible: boldMouseArea.containsMouse
+                            show: boldMouseArea.containsMouse
                         }
                     }
 
@@ -1505,9 +1502,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && !isItalic() ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: !isItalic()
+                            visible: parent.isHovered && !isItalic()
                         }
 
                         Text {
@@ -1529,7 +1526,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Italic (Ctrl+I)"
-                            visible: italicMouseArea.containsMouse
+                            show: italicMouseArea.containsMouse
                         }
                     }
 
@@ -1544,9 +1541,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && !isUnderline() ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: !isUnderline()
+                            visible: parent.isHovered && !isUnderline()
                         }
 
                         Text {
@@ -1568,7 +1565,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Underline (Ctrl+U)"
-                            visible: underlineMouseArea.containsMouse
+                            show: underlineMouseArea.containsMouse
                         }
                     }
 
@@ -1583,9 +1580,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && !isStrikeout() ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: !isStrikeout()
+                            visible: parent.isHovered && !isStrikeout()
                         }
 
                         Text {
@@ -1607,7 +1604,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Strikethrough (Ctrl+D)"
-                            visible: strikeMouseArea.containsMouse
+                            show: strikeMouseArea.containsMouse
                         }
                     }
 
@@ -1629,9 +1626,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignLeft ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: noteEditor.cursorSelection.alignment !== Qt.AlignLeft
+                            visible: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignLeft
                         }
 
                         Text {
@@ -1655,7 +1652,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Align Left (Alt+Left)"
-                            visible: alignLeftMouseArea.containsMouse
+                            show: alignLeftMouseArea.containsMouse
                         }
                     }
 
@@ -1670,9 +1667,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignHCenter ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: noteEditor.cursorSelection.alignment !== Qt.AlignHCenter
+                            visible: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignHCenter
                         }
 
                         Text {
@@ -1696,7 +1693,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Align Center (Alt+Left/Right)"
-                            visible: alignCenterMouseArea.containsMouse
+                            show: alignCenterMouseArea.containsMouse
                         }
                     }
 
@@ -1711,9 +1708,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignRight ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: noteEditor.cursorSelection.alignment !== Qt.AlignRight
+                            visible: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignRight
                         }
 
                         Text {
@@ -1737,7 +1734,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Align Right (Alt+Left/Right)"
-                            visible: alignRightMouseArea.containsMouse
+                            show: alignRightMouseArea.containsMouse
                         }
                     }
 
@@ -1752,9 +1749,9 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignJustify ? "surface" : "transparent"
+                            variant: "focus"
                             radius: Styling.radius(-4)
-                            visible: noteEditor.cursorSelection.alignment !== Qt.AlignJustify
+                            visible: parent.isHovered && noteEditor.cursorSelection.alignment !== Qt.AlignJustify
                         }
 
                         Text {
@@ -1778,7 +1775,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Justify (Alt+Right)"
-                            visible: alignJustifyMouseArea.containsMouse
+                            show: alignJustifyMouseArea.containsMouse
                         }
                     }
 
@@ -1980,7 +1977,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2002,7 +2000,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Decrease heading (Alt+Down)"
-                            visible: headingMinusMouse.containsMouse
+                            show: headingMinusMouse.containsMouse
                         }
                     }
 
@@ -2014,7 +2012,7 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: "surface"
+                            variant: "common"
                             radius: Styling.radius(-4)
                         }
 
@@ -2039,7 +2037,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2061,7 +2060,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Increase heading (Alt+Up)"
-                            visible: headingPlusMouse.containsMouse
+                            show: headingPlusMouse.containsMouse
                         }
                     }
 
@@ -2083,7 +2082,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2106,7 +2106,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Bold (Ctrl+B)"
-                            visible: mdBoldMouse.containsMouse
+                            show: mdBoldMouse.containsMouse
                         }
                     }
 
@@ -2121,7 +2121,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2144,7 +2145,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Italic (Ctrl+I)"
-                            visible: mdItalicMouse.containsMouse
+                            show: mdItalicMouse.containsMouse
                         }
                     }
 
@@ -2159,7 +2160,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2182,7 +2184,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Underline (Ctrl+U)"
-                            visible: mdUnderlineMouse.containsMouse
+                            show: mdUnderlineMouse.containsMouse
                         }
                     }
 
@@ -2197,7 +2199,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2220,7 +2223,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Strikethrough (Ctrl+D)"
-                            visible: mdStrikeMouse.containsMouse
+                            show: mdStrikeMouse.containsMouse
                         }
                     }
 
@@ -2242,14 +2245,15 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
                         Text {
                             anchors.centerIn: parent
                             text: "<>"
-                            font.family: "monospace"
+                            font.family: Config.theme.monoFont
                             font.pixelSize: 12
                             color: Colors.overSurface
                         }
@@ -2264,7 +2268,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Inline code (Ctrl+E)"
-                            visible: mdCodeMouse.containsMouse
+                            show: mdCodeMouse.containsMouse
                         }
                     }
 
@@ -2279,7 +2283,8 @@ Item {
 
                         StyledRect {
                             anchors.fill: parent
-                            variant: parent.isHovered ? "surface" : "transparent"
+                            variant: "focus"
+                            visible: parent.isHovered
                             radius: Styling.radius(-4)
                         }
 
@@ -2301,7 +2306,7 @@ Item {
 
                         StyledToolTip {
                             tooltipText: "Insert link (Ctrl+K)"
-                            visible: mdLinkMouse.containsMouse
+                            show: mdLinkMouse.containsMouse
                         }
                     }
 
@@ -2330,7 +2335,7 @@ Item {
                         id: mdEditorFlickable
                         anchors.fill: parent
                         contentWidth: width
-                        contentHeight: mdEditor.contentHeight + height * 0.5  // Extra bottom margin for scroll
+                        contentHeight: mdEditor.contentHeight + height * 0.5
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
 
@@ -2465,7 +2470,7 @@ Item {
                         id: mdPreviewFlickable
                         anchors.fill: parent
                         contentWidth: width
-                        contentHeight: mdPreviewText.contentHeight + height * 0.5  // Extra bottom margin for scroll
+                        contentHeight: mdPreviewText.contentHeight + height * 0.5
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
 
@@ -2563,11 +2568,12 @@ Item {
                 event.accepted = true;
             }
         } else if (root.renameMode) {
-            if (event.key === Qt.Key_Left) {
-                root.renameButtonIndex = 0;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Right) {
-                root.renameButtonIndex = 1;
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (root.renameButtonIndex === 0) {
+                    root.cancelRenameMode();
+                } else {
+                    root.confirmRenameNote();
+                }
                 event.accepted = true;
             } else if (event.key === Qt.Key_Escape) {
                 root.cancelRenameMode();

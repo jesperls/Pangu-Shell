@@ -101,6 +101,7 @@ Item {
             required property var modelData
             width: networkList.width
             height: networkItem.height
+            ListView.onReused: networkItem.resetState()
 
             WifiNetworkItem {
                 id: networkItem

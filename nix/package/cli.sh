@@ -13,7 +13,7 @@ shellPid() {
 		printf '%s' "$pid"
 		return 0
 	fi
-	pgrep -f "$shellRoot/shell.qml" | head -1
+	pgrep -f "$shellRoot/shell.qml" | head -n 1 || true
 }
 
 ipc() {
@@ -24,7 +24,7 @@ ipc() {
 }
 
 percentToUnit() {
-	awk -v value="$1" 'BEGIN { printf "%.2f", value / 100 }'
+	LC_ALL=C awk -v value="$1" 'BEGIN { printf "%.2f", value / 100 }'
 }
 
 listBrightness() {
@@ -38,10 +38,10 @@ saveBrightness() {
 		listBrightness | cut -d: -f1,2 >"$brightnessState"
 		return
 	fi
-	current=$(listBrightness | grep "^${monitor}:" | cut -d: -f2)
+	current=$(listBrightness | awk -F: -v mon="$monitor" '$1 == mon { print $2; exit }')
 	[ -n "$current" ] || die "no brightness reported for monitor $monitor"
 	if [ -f "$brightnessState" ]; then
-		grep -v "^${monitor}:" "$brightnessState" >"$brightnessState.tmp" || true
+		awk -F: -v mon="$monitor" '$1 != mon' "$brightnessState" >"$brightnessState.tmp"
 		mv "$brightnessState.tmp" "$brightnessState"
 	fi
 	printf '%s:%s\n' "$monitor" "$current" >>"$brightnessState"
@@ -82,10 +82,12 @@ usage() {
 case "${1:-}" in
 "")
 	if command -v gsettings >/dev/null 2>&1; then
-		QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
-		export QS_ICON_THEME
+		if icon_theme=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null); then
+			QS_ICON_THEME=${icon_theme//\'/}
+			export QS_ICON_THEME
+		fi
 	fi
-	export QT_QPA_PLATFORMTHEME=qt6ct
+	export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt6ct}"
 	unset HL_INITIAL_WORKSPACE_TOKEN
 	mkdir -p "$runtimeDir"
 	exec qs -p "$shellRoot/shell.qml"
@@ -109,7 +111,13 @@ quit)
 	;;
 screen)
 	case "${2:-}" in
-	on | off) ipc pangu run "screen-$2" ;;
+	on | off)
+		if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+			hyprctl dispatch dpms "$2" >/dev/null 2>&1 || ipc pangu run "screen-$2"
+		else
+			ipc pangu run "screen-$2"
+		fi
+		;;
 	*) die "usage: pangu screen on|off" ;;
 	esac
 	;;
@@ -128,10 +136,11 @@ brightness)
 		restoreBrightness "${3:-}"
 		;;
 	[+-][0-9]*)
+		[[ "$2" =~ ^[+-][0-9]+$ ]] || die "usage: pangu brightness <0-100|+N|-N|-s|-r|-l> [monitor]"
 		ipc brightness adjust "$(percentToUnit "$2")" "${3:-}"
 		;;
 	[0-9]*)
-		[ "$2" -le 100 ] || die "brightness must be between 0 and 100"
+		[[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -le 100 ] || die "brightness must be between 0 and 100"
 		monitor="${3:-}"
 		case "$monitor" in
 		-s | --save)

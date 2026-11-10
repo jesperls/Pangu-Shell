@@ -1,5 +1,5 @@
 root="${1:-$PWD}"
-root=$(realpath -- "$root")
+root=$(realpath -m -- "$root")
 if [ ! -f "$root/shell/shell.qml" ]; then
   echo "pangu-dev: run from the Pangu checkout or pass its directory" >&2
   exit 1

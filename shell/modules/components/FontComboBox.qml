@@ -12,17 +12,25 @@ Item {
     signal fontSelected(string fontFamily)
 
     readonly property var fontModel: Qt.fontFamilies()
+    property string filterText: ""
+    readonly property var filteredFonts: {
+        const q = filterText.trim().toLowerCase();
+        if (q === "")
+            return fontModel;
+        return fontModel.filter(f => f.toLowerCase().includes(q));
+    }
     property bool listExpanded: false
     property int highlightedIndex: -1
 
     implicitHeight: 32
 
     function findFontIndex(font) {
-        for (let i = 0; i < fontModel.length; i++) {
-            if (fontModel[i] === font)
+        const list = root.filteredFonts;
+        for (let i = 0; i < list.length; i++) {
+            if (list[i] === font)
                 return i;
         }
-        return -1;
+        return list.length > 0 ? 0 : -1;
     }
 
     Component.onCompleted: highlightedIndex = findFontIndex(selectedFont)
@@ -65,6 +73,7 @@ Item {
         onClicked: {
             root.listExpanded = !root.listExpanded;
             if (root.listExpanded) {
+                root.filterText = "";
                 root.highlightedIndex = root.findFontIndex(root.selectedFont);
                 positionTimer.restart();
             }
@@ -76,6 +85,7 @@ Item {
         interval: 50
         repeat: false
         onTriggered: {
+            fontFilterField.forceActiveFocus();
             if (root.highlightedIndex >= 0 && root.highlightedIndex < fontListView.count) {
                 fontListView.positionViewAtIndex(root.highlightedIndex, ListView.Center);
             }
@@ -95,11 +105,11 @@ Item {
         parent: root
         x: 0
         y: root.height + 4
-        width: root.width
-        height: Math.min(fontListView.contentHeight + 8, 320)
+        width: Math.max(root.width, 220)
+        height: Math.min(fontListView.contentHeight + 48, 340)
         padding: 4
         modal: false
-        focus: false
+        focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
         onClosed: {
@@ -113,54 +123,118 @@ Item {
             radius: Styling.radius(-4)
         }
 
-        contentItem: ListView {
-            id: fontListView
-            anchors.fill: parent
-            clip: true
-            model: root.fontModel
-            currentIndex: root.highlightedIndex
-            boundsBehavior: Flickable.StopAtBounds
+        contentItem: ColumnLayout {
+            spacing: 4
 
-            delegate: Button {
-                required property var modelData
-                required property int index
+            StyledRect {
+                variant: "pane"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 32
+                radius: Styling.radius(-6)
 
-                width: fontListView.width
-                height: 36
-                text: modelData
+                TextField {
+                    id: fontFilterField
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    placeholderText: "Search fonts..."
+                    placeholderTextColor: Colors.outline
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(-1)
+                    color: Colors.overBackground
+                    background: null
+                    verticalAlignment: TextInput.AlignVCenter
+                    text: root.filterText
 
-                onClicked: {
-                    root.highlightedIndex = index;
-                    root.listExpanded = false;
-                    root.fontSelected(modelData);
-                }
+                    onTextEdited: {
+                        root.filterText = text;
+                        root.highlightedIndex = root.findFontIndex(root.selectedFont);
+                    }
 
-                background: StyledRect {
-                    variant: root.highlightedIndex === index ? "focus" : "transparent"
-                    radius: Styling.radius(-4)
-                }
+                    Keys.onDownPressed: {
+                        if (fontListView.count > 0) {
+                            root.highlightedIndex = Math.min(fontListView.count - 1, root.highlightedIndex + 1);
+                            fontListView.positionViewAtIndex(root.highlightedIndex, ListView.Contain);
+                        }
+                    }
 
-                contentItem: Text {
-                    text: parent.text
-                    font.family: parent.text
-                    font.pixelSize: Styling.fontSize(0)
-                    color: root.highlightedIndex === index ? Styling.srItem("overprimary") : Colors.overBackground
-                    verticalAlignment: Text.AlignVCenter
-                    leftPadding: 12
-                    elide: Text.ElideRight
+                    Keys.onUpPressed: {
+                        if (fontListView.count > 0) {
+                            root.highlightedIndex = Math.max(0, root.highlightedIndex - 1);
+                            fontListView.positionViewAtIndex(root.highlightedIndex, ListView.Contain);
+                        }
+                    }
 
-                    Behavior on color {
-                        enabled: Styling.animDuration > 0
-                        ColorAnimation {
-                            duration: Styling.animDuration / 2
-                            easing.type: Easing.OutQuart
+                    Keys.onReturnPressed: {
+                        if (root.highlightedIndex >= 0 && root.highlightedIndex < root.filteredFonts.length) {
+                            const chosen = root.filteredFonts[root.highlightedIndex];
+                            root.listExpanded = false;
+                            root.fontSelected(chosen);
+                        }
+                    }
+
+                    Keys.onEscapePressed: {
+                        if (text.length > 0) {
+                            text = "";
+                            root.filterText = "";
+                            root.highlightedIndex = root.findFontIndex(root.selectedFont);
+                        } else {
+                            root.listExpanded = false;
                         }
                     }
                 }
             }
 
-            ScrollBar.vertical: ScrollBar {
-                width: 6
+            ListView {
+                id: fontListView
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: root.filteredFonts
+                currentIndex: root.highlightedIndex
+                boundsBehavior: Flickable.StopAtBounds
+
+                delegate: Button {
+                    required property var modelData
+                    required property int index
+
+                    width: fontListView.width
+                    height: 36
+                    text: modelData
+
+                    onClicked: {
+                        root.highlightedIndex = index;
+                        root.listExpanded = false;
+                        root.fontSelected(modelData);
+                    }
+
+                    background: StyledRect {
+                        variant: root.highlightedIndex === index ? "focus" : "transparent"
+                        radius: Styling.radius(-4)
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        font.family: parent.text
+                        font.pixelSize: Styling.fontSize(0)
+                        color: root.highlightedIndex === index ? Styling.srItem("overprimary") : Colors.overBackground
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 12
+                        elide: Text.ElideRight
+
+                        Behavior on color {
+                            enabled: Styling.animDuration > 0
+                            ColorAnimation {
+                                duration: Styling.animDuration / 2
+                                easing.type: Easing.OutQuart
+                            }
+                        }
+                    }
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    width: 6
+                }
             }
         }
     }

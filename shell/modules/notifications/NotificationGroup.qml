@@ -39,6 +39,12 @@ Item {
 
     property bool expanded: false
 
+    ListView.onReused: {
+        notificationAnimation.reset();
+        dragManager.resetDrag();
+        root.expanded = root.notificationCount === 1;
+    }
+
     onNotificationCountChanged: {
         if (notificationCount === 1)
             root.expanded = true;
@@ -114,7 +120,13 @@ Item {
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton)
+            if (mouse.button === Qt.LeftButton) {
+                if (root.multipleNotifications) {
+                    root.toggleExpanded();
+                } else if (root.validNotifications.length > 0) {
+                    Notifications.attemptInvokeAction(root.validNotifications[0].id, "default");
+                }
+            } else if (mouse.button === Qt.RightButton)
                 root.toggleExpanded();
             else if (mouse.button === Qt.MiddleButton)
                 root.destroyWithAnimation();
@@ -197,14 +209,19 @@ Item {
                             id: groupSmallAppIcon
                             Layout.preferredWidth: 16
                             Layout.preferredHeight: 16
-                            source: (notificationGroup && notificationGroup.appIcon !== "") ? "image://icon/" + notificationGroup.appIcon : ""
+                            readonly property string rawIcon: String(notificationGroup?.appIcon || "")
+                            source: {
+                                if (!rawIcon) return "";
+                                if (/^(data:|file:|image:|https?:|\/)/.test(rawIcon)) return rawIcon;
+                                return Quickshell.iconPath(rawIcon, "image-missing");
+                            }
                             fillMode: Image.PreserveAspectFit
                             smooth: true
-                            visible: notificationGroup && notificationGroup.appIcon !== ""
+                            visible: rawIcon !== "" && status !== Image.Error
                         }
                         Text {
                             text: Icons.info
-                            textFormat: Text.RichText
+                            textFormat: Text.PlainText
                             font.family: Icons.font
                             font.pixelSize: 16
                             color: topRow.showAppName ? Colors.outline : Styling.srItem("overprimary")
@@ -216,6 +233,7 @@ Item {
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             text: (topRow.showAppName ? notificationGroup?.appName : root.validNotifications[0]?.summary) || ""
+                            textFormat: Text.PlainText
                             font.family: Config.theme.font
                             font.pixelSize: Config.theme.fontSize
                             font.weight: Font.Bold

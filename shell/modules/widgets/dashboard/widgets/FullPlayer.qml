@@ -12,7 +12,8 @@ import qs.config
 
 StyledRect {
     id: player
-    variant: "transparent"
+    variant: "pane"
+    backgroundOpacity: (hasArtwork || wallpaperPath !== "") ? 0.0 : -1
 
     property real playerRadius: Config.roundness > 0 ? Config.roundness + 4 : 0
     property bool playersListExpanded: false
@@ -376,6 +377,7 @@ StyledRect {
                 Layout.fillWidth: true
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 text: player.hasActivePlayer ? (MprisController.activePlayer?.trackTitle ?? "") : "Nothing Playing"
+                textFormat: Text.PlainText
                 color: Colors.overBackground
                 font.pixelSize: Config.theme.fontSize + 2
                 font.weight: Font.Bold
@@ -390,6 +392,7 @@ StyledRect {
                 Layout.fillWidth: true
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 text: player.hasActivePlayer ? (MprisController.activePlayer?.trackAlbum ?? "") : "Enjoy the silence"
+                textFormat: Text.PlainText
                 color: Colors.overBackground
                 font.pixelSize: Config.theme.fontSize
                 font.family: Config.theme.font
@@ -404,6 +407,7 @@ StyledRect {
                 Layout.fillWidth: true
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 text: player.hasActivePlayer ? (MprisController.activePlayer?.trackArtist ?? "") : "¯\\_(ツ)_/¯"
+                textFormat: Text.PlainText
                 color: Colors.overBackground
                 font.pixelSize: Config.theme.fontSize
                 font.family: Config.theme.font
@@ -468,9 +472,10 @@ StyledRect {
             ]
 
             transitions: Transition {
+                enabled: Styling.animDuration > 0
                 NumberAnimation {
                     properties: "radius"
-                    duration: 300
+                    duration: Styling.animDuration
                     easing.type: Easing.OutBack
                 }
             }
@@ -576,7 +581,9 @@ StyledRect {
 
                     width: playersListView.width
                     height: 40
-                    variant: delegateMouseArea.containsMouse ? "focus" : "transparent"
+                    variant: delegateMouseArea.containsMouse ? "focus" : "common"
+                    backgroundOpacity: delegateMouseArea.containsMouse ? -1 : 0.0
+                    enableBorder: delegateMouseArea.containsMouse
                     radius: 4
 
                     RowLayout {
@@ -594,6 +601,7 @@ StyledRect {
                         Text {
                             Layout.fillWidth: true
                             text: (modelData?.trackTitle || modelData?.identity || "Unknown Player")
+                            textFormat: Text.PlainText
                             color: Colors.overBackground
                             font.family: Config.theme.font
                             elide: Text.ElideRight
@@ -625,6 +633,7 @@ StyledRect {
         color: mouseArea.containsMouse ? Colors.primary : Colors.overBackground
 
         Behavior on color {
+            enabled: Styling.animDuration > 0
             ColorAnimation {
                 duration: 150
             }

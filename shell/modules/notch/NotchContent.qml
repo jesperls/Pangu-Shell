@@ -25,7 +25,7 @@ Item {
     readonly property var screenVisibilities: Visibilities.getForScreen(screenName)
 
     readonly property var compositorMonitor: Compositor.monitorFor(screen)
-    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace.id === compositorMonitor.activeWorkspace.id)
+    readonly property var toplevels: (!compositorMonitor || !compositorMonitor.activeWorkspace || !Compositor.clients.values) ? [] : Compositor.clients.values.filter(c => c.workspace?.id === compositorMonitor.activeWorkspace.id)
 
     readonly property bool hasWindows: toplevels.length > 0
 
@@ -50,15 +50,7 @@ Item {
         return false;
     }
 
-    readonly property bool activeWindowFullscreen: {
-        if (barPanelRef && typeof barPanelRef.hasFullscreenWindow !== 'undefined') {
-            return barPanelRef.hasFullscreenWindow;
-        }
-        const toplevel = ToplevelManager.activeToplevel;
-        if (!toplevel || !toplevel.activated)
-            return false;
-        return toplevel.fullscreen === true;
-    }
+    readonly property bool activeWindowFullscreen: Compositor.hasFullscreenWindow(screen)
 
     readonly property bool shouldAutoHide: {
         if (barPosition !== notchPosition) {
@@ -306,8 +298,7 @@ Item {
                 }
             }
 
-            layer.enabled: true
-            layer.effect: Shadow {}
+            enableShadow: visible && Config.showBackground
 
             property bool popupHovered: false
 
@@ -354,6 +345,7 @@ Item {
                 anchors.margins: 16
                 visible: notificationPopupContainer.shouldShowNotificationPopup
                 opacity: visible ? 1 : 0
+                screenName: root.screenName
                 notchHovered: notificationPopupContainer.popupHovered
 
                 Behavior on opacity {
@@ -367,88 +359,62 @@ Item {
         }
     }
 
+    property bool _reconcilePending: false
+
+    function _scheduleStackReconcile() {
+        if (screenVisibilities?.launcher)
+            persistentLauncherViewLoader.active = true;
+        else if (screenVisibilities?.dashboard)
+            persistentDashboardViewLoader.active = true;
+        else if (screenVisibilities?.powermenu)
+            persistentPowerMenuViewLoader.active = true;
+        else if (screenVisibilities?.tools)
+            persistentToolsMenuViewLoader.active = true;
+
+        if (_reconcilePending)
+            return;
+        _reconcilePending = true;
+        Qt.callLater(root._reconcileNotchStack);
+    }
+
+    function _reconcileNotchStack() {
+        _reconcilePending = false;
+        let targetItem = null;
+        if (screenVisibilities?.launcher)
+            targetItem = persistentLauncherViewLoader.item;
+        else if (screenVisibilities?.dashboard)
+            targetItem = persistentDashboardViewLoader.item;
+        else if (screenVisibilities?.powermenu)
+            targetItem = persistentPowerMenuViewLoader.item;
+        else if (screenVisibilities?.tools)
+            targetItem = persistentToolsMenuViewLoader.item;
+
+        const sv = notchContainer.stackView;
+        if (!targetItem) {
+            if (sv.depth > 1)
+                sv.pop(null);
+            return;
+        }
+
+        if (sv.currentItem !== targetItem) {
+            if (sv.depth === 1)
+                sv.push(targetItem);
+            else
+                sv.replace(sv.currentItem, targetItem);
+        }
+        Qt.callLater(() => {
+            if (root.screenNotchOpen && sv.currentItem === targetItem)
+                targetItem.forceActiveFocus();
+        });
+    }
+
     Connections {
         target: screenVisibilities
 
-        function onLauncherChanged() {
-            if (screenVisibilities?.launcher) {
-                persistentLauncherViewLoader.active = true;
-                Qt.callLater(() => {
-                    if (screenVisibilities?.launcher && persistentLauncherViewLoader.item) {
-                        notchContainer.stackView.push(persistentLauncherViewLoader.item);
-                        Qt.callLater(() => {
-                            if (screenVisibilities?.launcher && notchContainer.stackView.currentItem) {
-                                notchContainer.stackView.currentItem.forceActiveFocus();
-                            }
-                        });
-                    }
-                });
-            } else {
-                if (notchContainer.stackView.depth > 1) {
-                    notchContainer.stackView.pop();
-                }
-            }
-        }
-
-        function onDashboardChanged() {
-            if (screenVisibilities?.dashboard) {
-                persistentDashboardViewLoader.active = true;
-                Qt.callLater(() => {
-                    if (screenVisibilities?.dashboard && persistentDashboardViewLoader.item) {
-                        notchContainer.stackView.push(persistentDashboardViewLoader.item);
-                        Qt.callLater(() => {
-                            if (screenVisibilities?.dashboard && notchContainer.stackView.currentItem) {
-                                notchContainer.stackView.currentItem.forceActiveFocus();
-                            }
-                        });
-                    }
-                });
-            } else {
-                if (notchContainer.stackView.depth > 1) {
-                    notchContainer.stackView.pop();
-                }
-            }
-        }
-
-        function onPowermenuChanged() {
-            if (screenVisibilities?.powermenu) {
-                persistentPowerMenuViewLoader.active = true;
-                Qt.callLater(() => {
-                    if (screenVisibilities?.powermenu && persistentPowerMenuViewLoader.item) {
-                        notchContainer.stackView.push(persistentPowerMenuViewLoader.item);
-                        Qt.callLater(() => {
-                            if (screenVisibilities?.powermenu && notchContainer.stackView.currentItem) {
-                                notchContainer.stackView.currentItem.forceActiveFocus();
-                            }
-                        });
-                    }
-                });
-            } else {
-                if (notchContainer.stackView.depth > 1) {
-                    notchContainer.stackView.pop();
-                }
-            }
-        }
-
-        function onToolsChanged() {
-            if (screenVisibilities?.tools) {
-                persistentToolsMenuViewLoader.active = true;
-                Qt.callLater(() => {
-                    if (screenVisibilities?.tools && persistentToolsMenuViewLoader.item) {
-                        notchContainer.stackView.push(persistentToolsMenuViewLoader.item);
-                        Qt.callLater(() => {
-                            if (screenVisibilities?.tools && notchContainer.stackView.currentItem) {
-                                notchContainer.stackView.currentItem.forceActiveFocus();
-                            }
-                        });
-                    }
-                });
-            } else {
-                if (notchContainer.stackView.depth > 1) {
-                    notchContainer.stackView.pop();
-                }
-            }
-        }
+        function onLauncherChanged() { root._scheduleStackReconcile(); }
+        function onDashboardChanged() { root._scheduleStackReconcile(); }
+        function onPowermenuChanged() { root._scheduleStackReconcile(); }
+        function onToolsChanged() { root._scheduleStackReconcile(); }
     }
 
     property alias notchContainerRef: notchContainer

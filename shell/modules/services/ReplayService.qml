@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.services
 
 Singleton {
     id: root
@@ -54,6 +55,7 @@ Singleton {
     }
 
     function stop() {
+        root._pendingStart = false;
         if (!root.active || root.daemonPid <= 0)
             return;
         root._stopping = true;

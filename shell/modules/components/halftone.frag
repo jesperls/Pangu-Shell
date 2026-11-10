@@ -22,8 +22,8 @@ void main() {
     vec2 pixelPos = qt_TexCoord0 * vec2(ubuf.canvasWidth, ubuf.canvasHeight);
     
     float angleRad = radians(ubuf.angle);
-    
-    float cellSize = ubuf.dotMaxSize * 2.0;
+
+    float cellSize = max(ubuf.dotMaxSize * 2.0, 1.0);
     
     mat2 rotation = mat2(
         cos(angleRad), -sin(angleRad),
@@ -71,9 +71,8 @@ void main() {
     float dotRadius;
     
     if (projection < activeStart) {
-        // Before the start: dots keep growing past the max.
         float distanceBeforeStart = activeStart - projection;
-        float growthFactor = distanceBeforeStart / activeRange;
+        float growthFactor = min(distanceBeforeStart / activeRange, 1.0);
         dotRadius = ubuf.dotMaxSize * (1.0 + growthFactor);
     } else if (projection > activeEnd) {
         dotRadius = 0.0;
@@ -81,11 +80,11 @@ void main() {
         float gradientPos = (projection - activeStart) / activeRange;
         dotRadius = mix(ubuf.dotMaxSize, ubuf.dotMinSize, gradientPos);
     }
-    
+
     float edgeWidth = length(vec2(dFdx(distToCenter), dFdy(distToCenter))) * 0.5;
     float alpha = 1.0 - smoothstep(dotRadius - edgeWidth, dotRadius + edgeWidth, distToCenter);
-    
+
     vec4 finalColor = mix(ubuf.backgroundColor, ubuf.dotColor, alpha);
-    
-    fragColor = vec4(finalColor.rgb, finalColor.a * ubuf.qt_Opacity);
+
+    fragColor = vec4(finalColor.rgb * finalColor.a, finalColor.a) * ubuf.qt_Opacity;
 }

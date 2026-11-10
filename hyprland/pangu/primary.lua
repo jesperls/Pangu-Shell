@@ -5,6 +5,8 @@ for _, id in ipairs(state.monitors.primary_workspaces or {}) do
   by_id[id] = true
 end
 
+local cached_primary_name = nil
+
 local M = {}
 
 function M.monitor(monitor)
@@ -13,11 +15,18 @@ function M.monitor(monitor)
     return false
   end
   if not name then
-    local monitors = hl.get_monitors()
-    return monitors[1] and monitor.name == monitors[1].name or false
+    if not cached_primary_name then
+      local monitors = hl.get_monitors()
+      if monitors[1] then
+        cached_primary_name = monitors[1].name
+      end
+    end
+    return cached_primary_name ~= nil and monitor.name == cached_primary_name
   end
   if name:sub(1, 5) == "desc:" then
-    return monitor.description == name:sub(6)
+    local pat = name:sub(6)
+    local desc = tostring(monitor.description or "")
+    return desc == pat or desc:sub(1, #pat) == pat
   end
   return monitor.name == name
 end

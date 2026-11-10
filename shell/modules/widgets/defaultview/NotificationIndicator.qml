@@ -78,7 +78,7 @@ Item {
     Connections {
         target: Notifications
         function onPopupListChanged() {
-            if (Notifications.popupList.length > previousNotifCount) {
+            if (Notifications.popupList.length > previousNotifCount && Styling.animDuration > 0) {
                 shakeAnimation.restart();
             }
             previousNotifCount = Notifications.popupList.length;

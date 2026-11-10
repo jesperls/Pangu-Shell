@@ -29,6 +29,7 @@ PanelWindow {
     visible: imagePath !== ""
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "pangu:screenshot-overlay"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     property Process copyOverlayProcess: Process {
@@ -51,7 +52,7 @@ PanelWindow {
         id: mouseAreaHover
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.NoButton  // Pass clicks through
+        acceptedButtons: Qt.NoButton
         propagateComposedEvents: true
     }
 
@@ -148,8 +149,9 @@ PanelWindow {
                     opacity: dragArea.containsMouse ? 0.8 : 0
                     visible: opacity > 0
                     Behavior on opacity {
+                        enabled: Styling.animDuration > 0
                         NumberAnimation {
-                            duration: 200
+                            duration: Styling.animDuration
                         }
                     }
 
@@ -182,7 +184,7 @@ PanelWindow {
             ActionButton {
                 icon: Icons.disk
                 onTriggered: {
-                    root.imagePath = ""; // Hide overlay
+                    root.imagePath = "";
                 }
                 StyledToolTip {
                     show: parent.containsMouse

@@ -1,4 +1,4 @@
-local data = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")
+local data = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 local dir = data .. "/pangu"
 local path = dir .. "/hypr-layout-state.lua"
 

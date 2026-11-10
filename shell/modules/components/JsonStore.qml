@@ -31,7 +31,7 @@ FileView {
             root.finish(null);
         }
     }
-    onLoadFailed: root.finish(null)
+    onLoadFailed: if (root.directoryReady) root.finish(null)
 
     function save() {
         setText(JSON.stringify(root.data, null, 2));

@@ -2,7 +2,7 @@ require("pangu.shell")
 require("pangu.shell_rules")
 require("pangu.gamemode")
 
-local data = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")
+local data = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 local chunk = loadfile(data .. "/pangu/macros.lua")
 if chunk then
   local ok, err = pcall(chunk)

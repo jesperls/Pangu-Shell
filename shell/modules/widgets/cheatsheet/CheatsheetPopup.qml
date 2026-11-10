@@ -159,9 +159,6 @@ PanelWindow {
         height: Math.min(root.height - 120, contentColumn.implicitHeight + 48)
         radius: Styling.radius(20)
 
-        layer.enabled: true
-        layer.effect: Shadow {}
-
         opacity: GlobalStates.cheatsheetVisible ? 1 : 0
         scale: GlobalStates.cheatsheetVisible ? 1 : 0.9
 
@@ -307,12 +304,7 @@ PanelWindow {
         }
     }
 
-    property bool openDone: false
-
     function open() {
-        if (openDone)
-            return;
-        openDone = true;
         refresh();
         Qt.callLater(() => {
             searchInput.clear();

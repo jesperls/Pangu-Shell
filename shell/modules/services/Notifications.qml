@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import qs.config
+import qs.modules.services
 
 Singleton {
     id: root
@@ -38,29 +39,32 @@ Singleton {
 
         property string cachedAppIcon: ""
         property string cachedImage: ""
-
         property bool isCached: false
+
+        function syncFromNotification() {
+            if (!notification)
+                return;
+            appIcon = notification.appIcon ?? "";
+            appName = notification.appName ?? "";
+            body = notification.body ?? "";
+            image = notification.image ?? "";
+            summary = notification.summary ?? "";
+            urgency = notification.urgency ?? NotificationUrgency.Normal;
+        }
+
+        property Connections liveWatcher: Connections {
+            target: entry.notification
+            ignoreUnknownSignals: true
+            function onSummaryChanged() { entry.syncFromNotification(); root.triggerListChange(); root.saveNotifications(); }
+            function onBodyChanged() { entry.syncFromNotification(); root.triggerListChange(); root.saveNotifications(); }
+            function onAppIconChanged() { entry.syncFromNotification(); root.triggerListChange(); root.saveNotifications(); }
+            function onImageChanged() { entry.syncFromNotification(); root.triggerListChange(); root.saveNotifications(); }
+            function onUrgencyChanged() { entry.syncFromNotification(); root.triggerListChange(); root.saveNotifications(); }
+        }
 
         onNotificationChanged: {
             if (notification) {
-                appIcon = notification.appIcon ?? "";
-                appName = notification.appName ?? "";
-                body = notification.body ?? "";
-                image = notification.image ?? "";
-                summary = notification.summary ?? "";
-                urgency = notification.urgency ?? NotificationUrgency.Normal;
-
-                if (appIcon && !appIcon.startsWith("data:")) {
-                    root.cacheImageAsBase64(appIcon, function (cachedData) {
-                        cachedAppIcon = cachedData;
-                    });
-                }
-                if (image && !image.startsWith("data:")) {
-                    root.cacheImageAsBase64(image, function (cachedData) {
-                        cachedImage = cachedData;
-                    });
-                }
-
+                syncFromNotification();
                 if (!closedConnected) {
                     notification.closed.connect(function (reason) {
                         if (reason === 3) {
@@ -82,7 +86,11 @@ Singleton {
     }
 
     function historyImage(image) {
-        return typeof image === "string" && !image.startsWith("image://qsimage/") ? image : "";
+        if (typeof image !== "string" || image.startsWith("image://qsimage/"))
+            return "";
+        if (image.startsWith("http://") || image.startsWith("https://"))
+            return "";
+        return image;
     }
 
     function notifToJSON(notif) {
@@ -122,6 +130,7 @@ Singleton {
     property var popupList: list.filter(notif => notif.popup)
     property bool popupInhibited: silent
     property var latestTimeForApp: ({})
+    property var hoveredScreens: ({})
 
     onSilentChanged: if (StateService.initialized) StateService.set("dnd", root.silent)
 
@@ -146,6 +155,12 @@ Singleton {
         path: Paths.cachePath("notifications.json")
         atomicWrites: true
         onLoaded: loadNotifications()
+    }
+
+    Timer {
+        id: saveDebounceTimer
+        interval: 500
+        onTriggered: root.flushSaveNotifications()
     }
 
     function appendNotification(notif) {
@@ -179,13 +194,17 @@ Singleton {
         });
     }
 
-    function saveNotifications() {
+    function flushSaveNotifications() {
         const limitedList = limitNotificationsPerSummary(root.list);
         notifFileView.setText(stringifyList(limitedList));
     }
 
+    function saveNotifications() {
+        saveDebounceTimer.restart();
+    }
+
     function limitNotificationsPerSummary(notifications) {
-        var groups = Object.create(null);
+        const groups = Object.create(null);
 
         notifications.forEach(notif => {
             const key = JSON.stringify([notif.appName, notif.summary || ""]);
@@ -219,7 +238,6 @@ Singleton {
             });
             root.idOffset = maxId + 1;
         } catch (e) {
-            console.log("No saved notifications or error loading:", e);
             root.list = [];
             root.idOffset = 0;
         }
@@ -249,7 +267,7 @@ Singleton {
 
     function groupsForList(list) {
         const groups = Object.create(null);
-        list.forEach((notif, index) => {
+        list.forEach(notif => {
             if (!notif || !notif.appName || (!notif.summary && !notif.body)) {
                 return;
             }
@@ -276,7 +294,7 @@ Singleton {
     property var groupsByAppName: groupsForList(root.list)
     property var appNameList: appNameListForGroups(root.groupsByAppName)
 
-    property int idOffset
+    property int idOffset: 0
     property int internalIdCounter: 1
     signal initDone
     signal notify(notification: var)
@@ -314,10 +332,13 @@ Singleton {
 
             if (!root.popupInhibited) {
                 newNotifObject.popup = true;
-                newNotifObject.timer = notifTimerComponent.createObject(root, {
+                const timerObj = notifTimerComponent.createObject(root, {
                     "id": newNotifObject.id,
                     "interval": root.popupTimeout(notification.expireTimeout, notification.urgency)
                 });
+                if (Object.values(root.hoveredScreens).some(Boolean))
+                    timerObj.pause();
+                newNotifObject.timer = timerObj;
             }
 
             root.notify(newNotifObject);
@@ -355,10 +376,13 @@ Singleton {
         });
 
         if (newNotifObject.popup) {
-            newNotifObject.timer = notifTimerComponent.createObject(root, {
+            const timerObj = notifTimerComponent.createObject(root, {
                 "id": newNotifObject.id,
                 "interval": root.popupTimeout(options.expireTimeout, options.urgency)
             });
+            if (Object.values(root.hoveredScreens).some(Boolean))
+                timerObj.pause();
+            newNotifObject.timer = timerObj;
         }
 
         root.appendNotification(newNotifObject);
@@ -387,7 +411,7 @@ Singleton {
         if (!ids || ids.length === 0)
             return;
 
-        var idsMap = {};
+        const idsMap = {};
         ids.forEach(id => {
             idsMap[id] = true;
         });
@@ -480,6 +504,8 @@ Singleton {
     }
 
     function resumeGroupTimers(appName) {
+        if (Object.values(root.hoveredScreens).some(Boolean))
+            return;
         root.popupList.forEach(notif => {
             if (notif.appName === appName && notif.timer) {
                 notif.timer.resume();
@@ -496,11 +522,27 @@ Singleton {
     }
 
     function resumeAllTimers() {
+        if (Object.values(root.hoveredScreens).some(Boolean))
+            return;
         root.popupList.forEach(notif => {
             if (notif.timer) {
                 notif.timer.resume();
             }
         });
+    }
+
+    function setScreenHovered(screenName, hovered) {
+        const key = String(screenName || "default");
+        const next = Object.assign({}, root.hoveredScreens);
+        if (hovered)
+            next[key] = true;
+        else
+            delete next[key];
+        root.hoveredScreens = next;
+        if (Object.values(next).some(Boolean))
+            root.pauseAllTimers();
+        else
+            root.resumeAllTimers();
     }
 
     function hideAllPopups() {
@@ -534,86 +576,6 @@ Singleton {
         if (!notif || root.pendingDestroys.indexOf(notif) !== -1) return;
         root.pendingDestroys = [...root.pendingDestroys, notif];
         if (!destroyTimer.running) destroyTimer.start();
-    }
-
-    property int activeXhrCount: 0
-    property int maxConcurrentXhr: 3
-
-    function cacheImageAsBase64(imageUrl, callback) {
-        if (!imageUrl || imageUrl.startsWith("data:")) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (imageUrl.length > 2048) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (activeXhrCount >= maxConcurrentXhr) {
-            callback(imageUrl);
-            return;
-        }
-
-        activeXhrCount++;
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", imageUrl, true);
-        xhr.responseType = "arraybuffer";
-        xhr.timeout = 5000;
-
-        var cleanupXhr = function () {
-            activeXhrCount--;
-            xhr = null;
-        };
-
-        xhr.onload = function () {
-            if (xhr.status === 200 && xhr.response) {
-                try {
-                    var arrayBuffer = xhr.response;
-                    var bytes = new Uint8Array(arrayBuffer);
-                    var len = Math.min(bytes.byteLength, 1024 * 1024);
-                    var chunks = [];
-                    for (var i = 0; i < len; i += 32768) {
-                        chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 32768, len))));
-                    }
-                    var base64 = btoa(chunks.join(''));
-
-                    var mimeType = "image/png";
-                    var lowerUrl = imageUrl.toLowerCase();
-                    if (lowerUrl.includes(".jpg") || lowerUrl.includes(".jpeg")) {
-                        mimeType = "image/jpeg";
-                    } else if (lowerUrl.includes(".gif")) {
-                        mimeType = "image/gif";
-                    } else if (lowerUrl.includes(".webp")) {
-                        mimeType = "image/webp";
-                    }
-
-                    callback("data:" + mimeType + ";base64," + base64);
-                } catch (e) {
-                    callback(imageUrl);
-                }
-            } else {
-                callback(imageUrl);
-            }
-            cleanupXhr();
-        };
-
-        xhr.onerror = function () {
-            callback(imageUrl);
-            cleanupXhr();
-        };
-
-        xhr.ontimeout = function () {
-            callback(imageUrl);
-            cleanupXhr();
-        };
-
-        xhr.send();
     }
 
     Component.onCompleted: {

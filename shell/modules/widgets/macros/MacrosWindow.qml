@@ -103,14 +103,17 @@ FloatingWindow {
     }
 
     function placeOnTargetWorkspace() {
-        const targetWorkspace = GlobalStates.macrosTargetWorkspaceId || Compositor.focusedMonitor?.activeWorkspace?.id || Compositor.focusedWorkspace?.id || 0;
+        const specialName = Compositor.focusedMonitor?.activeSpecialWorkspace?.name || "";
+        const specialTarget = specialName ? (specialName.startsWith("special:") ? specialName : "special:" + specialName) : "";
+        const targetWorkspace = specialTarget || GlobalStates.macrosTargetWorkspaceId || Compositor.focusedMonitor?.activeWorkspace?.id || Compositor.focusedWorkspace?.id || 0;
         if (!targetWorkspace)
             return false;
         const clients = Compositor.clients.values || [];
         for (let i = 0; i < clients.length; i++) {
             const client = clients[i];
             if (client.title === root.title && !clientsBeforeMapping.includes(client.nativeToplevel)) {
-                if (client.workspace?.id !== targetWorkspace)
+                const currentSpec = specialTarget ? (client.workspace?.name || "") : client.workspace?.id;
+                if (currentSpec !== targetWorkspace)
                     Compositor.dispatch(`movetoworkspacesilent ${targetWorkspace}, address:${client.address}`);
                 Compositor.dispatch(`focuswindow address:${client.address}`);
                 searchInput.focusInput();
@@ -153,6 +156,8 @@ FloatingWindow {
     onSearchTextChanged: refreshFilter()
     onVisibleChanged: {
         if (visible) {
+            if (initialized)
+                preparePlacement();
             refreshFilter();
             if (root.selectedId && MacroService.findMacro(root.selectedId))
                 root.selectMacro(root.selectedId);
@@ -216,6 +221,7 @@ FloatingWindow {
                 }
 
                 StyledRect {
+                    id: playingBadge
                     visible: MacroService.playing || MacroService.activeId !== ""
                     variant: "primary"
                     radius: Styling.radius(-4)
@@ -231,7 +237,7 @@ FloatingWindow {
                             text: Icons.stop
                             font.family: Icons.font
                             font.pixelSize: 14
-                            color: Styling.srItem("overprimary")
+                            color: playingBadge.item
                         }
 
                         Text {
@@ -241,7 +247,7 @@ FloatingWindow {
                             }
                             font.family: Config.theme.font
                             font.pixelSize: Styling.fontSize(-2)
-                            color: Styling.srItem("overprimary")
+                            color: playingBadge.item
                         }
                     }
 
@@ -350,17 +356,22 @@ FloatingWindow {
                             Repeater {
                                 model: root.filtered
 
-                                Rectangle {
+                                StyledRect {
                                     id: macroRow
                                     required property var modelData
+                                    readonly property bool isSelected: root.selectedId === modelData.id
                                     width: listColumn.width
                                     height: 56
                                     radius: Styling.radius(-4)
-                                    color: root.selectedId === modelData.id ? Styling.srItem("primary") : "transparent"
+                                    variant: isSelected ? "primary" : (macroMouse.containsMouse ? "focus" : "common")
+                                    backgroundOpacity: isSelected || macroMouse.containsMouse ? -1 : 0.0
+                                    enableBorder: isSelected || macroMouse.containsMouse
                                     opacity: modelData.enabled === false ? 0.55 : 1.0
 
                                     MouseArea {
+                                        id: macroMouse
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         acceptedButtons: Qt.LeftButton
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: root.selectMacro(macroRow.modelData.id)
@@ -379,7 +390,7 @@ FloatingWindow {
                                             }
                                             font.family: Icons.font
                                             font.pixelSize: 16
-                                            color: root.selectedId === modelData.id ? Styling.srItem("overprimary") : Colors.overSurfaceVariant
+                                            color: macroRow.isSelected ? macroRow.item : Colors.overSurfaceVariant
                                         }
 
                                         Column {
@@ -389,10 +400,11 @@ FloatingWindow {
                                             Text {
                                                 width: parent.width
                                                 text: modelData.name
+                                                textFormat: Text.PlainText
                                                 font.family: Config.theme.font
                                                 font.pixelSize: Styling.fontSize(0)
-                                                font.bold: root.selectedId === modelData.id
-                                                color: root.selectedId === modelData.id ? Styling.srItem("overprimary") : Colors.overBackground
+                                                font.bold: macroRow.isSelected
+                                                color: macroRow.isSelected ? macroRow.item : Colors.overBackground
                                                 elide: Text.ElideRight
                                             }
 
@@ -402,7 +414,7 @@ FloatingWindow {
                                                     + " · " + modelData.steps.length + " steps"
                                                 font.family: Config.theme.font
                                                 font.pixelSize: Styling.fontSize(-2)
-                                                color: root.selectedId === modelData.id ? Styling.srItem("overprimary") : Colors.overSurfaceVariant
+                                                color: macroRow.isSelected ? macroRow.item : Colors.overSurfaceVariant
                                                 elide: Text.ElideRight
                                             }
                                         }

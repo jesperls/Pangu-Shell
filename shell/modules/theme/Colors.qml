@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.globals
 
 FileView {
     id: colors
@@ -12,7 +13,21 @@ FileView {
     onFileChanged: reload()
     onLoaded: generationTimer.restart()
 
-    readonly property string exportSettings: JSON.stringify([Config.oledMode, Config.theme.lightMode, Config.theme.font, Config.theme.srBg.opacity])
+    readonly property string exportSettings: JSON.stringify([
+        Config.oledMode,
+        Config.theme.lightMode,
+        Config.theme.font,
+        Config.theme.monoFont ?? "",
+        Config.theme.dynamicColors ?? true,
+        Config.theme.srBg.opacity,
+        Config.theme.exports?.qt ?? true,
+        Config.theme.exports?.gtk ?? true,
+        Config.theme.exports?.pywal ?? true,
+        Config.theme.exports?.kitty ?? true,
+        Config.theme.exports?.nvchad ?? true,
+        Config.theme.exports?.discord ?? true,
+        GlobalStates.wallpaperManager?.currentWallpaper ?? ""
+    ])
     onExportSettingsChanged: generationTimer.restart()
 
     property Connections configWatcher: Connections {
@@ -50,12 +65,18 @@ FileView {
         repeat: false
         onTriggered: {
             if (!colors.loaded || !Config.initialLoadComplete) return;
-            qtCtGenerator.generate(colors);
-            gtkGenerator.generate(colors);
-            pywalGenerator.generate(colors);
-            kittyGenerator.generate(colors);
-            nvChadGenerator.generate(colors);
-            discordGenerator.generate(colors);
+            if (Config.theme.exports?.qt ?? true)
+                qtCtGenerator.generate(colors);
+            if (Config.theme.exports?.gtk ?? true)
+                gtkGenerator.generate(colors);
+            if (Config.theme.exports?.pywal ?? true)
+                pywalGenerator.generate(colors);
+            if (Config.theme.exports?.kitty ?? true)
+                kittyGenerator.generate(colors);
+            if (Config.theme.exports?.nvchad ?? true)
+                nvChadGenerator.generate(colors);
+            if (Config.theme.exports?.discord ?? true)
+                discordGenerator.generate(colors);
         }
     }
 
@@ -160,16 +181,20 @@ FileView {
         property color sourceColor: "#7f2424"
     }
 
+    function _oledTint(alpha) {
+        return Qt.tint("#000000", Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, alpha));
+    }
+
     property color background: Config.oledMode ? "#000000" : adapter.background
 
     property color surface: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.1))
     property color surfaceBright: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.2))
-    property color surfaceContainer: adapter.surfaceContainer
-    property color surfaceContainerHigh: adapter.surfaceContainerHigh
-    property color surfaceContainerHighest: adapter.surfaceContainerHighest
-    property color surfaceContainerLow: adapter.surfaceContainerLow
-    property color surfaceContainerLowest: adapter.surfaceContainerLowest
-    property color surfaceDim: adapter.surfaceDim
+    property color surfaceContainer: Config.oledMode ? _oledTint(0.07) : adapter.surfaceContainer
+    property color surfaceContainerHigh: Config.oledMode ? _oledTint(0.11) : adapter.surfaceContainerHigh
+    property color surfaceContainerHighest: Config.oledMode ? _oledTint(0.15) : adapter.surfaceContainerHighest
+    property color surfaceContainerLow: Config.oledMode ? _oledTint(0.04) : adapter.surfaceContainerLow
+    property color surfaceContainerLowest: Config.oledMode ? "#000000" : adapter.surfaceContainerLowest
+    property color surfaceDim: Config.oledMode ? "#000000" : adapter.surfaceDim
     property color surfaceTint: adapter.surfaceTint
     property color surfaceVariant: adapter.surfaceVariant
 

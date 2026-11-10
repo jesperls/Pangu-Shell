@@ -37,10 +37,10 @@ Singleton {
     property int lockscreenVersion: 0
     property string pendingLockscreenFrame: ""
 
-    property var scannedPaths: []  // regular files from wallPath
-    property var wePaths: []  // Wallpaper Engine wallpaper dirs
-    property var weWallpapers: ({})  // dir -> cached static preview jpg
-    property var weTitles: ({})  // dir -> title from project.json
+    property var scannedPaths: []
+    property var wePaths: []
+    property var weWallpapers: ({})
+    property var weTitles: ({})
     property string wallpaperEngineDir: wallpaperConfig.adapter.wallpaperEnginePath || (Paths.home + "/.local/share/Steam/steamapps/workshop/content/431960")
     property string weScriptPath: Paths.script("wallpaperengine.sh")
     signal engineSettingsChanged(string path)
@@ -50,7 +50,6 @@ Singleton {
     function mergeWallpaperLists() {
         var merged = scannedPaths.concat(wePaths);
         if (JSON.stringify(merged) !== JSON.stringify(wallpaperPaths)) {
-            console.log("Wallpaper list updated:", scannedPaths.length, "files +", wePaths.length, "Wallpaper Engine");
             wallpaperPaths = merged;
         }
 
@@ -59,12 +58,7 @@ Singleton {
 
         if (wallpaperConfig.adapter.currentWall) {
             var savedIndex = wallpaperPaths.indexOf(wallpaperConfig.adapter.currentWall);
-            if (savedIndex !== -1) {
-                currentIndex = savedIndex;
-            } else {
-                currentIndex = 0;
-                console.log("Saved wallpaper not found, using first");
-            }
+            currentIndex = savedIndex !== -1 ? savedIndex : 0;
         } else {
             currentIndex = 0;
         }
@@ -178,45 +172,40 @@ Singleton {
             return "";
         }
 
-        var fileType = getFileType(filePath);
+        var normalized = expandDirectory(filePath);
+        var fileType = getFileType(normalized);
 
         if (fileType === 'image') {
-            return filePath;
+            return normalized;
         }
 
         if (fileType === 'wallpaperengine') {
-            return weWallpapers[filePath];
+            return weWallpapers[normalized] || weWallpapers[filePath] || "";
         }
 
         if (fileType === 'video' || fileType === 'gif') {
-            var cachePath = Paths.cachePath("lockscreen/" + Qt.md5(filePath) + ".jpg");
-            return cachePath;
+            return Paths.cachePath("lockscreen/" + Qt.md5(normalized) + ".jpg");
         }
 
-        return filePath;
+        return normalized;
     }
 
     function generateLockscreenFrame(filePath) {
         if (!filePath) {
-            console.warn("generateLockscreenFrame: empty filePath");
             return;
         }
 
-        if (getFileType(filePath) === 'wallpaperengine') {
+        var normalized = expandDirectory(filePath);
+        if (getFileType(normalized) === 'wallpaperengine') {
             return;
         }
 
         if (lockscreenWallpaperScript.running) {
-            pendingLockscreenFrame = filePath;
+            pendingLockscreenFrame = normalized;
             return;
         }
-        console.log("Generating lockscreen frame for:", filePath);
 
-        var scriptPath = Paths.script("lockwall.py");
-        var dataPath = Paths.cacheDir;
-
-        lockscreenWallpaperScript.command = ["python3", scriptPath, filePath, dataPath];
-
+        lockscreenWallpaperScript.command = ["python3", Paths.script("lockwall.py"), normalized, Paths.cacheDir];
         lockscreenWallpaperScript.running = true;
     }
 
@@ -281,8 +270,6 @@ Singleton {
     onWallpaperDirChanged: if (_wallpaperDirInitialized) scanSubfolders()
 
     function setWallpaper(path, targetScreen = null) {
-
-        console.log("setWallpaper called with:", path, "for screen:", targetScreen);
         initialLoadCompleted = true;
         var pathIndex = wallpaperPaths.indexOf(path);
         if (pathIndex !== -1) {
@@ -290,19 +277,18 @@ Singleton {
                 let perScreen = Object.assign({}, wallpaperConfig.adapter.perScreenWallpapers || {});
                 perScreen[targetScreen] = path;
                 wallpaperConfig.adapter.perScreenWallpapers = perScreen;
+                if (wallpaperConfig.saveAdapter) wallpaperConfig.saveAdapter();
 
                 const isPrimary = targetScreen === Quickshell.screens[0]?.name;
 
                 if (isPrimary || !wallpaperConfig.adapter.currentWall) {
                     currentIndex = pathIndex;
                     wallpaperConfig.adapter.currentWall = path;
-
                     runMatugenForCurrentWallpaper();
                 }
             } else {
                 currentIndex = pathIndex;
                 wallpaperConfig.adapter.currentWall = path;
-
                 runMatugenForCurrentWallpaper();
             }
             generateLockscreenFrame(path);
@@ -312,17 +298,15 @@ Singleton {
     }
 
     function clearPerScreenWallpaper(targetScreen) {
-
-        console.log("Clearing per-screen wallpaper for:", targetScreen);
         let perScreen = Object.assign({}, wallpaperConfig.adapter.perScreenWallpapers || {});
         if (perScreen[targetScreen]) {
             delete perScreen[targetScreen];
             wallpaperConfig.adapter.perScreenWallpapers = perScreen;
+            if (wallpaperConfig.saveAdapter) wallpaperConfig.saveAdapter();
         }
     }
 
     function nextWallpaper() {
-
         if (wallpaperPaths.length === 0)
             return;
         initialLoadCompleted = true;
@@ -334,7 +318,6 @@ Singleton {
     }
 
     function previousWallpaper() {
-
         if (wallpaperPaths.length === 0)
             return;
         initialLoadCompleted = true;
@@ -346,7 +329,6 @@ Singleton {
     }
 
     function setWallpaperByIndex(index) {
-
         if (index >= 0 && index < wallpaperPaths.length) {
             initialLoadCompleted = true;
             currentIndex = index;
@@ -361,7 +343,6 @@ Singleton {
         wallpaperConfig.adapter.matugenScheme = scheme;
 
         if (wallpaperConfig.adapter.activeColorPreset) {
-            console.log("Switching to Matugen scheme, clearing preset");
             wallpaperConfig.adapter.activeColorPreset = "";
         } else {
             runMatugenForCurrentWallpaper(true);
@@ -370,23 +351,15 @@ Singleton {
 
     function runMatugenForCurrentWallpaper(force) {
         if (activeColorPreset) {
-            console.log("Skipping Matugen because color preset is active:", activeColorPreset);
             return;
         }
 
         if (!force && !(Config.theme.dynamicColors ?? true)) {
-            console.log("Skipping Matugen because dynamic colors are disabled");
             return;
         }
 
         if (currentWallpaper && initialLoadCompleted) {
-            console.log("Running Matugen for current wallpaper:", currentWallpaper);
-
-            var fileType = getFileType(currentWallpaper);
             var matugenSource = getColorSource(currentWallpaper);
-
-            console.log("Using source for matugen:", matugenSource, "(type:", fileType + ")");
-
             var command = ["matugen", "image", matugenSource, "--source-color-index", "0", "-c", Paths.asset("matugen/config.toml"), "-t", wallpaperConfig.adapter.matugenScheme];
             command.push("-m", Config.theme.lightMode ? "light" : "dark");
             requestPalette(command);
@@ -499,29 +472,22 @@ Singleton {
         running: false
         command: ["python3", Paths.script("thumbgen.py"), Paths.cachePath("wallpapers.json"), Paths.cacheDir, fallbackDir, "--directory", scanRoot]
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.log("Thumbnail Generator:", text);
-                }
-            }
-        }
+        stdout: StdioCollector {}
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Thumbnail Generator Error:", text);
+                if (text.trim().length > 0) {
+                    console.warn("Thumbnail Generator Error:", text.trim());
                 }
             }
         }
 
         onExited: function (exitCode) {
             if (exitCode === 0) {
-                console.log("✅ Video thumbnails generated successfully");
                 thumbnailsVersion++;
                 if (getFileType(currentWallpaper) === "video") runMatugenForCurrentWallpaper();
             } else {
-                console.warn("⚠️ Thumbnail generation failed with code:", exitCode);
+                console.warn("Thumbnail generation failed with code:", exitCode);
             }
             if (thumbnailsPending) {
                 thumbnailsPending = false;
@@ -545,18 +511,12 @@ Singleton {
         running: false
         command: []
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.log("Lockscreen Wallpaper Generator:", text);
-                }
-            }
-        }
+        stdout: StdioCollector {}
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Lockscreen Wallpaper Generator Error:", text);
+                if (text.trim().length > 0) {
+                    console.warn("Lockscreen Wallpaper Generator Error:", text.trim());
                 }
             }
         }
@@ -569,9 +529,8 @@ Singleton {
             }
             if (exitCode === 0) {
                 lockscreenVersion++;
-                console.log("✅ Lockscreen wallpaper ready");
             } else {
-                console.warn("⚠️ Lockscreen wallpaper generation failed with code:", exitCode);
+                console.warn("Lockscreen wallpaper generation failed with code:", exitCode);
             }
         }
     }
@@ -602,10 +561,7 @@ Singleton {
         watchChanges: true
         printErrors: false
 
-        onFileChanged: {
-            console.log("User color presets directory changed, rescanning...");
-            scanPresetsProcess.running = true;
-        }
+        onFileChanged: scanPresetsProcess.running = true
     }
 
     Process {
@@ -645,7 +601,6 @@ Singleton {
                 }
                 dirs.sort();
                 if (JSON.stringify(dirs) !== JSON.stringify(wePaths) || JSON.stringify(titles) !== JSON.stringify(weTitles)) {
-                    console.log("Wallpaper Engine wallpapers found:", dirs.length);
                     weWallpapers = map;
                     weTitles = titles;
                     wePaths = dirs;
@@ -657,8 +612,8 @@ Singleton {
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("Wallpaper Engine scan error:", text);
+                if (text.trim().length > 0) {
+                    console.warn("Wallpaper Engine scan error:", text.trim());
                 }
             }
         }
@@ -679,7 +634,6 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                console.log("Scan Presets Output:", text);
                 var rawLines = text.trim().split("\n");
                 var uniqueNames = [];
                 for (var i = 0; i < rawLines.length; i++) {
@@ -692,15 +646,11 @@ Singleton {
                     }
                 }
                 uniqueNames.sort();
-                console.log("Found color presets:", uniqueNames);
                 colorPresets = uniqueNames;
             }
         }
 
-        stderr: StdioCollector {
-            onStreamFinished: {
-            }
-        }
+        stderr: StdioCollector {}
     }
 
 }

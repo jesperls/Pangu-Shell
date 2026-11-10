@@ -81,21 +81,7 @@ StyledRect {
         running: lockPlayer.isPlaying && lockPlayer.visible
         interval: 1000
         repeat: true
-        onTriggered: {
-            if (!positionSlider.isDragging) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-            MprisController.activePlayer?.positionChanged();
-        }
-    }
-
-    Connections {
-        target: MprisController.activePlayer
-        function onPositionChanged() {
-            if (!positionSlider.isDragging && MprisController.activePlayer) {
-                positionSlider.value = lockPlayer.length > 0 ? Math.min(1.0, lockPlayer.position / lockPlayer.length) : 0;
-            }
-        }
+        onTriggered: MprisController.activePlayer?.positionChanged()
     }
 
     RowLayout {
@@ -105,16 +91,7 @@ StyledRect {
         spacing: 16
         visible: MprisController.activePlayer || wallpaperPath !== ""
 
-    Connections {
-        target: MprisController
-        function onActivePlayerChanged() {
-            if (!MprisController.activePlayer) {
-                positionSlider.value = 0;
-            }
-        }
-    }
-
-    Item {
+        Item {
 
             Layout.preferredWidth: 64
             Layout.preferredHeight: 64
@@ -392,25 +369,37 @@ StyledRect {
                         interval: 1000
                         repeat: false
                         onTriggered: {
+                            playerIconMouse.holdTriggered = true;
                             playersMenu.updateMenuItems();
                             playersMenu.popup(playerIcon);
                         }
                     }
 
                     MouseArea {
+                        id: playerIconMouse
+                        property bool holdTriggered: false
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onPressed: mouse => {
                             if (mouse.button === Qt.LeftButton) {
+                                holdTriggered = false;
                                 pressAndHoldTimer.start();
                             }
                         }
                         onReleased: {
                             pressAndHoldTimer.stop();
                         }
+                        onCanceled: {
+                            pressAndHoldTimer.stop();
+                            holdTriggered = false;
+                        }
                         onClicked: mouse => {
                             if (mouse.button === Qt.LeftButton) {
+                                if (holdTriggered) {
+                                    holdTriggered = false;
+                                    return;
+                                }
                                 MprisController.cyclePlayer(1);
                             } else if (mouse.button === Qt.RightButton) {
                                 playersMenu.updateMenuItems();

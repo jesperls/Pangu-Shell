@@ -37,8 +37,7 @@ Singleton {
             onStreamFinished: {
                 const path = text.trim();
                 if (path) {
-                    console.log("Selected icon:", path);
-                    copyIconProcess.command = ["cp", path, Paths.avatar];
+                    copyIconProcess.command = ["cp", "--", path, Paths.avatar];
                     copyIconProcess.running = true;
                 }
             }
@@ -52,9 +51,8 @@ Singleton {
 
         onExited: exitCode => {
             if (exitCode === 0) {
-                console.log("Icon updated successfully");
                 root.hasAvatar = true;
-                avatarCacheBuster = Date.now();
+                avatarCacheBuster = String(Date.now());
             } else {
                 console.warn("Failed to update icon");
             }
@@ -98,7 +96,48 @@ Singleton {
     property bool lockscreenVisible: false
 
     property bool osdVisible: false
-    property string osdIndicator: "volume" // volume, mic, brightness
+    property string osdIndicator: "volume"
+    property real osdValue: 0
+    property bool osdMuted: false
+    property string osdScreenName: ""
+
+    function showOsd(indicator: string, value: real, muted: bool, screenName: string) {
+        osdIndicator = indicator;
+        osdValue = Math.max(0, Math.min(1.5, isNaN(value) ? 0 : value));
+        osdMuted = muted;
+        osdScreenName = screenName || "";
+        osdVisible = true;
+        osdHideTimer.restart();
+    }
+
+    function restartOsdTimer() {
+        if (osdVisible)
+            osdHideTimer.restart();
+    }
+
+    Timer {
+        id: osdHideTimer
+        interval: 2500
+        onTriggered: root.osdVisible = false
+    }
+
+    Connections {
+        target: Audio
+        function onVolumeChanged(volume, muted, node) {
+            root.showOsd("volume", volume, muted, "");
+        }
+        function onMicVolumeChanged(volume, muted, node) {
+            root.showOsd("mic", volume, muted, "");
+        }
+    }
+
+    Connections {
+        target: Brightness
+        function onBrightnessChanged(value, screen) {
+            const name = (!Brightness.syncBrightness && screen && screen.name) ? screen.name : "";
+            root.showOsd("brightness", value, false, name);
+        }
+    }
 
     property bool screenshotToolVisible: false
     property string screenshotCaptureMode: "region" // region, window, screen
@@ -141,6 +180,17 @@ Singleton {
     property bool settingsWindowVisible: false
     property int settingsTargetWorkspaceId: 0
     property string settingsTargetScreenName: ""
+    property string pendingSettingsSection: ""
+    property string pendingSettingsSubSection: ""
+
+    signal settingsSectionRequested(string section, string subSection)
+
+    function openSettingsSection(section: string, subSection: string) {
+        pendingSettingsSection = section || "";
+        pendingSettingsSubSection = subSection || "";
+        settingsWindowVisible = true;
+        settingsSectionRequested(pendingSettingsSection, pendingSettingsSubSection);
+    }
 
     property bool themeHasChanges: false
     property var themeSnapshot: null
@@ -174,7 +224,7 @@ Singleton {
     property bool shellHasChanges: false
     property var shellSnapshot: null
 
-    readonly property var _shellSections: ["bar", "notch", "workspaces", "overview", "dashboard", "launcher", "dock", "lockscreen", "osd"]
+    readonly property var _shellSections: ["bar", "notch", "workspaces", "overview", "dashboard", "launcher", "dock", "lockscreen", "osd", "macros"]
 
     function createShellSnapshot() {
         const snapshot = {};

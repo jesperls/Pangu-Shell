@@ -6,39 +6,48 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Mpris
 import qs.config
+import qs.modules.services
 import qs.modules.theme
 
 Singleton {
     id: root
 
     property var trackedPlayer: null
-    property var filteredPlayers: {
-        const filtered = Mpris.players.values.filter(player => {
-            const dbusName = (player.dbusName || "").toLowerCase();
-            if (!Config.bar.enableFirefoxPlayer && dbusName.includes("firefox")) {
-                return false;
-            }
-            return true;
-        });
-        return filtered;
+
+    function isPlayerAllowed(player) {
+        if (!player) return false;
+        const dbusName = (player.dbusName || "").toLowerCase();
+        return Config.bar.enableFirefoxPlayer || !dbusName.includes("firefox");
     }
 
+    property var filteredPlayers: Mpris.players.values.filter(player => root.isPlayerAllowed(player))
+
     readonly property var activePlayer: filteredPlayers.includes(trackedPlayer) ? trackedPlayer : (filteredPlayers.find(player => player.isPlaying) ?? filteredPlayers[0] ?? null)
-    
+
     property bool isInitializing: true
     property string cachedDbusName: ""
+    property string cachedIdentity: ""
 
     property bool isPlaying: activePlayer ? activePlayer.isPlaying : false
     property bool canTogglePlaying: activePlayer ? activePlayer.canTogglePlaying : false
     property bool canGoPrevious: activePlayer ? activePlayer.canGoPrevious : false
     property bool canGoNext: activePlayer ? activePlayer.canGoNext : false
-    property bool loopSupported: activePlayer && activePlayer.loopSupported && activePlayer.canControl
-    property var loopState: activePlayer ? activePlayer.loopState : (typeof MprisLoopState !== 'undefined' ? MprisLoopState.None : 0)
-    property bool shuffleSupported: activePlayer && activePlayer.shuffleSupported && activePlayer.canControl
+    property bool loopSupported: activePlayer ? (activePlayer.loopSupported && activePlayer.canControl) : false
+    property var loopState: activePlayer ? activePlayer.loopState : (typeof MprisLoopState !== "undefined" ? MprisLoopState.None : 0)
+    property bool shuffleSupported: activePlayer ? (activePlayer.shuffleSupported && activePlayer.canControl) : false
     property bool hasShuffle: activePlayer ? activePlayer.shuffle : false
 
     function playerBaseName(name) {
         return (name || "").toLowerCase().replace(/\.instance[-_a-z0-9]*$/, "");
+    }
+
+    function matchesSavedPlayer(player) {
+        if (!player) return false;
+        if (root.cachedDbusName && playerBaseName(player.dbusName) === playerBaseName(root.cachedDbusName))
+            return true;
+        if (root.cachedIdentity && (player.identity || "").toLowerCase() === root.cachedIdentity.toLowerCase())
+            return true;
+        return false;
     }
 
     function getPlayerIcon(player) {
@@ -61,21 +70,19 @@ Singleton {
     onFilteredPlayersChanged: {
         if (!root.filteredPlayers.includes(root.trackedPlayer))
             root.trackedPlayer = root.filteredPlayers.find(player => player.isPlaying) ?? root.filteredPlayers[0] ?? null;
-        if (root.isInitializing && root.cachedDbusName && root.filteredPlayers.length > 0) {
-            for (let i = 0; i < root.filteredPlayers.length; i++) {
-                const player = root.filteredPlayers[i];
-                if (playerBaseName(player.dbusName) === playerBaseName(root.cachedDbusName)) {
-                    root.trackedPlayer = player;
-                    root.isInitializing = false;
-                    return;
-                }
+        if (root.isInitializing && (root.cachedDbusName || root.cachedIdentity) && root.filteredPlayers.length > 0) {
+            const matched = root.filteredPlayers.find(player => root.matchesSavedPlayer(player));
+            if (matched) {
+                root.trackedPlayer = matched;
+                root.isInitializing = false;
             }
         }
     }
 
     Component.onCompleted: {
-        root.cachedDbusName = StateService.get("lastPlayerDbusName", "");
         if (StateService.initialized) {
+            root.cachedDbusName = StateService.get("lastPlayerDbusName", "");
+            root.cachedIdentity = StateService.get("lastPlayerIdentity", "");
             root.loadLastPlayer();
         }
     }
@@ -84,31 +91,27 @@ Singleton {
         target: StateService
         function onStateLoaded() {
             root.cachedDbusName = StateService.get("lastPlayerDbusName", "");
+            root.cachedIdentity = StateService.get("lastPlayerIdentity", "");
             root.loadLastPlayer();
         }
     }
 
     function loadLastPlayer() {
-        if (!root.cachedDbusName) {
+        if (!root.cachedDbusName && !root.cachedIdentity) {
             root.isInitializing = false;
             return;
         }
-
-        for (let i = 0; i < root.filteredPlayers.length; i++) {
-            const player = root.filteredPlayers[i];
-            if (playerBaseName(player.dbusName) === playerBaseName(root.cachedDbusName)) {
-                root.trackedPlayer = player;
-                break;
-            }
-        }
+        const matched = root.filteredPlayers.find(player => root.matchesSavedPlayer(player));
+        if (matched)
+            root.trackedPlayer = matched;
         root.isInitializing = false;
     }
 
     function saveLastPlayer() {
         if (!root.trackedPlayer || root.isInitializing)
             return;
-
-        StateService.set("lastPlayerDbusName", root.trackedPlayer.dbusName);
+        StateService.set("lastPlayerDbusName", root.trackedPlayer.dbusName || "");
+        StateService.set("lastPlayerIdentity", root.trackedPlayer.identity || "");
     }
 
     function togglePlaying() {
@@ -117,33 +120,27 @@ Singleton {
     }
 
     function previous() {
-        if (root.canGoPrevious) {
+        if (root.canGoPrevious)
             root.activePlayer.previous();
-        }
     }
 
     function next() {
-        if (root.canGoNext) {
+        if (root.canGoNext)
             root.activePlayer.next();
-        }
     }
 
     function setLoopState(loopState) {
-        if (root.loopSupported) {
+        if (root.loopSupported)
             root.activePlayer.loopState = loopState;
-        }
     }
 
     function setShuffle(shuffle) {
-        if (root.shuffleSupported) {
+        if (root.shuffleSupported)
             root.activePlayer.shuffle = shuffle;
-        }
     }
 
     function setActivePlayer(player) {
-        const targetPlayer = player ? player : (root.filteredPlayers.length > 0 ? root.filteredPlayers[0] : null);
-
-        root.trackedPlayer = targetPlayer;
+        root.trackedPlayer = player ? player : (root.filteredPlayers.length > 0 ? root.filteredPlayers[0] : null);
         root.saveLastPlayer();
     }
 
@@ -153,35 +150,30 @@ Singleton {
             return;
 
         const currentIndex = players.indexOf(root.activePlayer);
-        let newIndex;
-
-        if (direction > 0) {
-            newIndex = (currentIndex + 1) % players.length;
-        } else {
-            newIndex = (currentIndex - 1 + players.length) % players.length;
-        }
+        const newIndex = direction > 0
+            ? (currentIndex + 1) % players.length
+            : (currentIndex - 1 + players.length) % players.length;
 
         root.trackedPlayer = players[newIndex];
         root.saveLastPlayer();
     }
 
     Instantiator {
-        model: root.filteredPlayers
+        model: Mpris.players
 
         Connections {
             required property var modelData
             target: modelData
 
             Component.onCompleted: {
+                if (!root.isPlayerAllowed(modelData))
+                    return;
                 if (!root.trackedPlayer || (modelData.isPlaying && !root.trackedPlayer.isPlaying))
                     root.trackedPlayer = modelData;
             }
 
             function onPlaybackStateChanged() {
-                if (!modelData.isPlaying)
-                    return;
-                const dbusName = (modelData.dbusName || "").toLowerCase();
-                if (!Config.bar.enableFirefoxPlayer && dbusName.includes("firefox"))
+                if (!modelData.isPlaying || !root.isPlayerAllowed(modelData))
                     return;
                 if (root.trackedPlayer !== modelData && !(root.trackedPlayer && root.trackedPlayer.isPlaying)) {
                     root.isInitializing = false;

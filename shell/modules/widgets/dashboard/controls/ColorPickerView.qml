@@ -197,8 +197,8 @@ Item {
                     }
 
                     StyledToolTip {
-                        visible: pickerMouseArea.containsMouse
-                        text: "Color picker"
+                        show: pickerMouseArea.containsMouse
+                        tooltipText: "Color picker"
                     }
                 }
             }

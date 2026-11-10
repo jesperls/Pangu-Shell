@@ -10,6 +10,7 @@ FileView {
     property bool ready: false
     property bool reloading: true
     property bool reloadPending: false
+    property bool savingSelf: false
 
     property Timer reloadWatchdog: Timer { // reload() during a write can leave reloading latched.
         interval: 3000
@@ -20,9 +21,21 @@ FileView {
         }
     }
 
+    property Timer saveSuppressTimer: Timer {
+        interval: 150
+        onTriggered: root.savingSelf = false
+    }
+
     path: root.pathOverride !== "" ? root.pathOverride : Config.configDir + "/" + root.name + ".json"
+    preload: false
     atomicWrites: true
     watchChanges: true
+
+    function saveAdapter() {
+        root.savingSelf = true;
+        saveSuppressTimer.restart();
+        writeAdapter();
+    }
 
     function reloadConfig() {
         if (ready && Config.isPaused(name)) {
@@ -40,6 +53,7 @@ FileView {
         function onPauseAutoSaveChanged() { if (root.reloadPending) root.reloadConfig(); }
     }
 
+    onSaved: saveSuppressTimer.restart()
     onLoaded: {
         ready = true;
         reloading = false;
@@ -48,9 +62,9 @@ FileView {
         reloading = false;
         ready = true;
         if (error === FileViewError.FileNotFound) {
-            writeAdapter();
+            saveAdapter();
         }
     }
-    onFileChanged: reloadConfig()
-    onAdapterUpdated: if (ready && !reloading && !Config.isPaused(name)) writeAdapter()
+    onFileChanged: if (!root.savingSelf) reloadConfig()
+    onAdapterUpdated: if (ready && !reloading && !Config.isPaused(name)) saveAdapter()
 }

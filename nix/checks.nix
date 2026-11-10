@@ -34,6 +34,18 @@ let
   invalid =
     builtins.tryEval
       (home { programs.pangu.settings.unknownFile.value = true; }).activationPackage.drvPath;
+  invalidPreset =
+    builtins.tryEval
+      (home {
+        programs.pangu.hyprland.preset = {
+          enable = true;
+          settings.unknownPresetKey = true;
+        };
+      }).activationPackage.drvPath;
+  spacedWallpapers =
+    (home {
+      programs.pangu.wallpapers = "/home/pangu-test/My Wallpapers";
+    }).config;
   disabled = (home { programs.pangu.enable = lib.mkForce false; }).config;
   manual =
     (home {
@@ -101,8 +113,17 @@ in
         touch "$out"
       '';
   home-manager =
-    assert valid plain && valid preset && valid overrides && valid disabled && valid manual;
-    assert !invalid.success;
+    assert
+      valid plain
+      && valid preset
+      && valid overrides
+      && valid disabled
+      && valid manual
+      && valid spacedWallpapers;
+    assert !invalid.success && !invalidPreset.success;
+    assert builtins.elem "PANGU_WALLPAPERS=/home/pangu-test/My Wallpapers"
+      spacedWallpapers.systemd.user.services.pangu.Service.Environment;
+    assert plain.systemd.user.services.pangu.Unit.BindsTo == [ "hyprland-session.target" ];
     assert !(disabled.systemd.user.services ? pangu);
     assert !(manual.systemd.user.services ? pangu);
     assert !(manual.xdg.configFile ? "hypr/pangu");
@@ -138,6 +159,7 @@ in
 
   nixos =
     assert nixos.programs.gpu-screen-recorder.enable;
+    assert nixos.security.pam.services ? pangu;
     assert nixos.programs.gpu-screen-recorder.package == nixos.programs.pangu.package.recorderPackage;
     assert nixos.programs.ydotool.enable && nixos.services.power-profiles-daemon.enable;
     assert nixos.hardware.i2c.enable;
@@ -150,6 +172,7 @@ in
 
   hyprland = pkgs.runCommand "pangu-hyprland-check" { nativeBuildInputs = [ pkgs.lua ]; } ''
     lua ${../tests/hyprland.lua} ${../hyprland/pangu}
+    lua ${../tests/hyprland_behavior.lua} ${../hyprland/pangu}
     lua ${../tests/integration.lua} ${../hyprland/pangu}
     touch "$out"
   '';

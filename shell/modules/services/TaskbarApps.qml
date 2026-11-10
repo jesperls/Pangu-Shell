@@ -62,6 +62,17 @@ Singleton {
         }
     }
 
+    Variants {
+        model: ToplevelManager.toplevels
+        Connections {
+            required property var modelData
+            target: modelData
+            function onAppIdChanged() {
+                updateTimer.restart();
+            }
+        }
+    }
+
     Connections {
         target: Config.pinnedApps ?? null
         function onAppsChanged() {
@@ -109,9 +120,10 @@ Singleton {
         const toplevels = ToplevelManager.toplevels.values;
         for (let i = 0; i < toplevels.length; i++) {
             const toplevel = toplevels[i];
-            if (ignoredRegexes.some(re => re.test(toplevel.appId))) continue;
+            const appId = toplevel.appId || "";
+            if (!appId || ignoredRegexes.some(re => re.test(appId))) continue;
             
-            const key = toplevel.appId.toLowerCase();
+            const key = appId.toLowerCase();
             
             if (map.has(key)) {
                 map.get(key).toplevels.push(toplevel);
@@ -120,7 +132,7 @@ Singleton {
                 if (!existing) {
                     unpinnedRunningApps.push({
                         key: key,
-                        appId: toplevel.appId,
+                        appId: appId,
                         toplevels: [toplevel]
                     });
                 } else {

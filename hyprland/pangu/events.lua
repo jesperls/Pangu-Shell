@@ -1,5 +1,6 @@
 local state = require("pangu.generated")
 local fullscreen = require("pangu.fullscreen")
+local popout = require("pangu.popout")
 local primary = require("pangu.primary")
 
 local classes = {}
@@ -19,13 +20,12 @@ hl.on("window.fullscreen", function(window)
     return
   end
 
-  if not primary.monitor(window.monitor) then
-    return
-  end
-
   local pinned = window.pinned or window.pin_fullscreened
 
   if not pinned then
+    if not primary.monitor(window.monitor) then
+      return
+    end
     if not state.auto_fake_fullscreen.enable or not classes[window.class] then
       return
     end
@@ -50,16 +50,28 @@ hl.on("window.fullscreen", function(window)
   pcall(hl.dispatch, hl.dsp.window.fullscreen_state({
     internal = 0,
     client = 2,
-    window = "address:" .. window.address,
+    window = window,
   }))
   demoting = false
 
-  if pinned then
-    pcall(hl.dispatch, hl.dsp.window.set_prop({
-      prop = "sync_fullscreen",
-      value = "1",
-      window = "address:" .. window.address,
-    }))
+  pcall(hl.dispatch, hl.dsp.window.set_prop({
+    prop = "sync_fullscreen", -- fullscreen_state clears sync_fullscreen; restore so client exit works
+    value = "1",
+    window = window,
+  }))
+
+  if pinned and not window.pinned then
+    pcall(hl.dispatch, hl.dsp.window.pin({ action = "enable", window = window }))
+  end
+end)
+
+hl.on("window.title", function(window)
+  if not window or window.pinned or window.pin_fullscreened then
+    return
+  end
+  local title = tostring(window.title or "")
+  if title == "Picture-in-Picture" or title == "Picture in Picture" or title == "Picture in picture" then
+    popout.toggle(window)
   end
 end)
 

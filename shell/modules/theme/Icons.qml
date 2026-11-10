@@ -16,7 +16,7 @@ QtObject {
     readonly property string logout: ""
     readonly property string reboot: ""
     readonly property string shutdown: ""
-    readonly property string hibernate: ""
+    readonly property string hibernate: "\ue5aa"
 
     readonly property string caretLeft: ""
     readonly property string caretRight: ""
@@ -93,10 +93,10 @@ QtObject {
     readonly property string repeat: ""
     readonly property string repeatOnce: ""
     readonly property string player: ""
-    readonly property string spotify: "<font face='Symbols Nerd Font Mono'>󰓇</font>"
-    readonly property string firefox: "<font face='Symbols Nerd Font Mono'>󰈹</font>"
-    readonly property string chromium: "<font face='Symbols Nerd Font Mono'></font>"
-    readonly property string telegram: "<font face='Symbols Nerd Font Mono'></font>"
+    readonly property string spotify: "\ue66e"
+    readonly property string firefox: "\ue0f4"
+    readonly property string chromium: "\ue976"
+    readonly property string telegram: "\ue5bc"
 
     readonly property string clock: ""
     readonly property string timer: ""
@@ -114,7 +114,7 @@ QtObject {
     readonly property string plug: ""
 
     readonly property string powerSave: ""
-    readonly property string power: ""
+    readonly property string power: "\ue3da"
     readonly property string balanced: ""
     readonly property string performance: ""
 

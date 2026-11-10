@@ -21,14 +21,16 @@ Item {
 
     signal iconClicked
     signal iconHovered(bool hovered)
+    signal moved(real newValue)
 
     property bool vertical: false
     property string icon: ""
     property real value: 0
     property bool isDragging: false
     property real dragPosition: 0.0
-    property real progressRatio: isDragging ? dragPosition : value
-    property string tooltipText: `${Math.round(value * 100)}%`
+    readonly property real effectiveValue: isDragging ? dragPosition : value
+    property real progressRatio: effectiveValue
+    property string tooltipText: `${Math.round(effectiveValue * 100)}%`
     property color progressColor: Styling.srItem("overprimary")
     property color progressColor2: progressColor
     property bool gradientProgress: false
@@ -204,7 +206,8 @@ Item {
 
             StyledToolTip {
                 tooltipText: root.tooltipText
-                visible: root.isDragging && root.tooltip && !root.vertical
+                delay: 0
+                show: root.isDragging && root.tooltip && !root.vertical
                 x: hDragHandle.x + hDragHandle.width / 2 - width / 2
                 y: hDragHandle.y - height - 5
             }
@@ -308,7 +311,8 @@ Item {
 
             StyledToolTip {
                 tooltipText: root.tooltipText
-                visible: root.isDragging && root.tooltip && root.vertical
+                delay: 0
+                show: root.isDragging && root.tooltip && root.vertical
                 x: vDragHandle.x + vDragHandle.width + 5
                 y: vDragHandle.y + vDragHandle.height / 2 - height / 2
             }
@@ -321,7 +325,7 @@ Item {
         text: root.icon
         font.family: Icons.font
         font.pixelSize: 18
-        color: Colors.overBackground
+        color: root.iconColor
         rotation: root.iconRotation
         scale: root.iconScale
         x: !root.vertical ? (root.iconPos === "start" ? 0 : parent.width - width) : (parent.width - width) / 2
@@ -375,11 +379,13 @@ Item {
         }
 
         function calculatePosition(mouseX, mouseY) {
+            if (layoutSize <= 0)
+                return root.value;
             const mousePos = !root.vertical ? mouseX : mouseY;
             const relativePos = mousePos - layoutStart;
             let ratio = Math.max(0, Math.min(1, relativePos / layoutSize));
             if (root.vertical) {
-                ratio = 1 - ratio;  // Invert for vertical
+                ratio = 1 - ratio;
             }
             return ratio;
         }
@@ -396,7 +402,7 @@ Item {
             }
             root.dragPosition = pos;
             if (!root.updateOnRelease) {
-                root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                root.moved(pos);
             }
         }
 
@@ -408,7 +414,7 @@ Item {
                 }
                 root.dragPosition = pos;
                 if (!root.updateOnRelease) {
-                    root.value = root.snapMode === "always" ? pos : root.dragPosition;
+                    root.moved(pos);
                 }
             }
         }
@@ -419,8 +425,8 @@ Item {
                 if (root.snapMode === "always" || root.snapMode === "release") {
                     finalValue = root.applyStep(finalValue);
                 }
-                root.value = finalValue;
                 root.dragPosition = finalValue;
+                root.moved(finalValue);
                 root.isDragging = false;
             }
         }
@@ -432,11 +438,11 @@ Item {
         onWheel: wheel => {
             if (root.scroll) {
                 const scrollStep = root.stepSize > 0 ? root.stepSize : 0.1;
-                if (wheel.angleDelta.y > 0) {
-                    root.value = root.applyStep(Math.min(1, root.value + scrollStep));
-                } else {
-                    root.value = root.applyStep(Math.max(0, root.value - scrollStep));
-                }
+                const base = root.effectiveValue;
+                const nextValue = wheel.angleDelta.y > 0
+                    ? root.applyStep(Math.min(1, base + scrollStep))
+                    : root.applyStep(Math.max(0, base - scrollStep));
+                root.moved(nextValue);
             } else {
                 wheel.accepted = false;
             }

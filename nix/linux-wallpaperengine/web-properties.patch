@@ -11,16 +11,17 @@ diff --git a/src/WallpaperEngine/Render/Wallpapers/CWeb.cpp b/src/WallpaperEngin
  
  using namespace WallpaperEngine::Render;
  using namespace WallpaperEngine::Render::Wallpapers;
-@@ -29,7 +30,12 @@
+@@ -29,7 +30,13 @@
      // documentaion says that 60 fps is maximum value
      browserSettings.windowless_frame_rate = std::max (60, context.getApp ().getContext ().settings.render.maximumFPS);
  
 -    this->m_client = new WebBrowser::CEF::BrowserClient (m_renderHandler);
-+    const auto projectJSON = nlohmann::json::parse (this->getWeb ().project.assetLocator->readString ("project.json"));
-+    const auto definitions = projectJSON.value ("general", nlohmann::json::object ()).value (
-+        "properties", nlohmann::json::object ()
++    const auto projectJSON = nlohmann::json::parse (
++        this->getWeb ().project.assetLocator->readString ("project.json"), nullptr, false, true
 +    );
-+    const auto properties = webProperties (definitions, context.getApp ().getContext ().settings.general.properties);
++    const auto general = projectJSON.is_object () ? projectJSON.value ("general", nlohmann::json::object ()) : nlohmann::json::object ();
++    const auto definitions = general.is_object () ? general.value ("properties", nlohmann::json::object ()) : nlohmann::json::object ();
++    const auto properties = webProperties (definitions.is_object () ? definitions : nlohmann::json::object (), context.getApp ().getContext ().settings.general.properties);
 +    this->m_client = new WebBrowser::CEF::BrowserClient (m_renderHandler, webPropertyScript (properties));
      // use the custom scheme for the wallpaper's files
      const std::string htmlURL = WPSchemeHandlerFactory::generateSchemeName (this->getWeb ().project.workshopId)
@@ -43,7 +44,7 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.cpp b/src/Wallpape
 +CefRefPtr<CefRenderHandler> BrowserClient::GetRenderHandler () { return m_renderHandler; }
 +
 +void BrowserClient::OnLoadEnd (CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) {
-+    if (frame->IsMain ()) {
++    if (frame->IsMain () && !this->m_propertyScript.empty ()) {
 +        frame->ExecuteJavaScript (this->m_propertyScript, frame->GetURL (), 0);
 +    }
 +}
@@ -85,9 +86,10 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/BrowserClient.h b/src/WallpaperE
 diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h
 --- /dev/null
 +++ b/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,69 @@
 +#pragma once
 +
++#include <charconv>
 +#include <map>
 +#include <string>
 +#include <nlohmann/json.hpp>
@@ -97,6 +99,7 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperE
 +    const nlohmann::json& definitions, const std::map<std::string, std::string>& overrides
 +) {
 +    auto result = nlohmann::json::object ();
++    if (!definitions.is_object ()) return result;
 +    for (const auto& [name, definition] : definitions.items ()) {
 +        if (!definition.is_object () || !definition.contains ("value")) continue;
 +        auto property = definition;
@@ -107,13 +110,22 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperE
 +            if (type == "bool") {
 +                property["value"] = value == "1" || value == "true";
 +            } else if (type == "slider") {
-+                property["value"] = std::stod (value);
++                double parsed = 0.0;
++                const auto* begin = value.data ();
++                const auto* end = begin + value.size ();
++                const auto [ptr, ec] = std::from_chars (begin, end, parsed);
++                if (ec == std::errc () && ptr == end) {
++                    property["value"] = parsed;
++                }
 +            } else if (type == "combo") {
-+                for (const auto& option : definition.at ("options")) {
-+                    const auto& candidate = option.at ("value");
-+                    if ((candidate.is_string () ? candidate.get<std::string> () : candidate.dump ()) == value) {
-+                        property["value"] = candidate;
-+                        break;
++                if (definition.contains ("options") && definition["options"].is_array ()) {
++                    for (const auto& option : definition["options"]) {
++                        if (!option.is_object () || !option.contains ("value")) continue;
++                        const auto& candidate = option["value"];
++                        if ((candidate.is_string () ? candidate.get<std::string> () : candidate.dump ()) == value) {
++                            property["value"] = candidate;
++                            break;
++                        }
 +                    }
 +                }
 +            } else {
@@ -126,7 +138,7 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperE
 +}
 +
 +inline std::string webPropertyScript (const nlohmann::json& properties) {
-+    // The listener may be installed asynchronously after the page load callback.
++    if (properties.empty ()) return "";
 +    return R"JS((function () {
 +        const properties = )JS" + properties.dump (-1, ' ', true) + R"JS(;
 +        function deliver() {
@@ -136,8 +148,9 @@ diff --git a/src/WallpaperEngine/WebBrowser/CEF/WebProperties.h b/src/WallpaperE
 +            return true;
 +        }
 +        if (!deliver()) {
++            let attempts = 0;
 +            const timer = setInterval(function () {
-+                if (deliver()) clearInterval(timer);
++                if (deliver() || ++attempts >= 100) clearInterval(timer);
 +            }, 100);
 +        }
 +    })(); )JS";

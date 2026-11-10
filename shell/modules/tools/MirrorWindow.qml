@@ -21,6 +21,7 @@ PanelWindow {
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "pangu:mirror"
     exclusionMode: ExclusionMode.Ignore
     visible: GlobalStates.mirrorWindowVisible
 
@@ -107,8 +108,9 @@ PanelWindow {
 
                 opacity: (dragArea.containsMouse || controlHover.hovered) ? 1.0 : 0.0
                 Behavior on opacity {
+                    enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: 200
+                        duration: Styling.animDuration
                     }
                 }
 
@@ -140,7 +142,7 @@ PanelWindow {
                                 root.currentWidth = 300;
                             } else {
                                 root.currentHeight = 300;
-                                root.currentWidth = 480;  // Reset to default wide
+                                root.currentWidth = 480;
                             }
                         }
                     }
@@ -220,7 +222,7 @@ PanelWindow {
     }
 
     component ResizeHandle: MouseArea {
-        property int mode: 0  // 0:BR, 1:BL, 2:TR, 3:TL
+        property int mode: 0
         width: 20
         height: 20
         hoverEnabled: true

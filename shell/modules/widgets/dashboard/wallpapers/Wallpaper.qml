@@ -60,8 +60,6 @@ PanelWindow {
         }
 
         var colors = [];
-        var firstColorRaw = Colors[optimizedPalette[0]];
-        console.log("Generating MPV shader. First palette color (" + optimizedPalette[0] + "):", firstColorRaw);
 
         for (var i = 0; i < optimizedPalette.length; i++) {
             var rawColor = Colors[optimizedPalette[i]];
@@ -195,24 +193,18 @@ PanelWindow {
     Timer {
         id: shaderUpdateDebounce
         interval: 500
-        onTriggered: {
-            console.log("Shader debounce triggered, updating MPV...");
-            updateMpvShader();
-        }
+        onTriggered: updateMpvShader()
     }
 
     Connections {
         target: Colors
         function onFileChanged() {
-            console.log("Colors file changed, scheduling update...");
             shaderUpdateDebounce.restart();
         }
         function onBackgroundChanged() {
-            console.log("Colors background changed, scheduling update...");
             shaderUpdateDebounce.restart();
         }
         function onPrimaryChanged() {
-            console.log("Colors primary changed, scheduling update...");
             shaderUpdateDebounce.restart();
         }
     }
@@ -220,15 +212,11 @@ PanelWindow {
     Connections {
         target: Config
         function onOledModeChanged() {
-            console.log("Config OLED mode changed, scheduling update...");
             shaderUpdateDebounce.restart();
         }
     }
 
-    onTintEnabledChanged: {
-        console.log("Tint enabled changed to", tintEnabled);
-        updateMpvShader();
-    }
+    onTintEnabledChanged: updateMpvShader()
 
     onEffectiveWallpaperChanged: {
         if (usesMpv) {
@@ -346,7 +334,7 @@ PanelWindow {
 
                 Item {
                     id: paletteSourceItem
-                    visible: true
+                    visible: staticImageRoot.tint
                     width: staticImageRoot.optimizedPalette.length
                     height: 1
                     opacity: 0
@@ -354,8 +342,9 @@ PanelWindow {
                     Row {
                         anchors.fill: parent
                         Repeater {
-                            model: staticImageRoot.optimizedPalette
+                            model: staticImageRoot.tint ? staticImageRoot.optimizedPalette : []
                             Rectangle {
+                                required property string modelData
                                 width: 1
                                 height: 1
                                 color: Colors[modelData]
@@ -366,11 +355,12 @@ PanelWindow {
 
                 ShaderEffectSource {
                     id: paletteTextureSource
-                    sourceItem: paletteSourceItem
+                    sourceItem: staticImageRoot.tint ? paletteSourceItem : null
                     hideSource: true
                     visible: false
                     smooth: false
                     recursive: false
+                    live: staticImageRoot.tint
                 }
 
                 Image {
@@ -471,7 +461,6 @@ PanelWindow {
                     interval: 100
                     onTriggered: {
                         if (sourceFile) {
-                            console.log("Restarting mpvpaper for:", sourceFile);
                             mpvpaperProcess.running = true;
                             wallpaper.requestVideoSync();
                         }
@@ -480,7 +469,6 @@ PanelWindow {
 
                 onSourceFileChanged: {
                     if (sourceFile) {
-                        console.log("Source file changed to:", sourceFile);
                         mpvpaperProcess.running = false;
                         mpvpaperRestartTimer.restart();
                     }
@@ -488,7 +476,6 @@ PanelWindow {
 
                 Component.onCompleted: {
                     if (sourceFile) {
-                        console.log("Initial mpvpaper run for:", sourceFile);
                         mpvpaperProcess.running = true;
                         wallpaper.requestVideoSync();
                     }
@@ -501,13 +488,7 @@ PanelWindow {
                     running: false
                     command: sourceFile && wallpaper.currentScreenName ? ["bash", scriptPath, sourceFile, (wallpaper.tintEnabled ? wallpaper.mpvShaderPath : ""), wallpaper.currentScreenName] : []
 
-                    stdout: StdioCollector {
-                        onStreamFinished: {
-                            if (text.length > 0) {
-                                console.log("mpvpaper output:", text);
-                            }
-                        }
-                    }
+                    stdout: StdioCollector {}
 
                     stderr: StdioCollector {
                         onStreamFinished: {
@@ -515,10 +496,6 @@ PanelWindow {
                                 console.warn("mpvpaper error:", text);
                             }
                         }
-                    }
-
-                    onExited: function (exitCode) {
-                        console.log("mpvpaper process exited with code:", exitCode);
                     }
                 }
             }

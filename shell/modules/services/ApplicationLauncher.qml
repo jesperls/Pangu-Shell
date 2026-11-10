@@ -4,12 +4,34 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.services
 
 Singleton {
     id: root
 
     function scopedCommand(command) {
-        return ["systemd-run", "--user", "--scope", "--collect", "--quiet", "--slice=app.slice", "--property=PartOf=graphical-session.target", "--expand-environment=no", "--", "env", "-u", "HL_INITIAL_WORKSPACE_TOKEN"].concat(command);
+        const envArgs = ["env", "-u", "HL_INITIAL_WORKSPACE_TOKEN"];
+        if (typeof Quickshell !== "undefined" && typeof Quickshell.env === "function") {
+            const userPath = Quickshell.env("PANGU_USER_PATH");
+            if (userPath !== null && userPath !== "")
+                envArgs.push("PATH=" + userPath);
+            for (const [saved, target] of [
+                ["PANGU_USER_QT_PLUGIN_PATH", "QT_PLUGIN_PATH"],
+                ["PANGU_USER_QML2_IMPORT_PATH", "QML2_IMPORT_PATH"],
+                ["PANGU_USER_QML_IMPORT_PATH", "QML_IMPORT_PATH"]
+            ]) {
+                const val = Quickshell.env(saved);
+                if (val === "__UNSET__")
+                    envArgs.push("-u", target);
+                else if (val !== null && val !== "")
+                    envArgs.push(target + "=" + val);
+            }
+        }
+        return [
+            "systemd-run", "--user", "--scope", "--collect", "--quiet",
+            "--slice=app.slice", "--property=PartOf=graphical-session.target",
+            "--expand-environment=no", "--"
+        ].concat(envArgs, command);
     }
 
     function launchCommand(command) {

@@ -88,14 +88,13 @@ Singleton {
     function save(name) {
         const file = root.files[name];
         if (file)
-            file.writeAdapter();
+            file.saveAdapter();
     }
 
     Process {
         command: ["mkdir", "-p", root.configDir, Paths.dataDir, Paths.cacheDir]
         running: true
-        onExited: exitCode => {
-            if (exitCode !== 0) return;
+        onExited: {
             for (const name in root.files)
                 root.files[name].reloadConfig();
         }
@@ -431,7 +430,7 @@ Singleton {
 
             property JsonObject srErrorFocus: JsonObject {
                 property string label: "Error Focus"
-                property list<var> gradient: [["overBackground", 0.0]]
+                property list<var> gradient: [["overErrorContainer", 0.0]]
                 property string gradientType: "linear"
                 property int gradientAngle: 0
                 property real gradientCenterX: 0.5
@@ -463,6 +462,15 @@ Singleton {
                 property list<var> border: ["overError", 0]
                 property string itemColor: "error"
                 property real opacity: 1.0
+            }
+
+            property JsonObject exports: JsonObject {
+                property bool gtk: true
+                property bool qt: true
+                property bool kitty: true
+                property bool discord: true
+                property bool pywal: true
+                property bool nvchad: true
             }
         }
     }
@@ -717,6 +725,12 @@ Singleton {
                 property bool useSunriseSunset: true
                 property string dayStart: "08:00"
                 property string nightStart: "20:00"
+            }
+            property JsonObject clipboard: JsonObject {
+                property int maxItems: 200
+            }
+            property JsonObject audio: JsonObject {
+                property bool overAmplify: false
             }
         }
     }

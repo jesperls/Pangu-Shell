@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-"""
-Link preview metadata extractor using Open Graph and Twitter Card metadata.
-Fetches title, description, image, and other metadata from URLs.
-Includes special support for YouTube, Twitter, and other oEmbed services.
-"""
-
+import ipaddress
 import json
 import re
 import socket
 import sys
 import urllib.error
 import urllib.request
-import ipaddress
 from html.parser import HTMLParser
 from urllib.parse import quote, urljoin, urlparse
 
@@ -52,7 +46,6 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def extract_youtube_id(url):
-    """Extract YouTube video ID from various YouTube URL formats."""
     patterns = [
         r"(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})",
         r"youtube\.com\/embed\/([a-zA-Z0-9_-]{11})",
@@ -68,7 +61,6 @@ def extract_youtube_id(url):
 
 
 def fetch_youtube_metadata(url, timeout=5):
-    """Fetch metadata from YouTube using oEmbed API."""
     video_id = extract_youtube_id(url)
     if not video_id:
         return None
@@ -78,12 +70,11 @@ def fetch_youtube_metadata(url, timeout=5):
 
         req = urllib.request.Request(oembed_url)
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            data = json.loads(response.read(256 * 1024).decode("utf-8"))
 
         thumbnail = data.get("thumbnail_url", "")
         if "hqdefault" in thumbnail:
-            maxres_thumbnail = thumbnail.replace("hqdefault", "maxresdefault")
-            thumbnail = maxres_thumbnail
+            thumbnail = thumbnail.replace("hqdefault", "maxresdefault")
 
         return {
             "title": data.get("title", ""),
@@ -97,22 +88,21 @@ def fetch_youtube_metadata(url, timeout=5):
             "author": data.get("author_name", ""),
             "video_id": video_id,
         }
-    except Exception as e:
+    except Exception:
         return None
 
 
 def fetch_twitter_metadata(url, timeout=5):
-    """Fetch metadata from Twitter/X using oEmbed API."""
     try:
         oembed_url = f"https://publish.twitter.com/oembed?url={quote(url)}"
 
         req = urllib.request.Request(oembed_url)
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            data = json.loads(response.read(256 * 1024).decode("utf-8"))
 
         return {
             "title": data.get("author_name", "Tweet"),
-            "description": re.sub(r"<[^>]+>", "", data.get("html", "")),  # Strip HTML
+            "description": re.sub(r"<[^>]+>", "", data.get("html", "")),
             "image": "",
             "url": url,
             "request_url": url,
@@ -121,22 +111,24 @@ def fetch_twitter_metadata(url, timeout=5):
             "favicon": "https://abs.twimg.com/favicons/twitter.3.ico",
             "author": data.get("author_name", ""),
         }
-    except Exception as e:
+    except Exception:
         return None
 
 
+def _host_matches(url, domains):
+    host = (urlparse(url).hostname or "").lower()
+    return any(host == d or host.endswith("." + d) for d in domains)
+
+
 def is_youtube_url(url):
-    """Check if URL is a YouTube URL."""
-    return "youtube.com" in url or "youtu.be" in url
+    return _host_matches(url, ("youtube.com", "youtu.be"))
 
 
 def is_twitter_url(url):
-    """Check if URL is a Twitter/X URL."""
-    return "twitter.com" in url or "x.com" in url
+    return _host_matches(url, ("twitter.com", "x.com"))
 
 
 class MetaTagParser(HTMLParser):
-    """Parser to extract meta tags from HTML."""
 
     def __init__(self):
         super().__init__()
@@ -232,7 +224,6 @@ class MetaTagParser(HTMLParser):
                 self.metadata["title"] = self.title_text.strip()
 
     def get_best_favicon(self):
-        """Select the best favicon from collected candidates."""
         if not self.favicon_candidates:
             return self.metadata["favicon"]
 
@@ -242,9 +233,9 @@ class MetaTagParser(HTMLParser):
             if 32 <= size <= 128:
                 size_score = size
             elif size > 128:
-                size_score = 128 - (size - 128) // 10  # Penalize very large
+                size_score = 128 - (size - 128) // 10
             else:
-                size_score = size  # Small or unknown (0)
+                size_score = size
             return (priority, size_score)
 
         sorted_favicons = sorted(self.favicon_candidates, key=score, reverse=True)
@@ -253,17 +244,15 @@ class MetaTagParser(HTMLParser):
         )
 
 
+def _safe_http_asset(candidate, base_url):
+    if not candidate:
+        return ""
+    resolved = candidate if candidate.startswith(("http://", "https://")) else urljoin(base_url, candidate)
+    parsed = urlparse(resolved)
+    return resolved if parsed.scheme in ("http", "https") and parsed.netloc else ""
+
+
 def fetch_preview(url, timeout=5):
-    """
-    Fetch preview metadata for a given URL.
-
-    Args:
-        url: The URL to fetch metadata from
-        timeout: Request timeout in seconds
-
-    Returns:
-        Dictionary with metadata or error information
-    """
     try:
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
@@ -318,20 +307,11 @@ def fetch_preview(url, timeout=5):
         if best_favicon:
             metadata["favicon"] = best_favicon
 
-        if metadata["image"] and not metadata["image"].startswith(
-            ("http://", "https://")
-        ):
-            metadata["image"] = urljoin(final_url, metadata["image"])
-
-        if metadata["favicon"] and not metadata["favicon"].startswith(
-            ("http://", "https://")
-        ):
-            metadata["favicon"] = urljoin(final_url, metadata["favicon"])
-        elif not metadata["favicon"]:
-            metadata["favicon"] = f"{base_url}/favicon.ico"
+        metadata["image"] = _safe_http_asset(metadata["image"], final_url)
+        metadata["favicon"] = _safe_http_asset(metadata["favicon"], final_url) or f"{base_url}/favicon.ico"
 
         if not metadata["url"]:
-            metadata["url"] = url  # Keep original URL, not redirected
+            metadata["url"] = url
 
         metadata["request_url"] = url
 

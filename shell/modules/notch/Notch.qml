@@ -77,6 +77,7 @@ Item {
         height: parent.implicitHeight
         enabled: false
         enableBorder: false  // the Canvas below draws the border
+        enableShadow: false
         animateRadius: false
         backgroundOpacity: notchContainer.dashboardBgOpacity
 
@@ -123,9 +124,10 @@ Item {
             }
         }
 
-        layer.enabled: true
+        layer.enabled: Config.notchTheme === "default"
         layer.smooth: true
-        layer.effect: MultiEffect {
+        layer.effect: Shadow {
+            shadowEnabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
             maskEnabled: true
             maskSource: notchFullMask
             maskThresholdMin: 0.5
@@ -140,7 +142,7 @@ Item {
         anchors.centerIn: parent
         width: parent.implicitWidth
         height: parent.implicitHeight
-        layer.enabled: true
+        layer.enabled: Config.notchTheme === "default"
         layer.smooth: true
 
         Item {
@@ -220,10 +222,10 @@ Item {
             variant: "bg"
             visible: Config.notchTheme === "island"
             anchors.fill: parent
-            layer.enabled: false
             clip: false
             enableBorder: true
-            animateRadius: false  // custom animation below
+            enableShadow: Config.showBackground
+            animateRadius: false
             backgroundOpacity: notchContainer.dashboardBgOpacity
 
             radius: parent.islandRadius

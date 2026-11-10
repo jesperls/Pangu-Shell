@@ -51,4 +51,15 @@ Item {
     function startDestroy() {
         destroyAnimation.running = true;
     }
+
+    function reset() {
+        destroyAnimation.stop();
+        isDiscardAll = false;
+        if (root.targetItem) {
+            root.targetItem.scale = 1.0;
+            root.targetItem.opacity = 1.0;
+            if (root.targetItem.anchors)
+                root.targetItem.anchors.leftMargin = 0;
+        }
+    }
 }

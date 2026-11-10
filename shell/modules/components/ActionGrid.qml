@@ -16,6 +16,7 @@ FocusScope {
     property int spacing: 4
     property int columns: 3
     property int textSpacing: 8
+    property bool selectOnHover: true
 
     signal actionTriggered(var action)
 
@@ -256,7 +257,7 @@ FocusScope {
                                 height: parent.height
                                 anchors.left: parent.left
                                 text: modelData.icon || ""
-                                textFormat: Text.RichText
+                                textFormat: (modelData.icon || "").startsWith("<") ? Text.RichText : Text.PlainText
                                 font.family: Icons.font
                                 font.pixelSize: root.iconSize
                                 color: actionButton.pressed ? Styling.srItem("overprimary") : (index === root.currentIndex ? (highlight.targetItem ? highlight.item : Styling.srItem("primary")) : Colors.overBackground)
@@ -298,7 +299,7 @@ FocusScope {
                         onClicked: triggerAction()
 
                         onHoveredChanged: {
-                            if (hovered && actionButton.enabled) {
+                            if (hovered && actionButton.enabled && root.selectOnHover) {
                                 root.currentIndex = index;
                             }
                         }
@@ -310,7 +311,7 @@ FocusScope {
                         }
 
                         StyledToolTip {
-                            visible: parent.hovered
+                            show: actionButton.hovered
                             tooltipText: modelData.tooltip || ""
                             delay: 500
                         }

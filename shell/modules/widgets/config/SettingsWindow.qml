@@ -31,7 +31,7 @@ FloatingWindow {
     }
 
     function preparePlacement() {
-        clientsBeforeMapping = Compositor.clients.values.map(client => client.nativeToplevel);
+        clientsBeforeMapping = (Compositor.clients.values || []).map(client => client.nativeToplevel);
         const targetScreen = screenByName(GlobalStates.settingsTargetScreenName || Compositor.focusedMonitor?.name || "");
         if (targetScreen) {
             settingsWindow.screen = targetScreen;
@@ -42,14 +42,17 @@ FloatingWindow {
     }
 
     function placeOnTargetWorkspace() {
-        const targetWorkspace = GlobalStates.settingsTargetWorkspaceId || Compositor.focusedMonitor?.activeWorkspace?.id || Compositor.focusedWorkspace?.id || 0;
+        const specialName = Compositor.focusedMonitor?.activeSpecialWorkspace?.name || "";
+        const specialTarget = specialName ? (specialName.startsWith("special:") ? specialName : "special:" + specialName) : "";
+        const targetWorkspace = specialTarget || GlobalStates.settingsTargetWorkspaceId || Compositor.focusedMonitor?.activeWorkspace?.id || Compositor.focusedWorkspace?.id || 0;
         if (!targetWorkspace) return false;
 
         const clients = Compositor.clients.values || [];
         for (let i = 0; i < clients.length; i++) {
             const client = clients[i];
             if (client.title === settingsWindow.title && !clientsBeforeMapping.includes(client.nativeToplevel)) {
-                if (client.workspace?.id !== targetWorkspace) {
+                const currentWorkspace = specialTarget ? (client.workspace?.name || "") : client.workspace?.id;
+                if (currentWorkspace !== targetWorkspace) {
                     Compositor.dispatch(`movetoworkspacesilent ${targetWorkspace}, address:${client.address}`);
                 }
                 Compositor.dispatch(`focuswindow address:${client.address}`);
@@ -87,8 +90,23 @@ FloatingWindow {
     }
 
     Component.onCompleted: {
-        preparePlacement();
         initialized = true;
+        if (GlobalStates.settingsWindowVisible) {
+            preparePlacement();
+        }
+    }
+
+    onVisibleChanged: {
+        if (!initialized)
+            return;
+        if (visible) {
+            preparePlacement();
+        } else {
+            placementTimer.stop();
+            GlobalStates.discardThemeChanges();
+            GlobalStates.discardShellChanges();
+            GlobalStates.discardCompositorChanges();
+        }
     }
 
     onClosed: GlobalStates.settingsWindowVisible = false

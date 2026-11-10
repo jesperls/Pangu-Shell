@@ -1,10 +1,13 @@
 pragma Singleton
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.services
 
-QtObject {
+Singleton {
     id: root
 
     property bool active: true
@@ -13,26 +16,27 @@ QtObject {
     property var linkPreviewCache: ({})
     property int revision: 0
     property bool _operationInProgress: false
-    
+
     readonly property string dbPath: Quickshell.dataPath("clipboard.db")
     readonly property string binaryDataDir: Quickshell.dataPath("clipboard-data")
     readonly property string schemaPath: Qt.resolvedUrl("clipboard_init.sql").toString().replace("file://", "")
     readonly property string backendPath: Paths.script("clipboard.py")
     readonly property string watchScriptPath: Paths.script("clipboard_watch.sh")
     readonly property string linkPreviewScriptPath: Paths.script("link_preview.py")
+    readonly property int maxItems: Math.max(10, Config.system.clipboard?.maxItems ?? 200)
 
     property bool _initialized: false
     property bool watcherEnabled: true
     property bool listPending: false
 
-    property var suspendConnections: Connections {
+    Connections {
         target: SuspendManager
         function onWakingUp() {
             wakeRestartTimer.restart();
         }
     }
 
-    property var wakeRestartTimer: Timer {
+    Timer {
         id: wakeRestartTimer
         interval: 2000
         repeat: false
@@ -48,12 +52,13 @@ QtObject {
 
     property int watcherRestarts: 0
 
-    property Process clipboardWatcher: Process {
+    Process {
+        id: clipboardWatcher
         running: root._initialized && !SuspendManager.isSuspending && root.watcherEnabled
-        command: [watchScriptPath, backendPath, dbPath, binaryDataDir]
+        command: [root.watchScriptPath, root.backendPath, root.dbPath, root.binaryDataDir, String(root.maxItems)]
 
         onStarted: watcherStableTimer.restart()
-        
+
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: data => {
@@ -62,7 +67,7 @@ QtObject {
                 }
             }
         }
-        
+
         stderr: StdioCollector {
             onStreamFinished: {
                 if (text.length > 0 && !text.includes("No selection")) {
@@ -70,8 +75,8 @@ QtObject {
                 }
             }
         }
-        
-        onExited: function(code) {
+
+        onExited: code => {
             if (root._initialized && !SuspendManager.isSuspending) {
                 root.watcherEnabled = false;
                 root.watcherRestarts++;
@@ -82,12 +87,14 @@ QtObject {
         }
     }
 
-    property Timer watcherStableTimer: Timer {
+    Timer {
+        id: watcherStableTimer
         interval: 30000
         onTriggered: root.watcherRestarts = 0
     }
 
-    property Timer watcherRestartTimer: Timer {
+    Timer {
+        id: watcherRestartTimer
         interval: 1000
         repeat: false
         onTriggered: {
@@ -97,85 +104,113 @@ QtObject {
         }
     }
 
-    property Process initDbProcess: Process {
+    Process {
+        id: initDbProcess
         running: false
-        
+
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) console.warn("ClipboardService: DB Init Error: " + text)
+                if (text.length > 0) console.warn("ClipboardService: DB Init Error:", text);
             }
         }
 
-        onExited: function(code) {
+        onExited: code => {
             if (code === 0) {
                 root._initialized = true;
                 Qt.callLater(root.list);
             } else {
-                console.warn("ClipboardService: Failed to initialize database (Exit code: " + code + ")");
+                console.warn("ClipboardService: Failed to initialize database (exit " + code + ")");
             }
         }
     }
 
-    property Process checkAndInsertProcess: Process {
+    Process {
+        id: checkAndInsertProcess
         running: false
-        
+
         stderr: StdioCollector {
             onStreamFinished: {
                 if (text.length > 0 && !text.includes("No selection")) {
-                    console.warn("ClipboardService: checkAndInsertProcess stderr:", text);
+                    console.warn("ClipboardService: capture stderr:", text);
                 }
             }
         }
-        
-        onExited: function(code) {
-            _operationInProgress = false;
+
+        onExited: code => {
+            root._operationInProgress = false;
             if (code === 0) {
                 Qt.callLater(root.list);
             }
         }
     }
 
-    property Process listProcess: Process {
+    function pruneCaches(items) {
+        const activeIds = {};
+        for (let i = 0; i < items.length; i++)
+            activeIds[items[i].id] = true;
+
+        const nextImages = {};
+        let imagesPruned = false;
+        for (const id in root.imageDataById) {
+            if (activeIds[id])
+                nextImages[id] = root.imageDataById[id];
+            else
+                imagesPruned = true;
+        }
+        if (imagesPruned)
+            root.imageDataById = nextImages;
+
+        const previewKeys = Object.keys(root.linkPreviewCache);
+        if (previewKeys.length > 100) {
+            const nextPreviews = {};
+            const keep = previewKeys.slice(-100);
+            for (const k of keep)
+                nextPreviews[k] = root.linkPreviewCache[k];
+            root.linkPreviewCache = nextPreviews;
+        }
+    }
+
+    Process {
+        id: listProcess
         running: false
-        
+
         stdout: StdioCollector {
             waitForEnd: true
-            
+
             onStreamFinished: {
-                var clipboardItems = [];
-                
-                var trimmedText = text.trim();
+                const clipboardItems = [];
+                const trimmedText = text.trim();
                 if (trimmedText.length === 0) {
                     root.items = clipboardItems;
+                    root.pruneCaches(clipboardItems);
                     root.listCompleted();
                     root._operationInProgress = false;
                     return;
                 }
-                
+
                 try {
-                    var jsonArray = JSON.parse(trimmedText);
-                    
-                    for (var i = 0; i < jsonArray.length; i++) {
-                        var item = jsonArray[i];
-                        var isFile = item.mime_type === "text/uri-list";
-                        
-                        var preview = item.preview;
-                        if (isFile && item.full_content) {
-                            var uriContent = item.full_content.trim();
+                    const jsonArray = JSON.parse(trimmedText);
+                    for (let i = 0; i < jsonArray.length; i++) {
+                        const item = jsonArray[i];
+                        const isFile = item.mime_type === "text/uri-list";
+                        const fullText = item.full_content || item.preview || "";
+
+                        let preview = item.preview || "";
+                        if (isFile && fullText) {
+                            const uriContent = fullText.trim();
                             if (uriContent.startsWith("file://")) {
-                                var filePath = uriContent.substring(7);  // Remove "file://"
-                                var fileName = filePath.split('/').pop();
-                                fileName = root.decodeUriString(fileName);
+                                const filePath = uriContent.substring(7);
+                                const fileName = root.decodeUriString(filePath.split("/").pop());
                                 preview = "[File] " + fileName;
                             }
                         } else if (item.is_image === 1) {
                             preview = "[Image]";
                         }
-                        
+
                         clipboardItems.push({
                             id: item.id.toString(),
                             preview: preview,
-                            fullContent: item.preview,
+                            fullContent: fullText,
                             mime: item.mime_type,
                             isImage: item.is_image === 1,
                             isFile: isFile,
@@ -191,22 +226,22 @@ QtObject {
                 } catch (e) {
                     console.warn("ClipboardService: Failed to parse clipboard items:", e);
                 }
-                
+
                 root.items = clipboardItems;
+                root.pruneCaches(clipboardItems);
                 root.listCompleted();
                 root._operationInProgress = false;
             }
         }
-        
+
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("ClipboardService: listProcess stderr:", text);
-                }
+                if (text.length > 0)
+                    console.warn("ClipboardService: list stderr:", text);
             }
         }
-        
-        onExited: function(code) {
+
+        onExited: code => {
             if (root.listPending) {
                 root.listPending = false;
                 Qt.callLater(root.list);
@@ -219,104 +254,56 @@ QtObject {
         }
     }
 
-    property Process getContentProcess: Process {
+    Process {
+        id: getContentProcess
         property var pending: []
         property string itemId: ""
         stdout: StdioCollector {}
         onExited: code => {
-            root.fullContentRetrieved(itemId, code === 0 ? stdout.text : "");
+            root.fullContentRetrieved(getContentProcess.itemId, code === 0 ? getContentProcess.stdout.text : "");
             Qt.callLater(root.startNext, getContentProcess);
         }
     }
 
-    property Process deleteProcess: Process {
+    Process {
+        id: mutationProcess
+        property var pending: []
         property string itemId: ""
-        running: false
-        
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("ClipboardService: deleteProcess stderr:", text);
-                }
+                if (text.length > 0)
+                    console.warn("ClipboardService: mutation stderr:", text);
             }
         }
-        
-        onExited: function(code) {
-            if (code === 0) {
+        onExited: code => {
+            if (code === 0 && mutationProcess.pending.length === 0) {
                 Qt.callLater(root.list);
-            } else {
+            } else if (code !== 0) {
                 root._operationInProgress = false;
             }
+            Qt.callLater(root.startNext, mutationProcess);
         }
     }
-    
-    property Process clearProcess: Process {
-        running: false
-        
-        onExited: function(code) {
-            if (code === 0) {
-                Qt.callLater(root.list);
-            }
-        }
-    }
-    
-    property Process togglePinProcess: Process {
-        property string itemId: ""
-        running: false
-        
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("ClipboardService: togglePinProcess stderr:", text);
-                }
-            }
-        }
-        
-        onExited: function(code) {
-            if (code === 0) {
-                Qt.callLater(root.list);
-            } else {
-                root._operationInProgress = false;
-            }
-        }
-    }
-    
-    property Process setAliasProcess: Process {
-        property string itemId: ""
-        running: false
-        
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    console.warn("ClipboardService: setAliasProcess stderr:", text);
-                }
-            }
-        }
-        
-        onExited: function(code) {
-            if (code === 0) {
-                Qt.callLater(root.list);
-            } else {
-                root._operationInProgress = false;
-            }
-        }
-    }
-    
-    property Process loadImageProcess: Process {
+
+    Process {
+        id: loadImageProcess
         property var pending: []
         property string itemId: ""
         property string mimeType: ""
         stdout: StdioCollector {}
         onExited: code => {
-            if (code === 0 && stdout.text.length > 0) {
-                root.imageDataById[itemId] = "data:" + mimeType + ";base64," + stdout.text.replace(/\s/g, "");
+            if (code === 0 && loadImageProcess.stdout.text.length > 0) {
+                const next = Object.assign({}, root.imageDataById);
+                next[loadImageProcess.itemId] = "data:" + loadImageProcess.mimeType + ";base64," + loadImageProcess.stdout.text.replace(/\s/g, "");
+                root.imageDataById = next;
                 root.revision++;
             }
             Qt.callLater(root.startNext, loadImageProcess);
         }
     }
 
-    property Process linkPreviewProcess: Process {
+    Process {
+        id: linkPreviewProcess
         property var pending: []
         property string requestUrl: ""
         property string requestItemId: ""
@@ -325,12 +312,12 @@ QtObject {
             let metadata;
             try {
                 if (code !== 0) throw new Error("Preview process failed");
-                metadata = JSON.parse(stdout.text);
-                if (!metadata.error) root.linkPreviewCache[requestUrl] = metadata;
+                metadata = JSON.parse(linkPreviewProcess.stdout.text);
+                if (!metadata.error) root.linkPreviewCache[linkPreviewProcess.requestUrl] = metadata;
             } catch (error) {
                 metadata = {error: String(error)};
             }
-            root.linkPreviewFetched(requestUrl, metadata, requestItemId);
+            root.linkPreviewFetched(linkPreviewProcess.requestUrl, metadata, linkPreviewProcess.requestItemId);
             Qt.callLater(root.startNext, linkPreviewProcess);
         }
     }
@@ -350,7 +337,7 @@ QtObject {
 
     signal fullContentRetrieved(string itemId, string content)
     signal linkPreviewFetched(string url, var metadata, string itemId)
-    
+
     function decodeUriString(str) {
         try {
             return decodeURIComponent(str);
@@ -360,18 +347,18 @@ QtObject {
     }
 
     function backend(operation, args = []) {
-        return ["python3", backendPath, dbPath, operation, "--"].concat(args);
+        return ["python3", root.backendPath, root.dbPath, operation, "--"].concat(args);
     }
 
     function initialize() {
-        initDbProcess.command = backend("init", [schemaPath]);
+        initDbProcess.command = backend("init", [root.schemaPath]);
         initDbProcess.running = true;
     }
 
     function checkClipboard() {
         if (!_initialized || _operationInProgress) return;
         _operationInProgress = true;
-        checkAndInsertProcess.command = backend("capture", [binaryDataDir]);
+        checkAndInsertProcess.command = backend("capture", [root.binaryDataDir, String(root.maxItems)]);
         checkAndInsertProcess.running = true;
     }
 
@@ -382,7 +369,7 @@ QtObject {
             return;
         }
         _operationInProgress = true;
-        listProcess.command = backend("list");
+        listProcess.command = backend("list", [String(root.maxItems)]);
         listProcess.running = true;
     }
 
@@ -394,45 +381,35 @@ QtObject {
     function deleteItem(id) {
         if (!_initialized) return;
         _operationInProgress = true;
-        deleteProcess.itemId = id;
-        
-        deleteProcess.command = backend("delete", [id, binaryDataDir]);
-        deleteProcess.running = true;
+        enqueue(mutationProcess, {itemId: id, command: backend("delete", [id, root.binaryDataDir])});
     }
 
     function clear() {
         if (!_initialized) return;
-        clearProcess.command = backend("clear", [binaryDataDir]);
-        clearProcess.running = true;
+        _operationInProgress = true;
+        enqueue(mutationProcess, {itemId: "", command: backend("clear", [root.binaryDataDir])});
     }
 
     function togglePin(id) {
         if (!_initialized) return;
         _operationInProgress = true;
-        togglePinProcess.itemId = id;
-        togglePinProcess.command = backend("pin", [id]);
-        togglePinProcess.running = true;
+        enqueue(mutationProcess, {itemId: id, command: backend("pin", [id])});
     }
 
     function setAlias(id, alias) {
         if (!_initialized) return;
         _operationInProgress = true;
-        setAliasProcess.itemId = id;
-        setAliasProcess.command = backend("alias", [id, alias.trim()]);
-        setAliasProcess.running = true;
+        enqueue(mutationProcess, {itemId: id, command: backend("alias", [id, alias.trim()])});
     }
 
     function decodeToDataUrl(id, mime) {
-        if (imageDataById[id]) {
+        if (imageDataById[id])
             return;
-        }
-        
-        for (var i = 0; i < items.length; i++) {
+        for (let i = 0; i < items.length; i++) {
             if (items[i].id === id) {
-                var binaryPath = items[i].binaryPath;
-                if (binaryPath && binaryPath.length > 0) {
+                const binaryPath = items[i].binaryPath;
+                if (binaryPath && binaryPath.length > 0)
                     enqueue(loadImageProcess, {itemId: id, mimeType: mime, command: ["base64", "-w", "0", binaryPath]});
-                }
                 break;
             }
         }
@@ -441,134 +418,91 @@ QtObject {
     function getImageData(id) {
         return imageDataById[id] || "";
     }
-    
+
     function fetchLinkPreview(url, itemId) {
         if (!_initialized) return;
-        
         if (linkPreviewCache[url]) {
-            Qt.callLater(function() {
-                root.linkPreviewFetched(url, linkPreviewCache[url], itemId);
-            });
+            Qt.callLater(() => root.linkPreviewFetched(url, root.linkPreviewCache[url], itemId));
             return;
         }
-        
-        enqueue(linkPreviewProcess, {requestUrl: url, requestItemId: itemId, command: ["python3", linkPreviewScriptPath, url, "5"]});
+        enqueue(linkPreviewProcess, {requestUrl: url, requestItemId: itemId, command: ["python3", root.linkPreviewScriptPath, url, "5"]});
     }
-    
+
     function moveItemUp(itemId) {
-        var item = null;
-        var currentIdx = -1;
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].id === itemId) {
-                item = items[i];
-                currentIdx = i;
-                break;
-            }
-        }
-        
-        if (!item || currentIdx < 0) return;
-        
-        if (currentIdx === 0) return;
-        
-        var prevItem = items[currentIdx - 1];
+        const currentIdx = items.findIndex(entry => entry.id === itemId);
+        if (currentIdx <= 0) return;
+
+        const item = items[currentIdx];
+        const prevItem = items[currentIdx - 1];
         if (prevItem.pinned !== item.pinned) return;
-        
-        var temp = items[currentIdx];
-        items[currentIdx] = items[currentIdx - 1];
-        items[currentIdx - 1] = temp;
-        
-        listCompleted();
-        
+
+        const next = items.slice();
+        next[currentIdx] = prevItem;
+        next[currentIdx - 1] = item;
+        root.items = next;
+        root.listCompleted();
         swapItems(itemId, prevItem.id);
     }
-    
+
     function moveItemDown(itemId) {
-        var item = null;
-        var currentIdx = -1;
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].id === itemId) {
-                item = items[i];
-                currentIdx = i;
-                break;
-            }
-        }
-        
-        if (!item || currentIdx < 0) return;
-        
-        if (currentIdx >= items.length - 1) return;
-        
-        var nextItem = items[currentIdx + 1];
+        const currentIdx = items.findIndex(entry => entry.id === itemId);
+        if (currentIdx < 0 || currentIdx >= items.length - 1) return;
+
+        const item = items[currentIdx];
+        const nextItem = items[currentIdx + 1];
         if (nextItem.pinned !== item.pinned) return;
-        
-        var temp = items[currentIdx];
-        items[currentIdx] = items[currentIdx + 1];
-        items[currentIdx + 1] = temp;
-        
-        listCompleted();
-        
+
+        const next = items.slice();
+        next[currentIdx] = nextItem;
+        next[currentIdx + 1] = item;
+        root.items = next;
+        root.listCompleted();
         swapItems(itemId, nextItem.id);
     }
-    
+
     function swapItems(itemId1, itemId2) {
         if (!_initialized) return;
-        
-        var proc = Qt.createQmlObject('import Quickshell.Io; Process {}', root);
-        proc.command = backend("swap", [itemId1, itemId2]);
-
-        proc.onExited.connect(function(code) {
-             if (code === 0) {
-                 Qt.callLater(root.list);
-             } else {
-                 console.warn("ClipboardService: dynamic swapProcess failed with code:", code);
-             }
-             proc.destroy();
-        });
-        
-        proc.running = true;
+        enqueue(mutationProcess, {itemId: itemId1, command: backend("swap", [itemId1, itemId2])});
     }
-    
-    property Process emojiTypeProcess: Process {
+
+    property string _pendingEmoji: ""
+
+    Process {
+        id: emojiTypeProcess
         running: false
-        
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.length > 0) {
+                if (text.length > 0)
                     console.warn("ClipboardService: emojiTypeProcess stderr:", text);
-                }
-            }
-        }
-        
-        onExited: function(code) {
-            if (code !== 0) {
-                console.warn("ClipboardService: emojiTypeProcess failed with code:", code);
             }
         }
     }
-    
-    property Timer emojiTypeTimer: Timer {
-        interval: 250
+
+    Timer {
+        id: emojiTypeTimer
+        interval: 150
         repeat: false
         onTriggered: {
-            emojiTypeProcess.command = ["wtype", "-M", "ctrl", "-P", "v", "-p", "v", "-m", "ctrl"];
-            emojiTypeProcess.running = true;
+            if (root._pendingEmoji !== "") {
+                emojiTypeProcess.command = ["wtype", "--", root._pendingEmoji];
+                emojiTypeProcess.running = true;
+            }
         }
     }
-    
-    property Process emojiCopyProcess: Process {
-        running: false
 
+    Process {
+        id: emojiCopyProcess
+        running: false
         onExited: code => {
             if (code === 0) emojiTypeTimer.restart();
         }
     }
 
     function copyAndTypeEmoji(emojiText) {
+        root._pendingEmoji = emojiText;
         emojiCopyProcess.command = ["wl-copy", "--", emojiText];
         emojiCopyProcess.running = true;
-
     }
 
-    Component.onCompleted: {
-        Qt.callLater(() => initialize());
-    }
+    Component.onCompleted: Qt.callLater(() => root.initialize())
 }

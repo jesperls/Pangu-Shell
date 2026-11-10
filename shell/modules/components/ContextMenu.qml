@@ -16,6 +16,8 @@ PanelWindow {
     property int itemHeight: 32
     property string menuType: ""
 
+    screen: Quickshell.screens[0] ?? null
+
     anchors {
         top: true
         bottom: true
@@ -44,9 +46,11 @@ PanelWindow {
         }
     }
 
-    Item {
+    FocusScope {
         id: menuContainer
         anchors.fill: parent
+        focus: contextWindow.visible
+        Keys.onEscapePressed: contextWindow.close()
 
         OptionsMenu {
             id: menu
@@ -184,10 +188,52 @@ PanelWindow {
                 console.warn("ContextMenu: could not read cursor position:", reply);
                 return;
             }
-            menu.x = pos.x;
-            menu.y = pos.y;
+            let monX = 0;
+            let monY = 0;
+            let monW = contextWindow.width || 1920;
+            let monH = contextWindow.height || 1080;
+            const monitors = Compositor.monitors?.values ?? [];
+            let matchedMon = null;
+            for (let i = 0; i < monitors.length; i++) {
+                const m = monitors[i];
+                const scale = m.scale > 0 ? m.scale : 1;
+                const lw = m.width / scale;
+                const lh = m.height / scale;
+                if (pos.x >= m.x && pos.x < m.x + lw && pos.y >= m.y && pos.y < m.y + lh) {
+                    matchedMon = m;
+                    monX = m.x;
+                    monY = m.y;
+                    monW = lw;
+                    monH = lh;
+                    break;
+                }
+            }
+            if (!matchedMon && Compositor.focusedMonitor) {
+                matchedMon = Compositor.focusedMonitor;
+                const scale = matchedMon.scale > 0 ? matchedMon.scale : 1;
+                monX = matchedMon.x;
+                monY = matchedMon.y;
+                monW = matchedMon.width / scale;
+                monH = matchedMon.height / scale;
+            }
+            if (matchedMon) {
+                const targetScreen = Quickshell.screens.find(s => s.name === matchedMon.name);
+                if (targetScreen && contextWindow.screen !== targetScreen) {
+                    contextWindow.screen = targetScreen;
+                }
+            }
+            const estHeight = Math.max(48, (menu.items?.length ?? 1) * contextWindow.itemHeight + 16);
+            const localX = pos.x - monX;
+            const localY = pos.y - monY;
+            menu.x = Math.max(8, Math.min(localX, monW - menu.menuWidth - 8));
+            menu.y = Math.max(8, Math.min(localY, monH - estHeight - 8));
             menu.visible = false;
-            Qt.callLater(() => menu.popup());
+            contextWindow.visible = true;
+            contextWindow.WlrLayershell.keyboardFocus = WlrKeyboardFocus.Exclusive;
+            Qt.callLater(() => {
+                menuContainer.forceActiveFocus();
+                menu.popup();
+            });
         });
     }
 
@@ -195,10 +241,8 @@ PanelWindow {
         menuHandle = null;
         customItems = items;
         menuType = type || "";
-        if (width !== undefined) menuWidth = width;
-        if (height !== undefined) itemHeight = height;
-        visible = true;
-        WlrLayershell.keyboardFocus = WlrKeyboardFocus.Exclusive;
+        menuWidth = width !== undefined ? width : 160;
+        itemHeight = height !== undefined ? height : 32;
         if (menuType === "player") {
             Visibilities.playerMenuOpen = true;
         }
@@ -218,6 +262,8 @@ PanelWindow {
             menuHandle = null;
             customItems = [];
             menuType = "";
+            menuWidth = 160;
+            itemHeight = 32;
         });
     }
 
@@ -226,6 +272,7 @@ PanelWindow {
             menu.hoveredIndex = -1;
             menu.previousHoveredIndex = -1;
             menu.close();
+            WlrLayershell.keyboardFocus = WlrKeyboardFocus.None;
             if (menuType === "player") {
                 Visibilities.playerMenuOpen = false;
             }
@@ -233,6 +280,8 @@ PanelWindow {
                 menuHandle = null;
                 customItems = [];
                 menuType = "";
+                menuWidth = 160;
+                itemHeight = 32;
             });
         }
     }

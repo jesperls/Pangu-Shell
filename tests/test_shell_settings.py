@@ -15,12 +15,13 @@ with tempfile.TemporaryDirectory() as directory:
     }))
     target.chmod(0o640)
 
-    def run(ok=True):
+    def run():
         result = subprocess.run([sys.argv[1]], cwd=root, capture_output=True, text=True)
-        assert (result.returncode == 0) == ok, result.stderr
-        assert sorted(p.name for p in config.iterdir()) == ["system.json"]
+        assert result.returncode == 0, result.stderr
+        return result
 
     run()
+    assert sorted(p.name for p in config.iterdir()) == ["system.json"]
     assert json.loads(target.read_text()) == {
         "idle": {"lock": {"timeout": 42, "enabled": False}, "other": 99},
         "list": ["replacement"], "untouched": "keep",
@@ -34,10 +35,15 @@ with tempfile.TemporaryDirectory() as directory:
 
     for invalid in ['{broken', '[]', 'null', '{} {}']:
         target.write_text(invalid)
-        run(ok=False)
-        assert target.read_text() == invalid
+        result = run()
+        backup = config / "system.json.corrupt"
+        assert "invalid JSON" in result.stderr
+        assert backup.read_text() == invalid
+        assert json.loads(target.read_text())["idle"]["lock"]["timeout"] == 42
+        backup.unlink()
 
     target.unlink()
     run()
+    assert sorted(p.name for p in config.iterdir()) == ["system.json"]
     assert json.loads(target.read_text())["idle"]["lock"]["timeout"] == 42
     assert target.stat().st_mode & 0o777 == 0o600

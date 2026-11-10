@@ -39,7 +39,7 @@ Item {
             return;
         }
 
-        cascadeIndex = cascadeItems.length - 1;  // Start from last
+        cascadeIndex = cascadeItems.length - 1;
         cascadeTimer.restart();
     }
 
@@ -56,7 +56,7 @@ Item {
                 cascadeIndex--;
             } else {
                 stop();
-                cascadeItems = [];  // Clear
+                cascadeItems = [];
                 const totalDelay = Styling.animDuration + 50;
                 discardAllTimer.interval = totalDelay;
                 discardAllTimer.restart();
@@ -172,30 +172,24 @@ Item {
                     color: "transparent"
                     radius: Styling.radius(0)
 
-                    Flickable {
+                    ListView {
+                        id: notificationList
                         anchors.fill: parent
-                        contentWidth: width
-                        contentHeight: notificationList.contentHeight
+                        spacing: 4
+                        model: Notifications.appNameList
+                        interactive: true
                         clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        cacheBuffer: 200
+                        reuseItems: true
 
-                        ListView {
-                            id: notificationList
-                            width: parent.width
-                            height: contentHeight
-                            spacing: 4
-                            model: Notifications.appNameList
-                            interactive: false
-                            cacheBuffer: 200
-                            reuseItems: true
-
-                            delegate: NotificationGroup {
-                                required property int index
-                                required property string modelData
-                                width: notificationList.width
-                                notificationGroup: Notifications.groupsByAppName[modelData]
-                                expanded: false
-                                popup: false
-                            }
+                        delegate: NotificationGroup {
+                            required property int index
+                            required property string modelData
+                            width: notificationList.width
+                            notificationGroup: Notifications.groupsByAppName[modelData]
+                            expanded: false
+                            popup: false
                         }
                     }
                 }

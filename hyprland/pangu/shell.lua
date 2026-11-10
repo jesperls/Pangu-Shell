@@ -1,10 +1,10 @@
-local state = require("pangu.generated")
+local ok_state, state = pcall(require, "pangu.generated")
 
-if not state.shell then
+if ok_state and state and state.shell == false then
   return true
 end
 
-local data = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")
+local data = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 
 local chunk = loadfile(data .. "/pangu/hyprland.lua")
 if chunk then

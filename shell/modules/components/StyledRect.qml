@@ -16,7 +16,7 @@ ClippingRectangle {
     property bool enableShadow: false
     property bool enableBorder: true
     property bool animateRadius: true
-    property real backgroundOpacity: -1  // -1 means use config value
+    property real backgroundOpacity: -1
 
     readonly property var variantConfig: Styling.getStyledRectConfig(variant) || {}
 
@@ -104,7 +104,7 @@ ClippingRectangle {
 
     Loader {
         anchors.fill: parent
-        active: root.gradientType === "linear" && root.needsGradientShader
+        active: root.gradientType === "linear" && root.needsGradientShader && root.rectOpacity > 0
 
         sourceComponent: ShaderEffect {
             opacity: root.rectOpacity
@@ -133,7 +133,7 @@ ClippingRectangle {
 
     Loader {
         anchors.fill: parent
-        active: root.gradientType === "radial" && root.needsGradientShader
+        active: root.gradientType === "radial" && root.needsGradientShader && root.rectOpacity > 0
 
         sourceComponent: ShaderEffect {
             opacity: root.rectOpacity
@@ -163,7 +163,7 @@ ClippingRectangle {
 
     Loader {
         anchors.fill: parent
-        active: root.gradientType === "halftone"
+        active: root.gradientType === "halftone" && root.rectOpacity > 0
 
         sourceComponent: ShaderEffect {
             opacity: root.rectOpacity
@@ -189,7 +189,7 @@ ClippingRectangle {
         }
     }
 
-    layer.enabled: enableShadow
+    layer.enabled: enableShadow && (Config.theme?.shadowOpacity ?? 0) > 0
     layer.effect: Shadow {}
 
     ClippingRectangle {
@@ -200,8 +200,8 @@ ClippingRectangle {
         bottomLeftRadius: root.bottomLeftRadius
         bottomRightRadius: root.bottomRightRadius
         color: "transparent"
-        border.color: Colors.resolve(borderData[0])
-        border.width: borderData[1]
-        visible: root.enableBorder
+        border.color: Colors.resolve(borderData && borderData.length > 0 ? borderData[0] : "transparent")
+        border.width: borderData && borderData.length > 1 ? borderData[1] : 0
+        visible: root.enableBorder && border.width > 0
     }
 }

@@ -80,7 +80,6 @@ Rectangle {
                         return;
                     }
                     root.linuxLogos = JSON.parse(text);
-                    console.log("Loaded", Object.keys(root.linuxLogos).length, "Linux logos");
                 } catch (e) {
                     console.warn("Failed to parse linux-logos.json:", e);
                     console.warn("Text received:", text.substring(0, 100));
@@ -212,6 +211,7 @@ Rectangle {
                                 radius: avatarContainer.radius
 
                                 Behavior on opacity {
+                                    enabled: Styling.animDuration > 0
                                     NumberAnimation {
                                         duration: 150
                                     }
@@ -785,10 +785,10 @@ Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: parent.height
                             vertical: false
-                            value: (root.chartZoom - 0.2) / 2.8  // Map 0.2-3.0 to 0-1
+                            value: (root.chartZoom - 0.2) / 2.8
                             progressColor: Styling.srItem("overprimary")
                             backgroundColor: Colors.surface
-                            tooltipText: root.chartZoom ? `${root.chartZoom.toFixed(1)}×` : "1.0×"
+                            tooltipText: `${(0.2 + effectiveValue * 2.8).toFixed(1)}×`
                             thickness: 3
                             handleSpacing: 2
                             wavy: false
@@ -796,8 +796,8 @@ Rectangle {
                             iconPos: "start"
                             stepSize: 0.1
                             snapMode: "always"
-                            onValueChanged: {
-                                const newZoom = 0.2 + (value * 2.8);  // Map 0-1 to 0.2-3.0
+                            onMoved: newValue => {
+                                const newZoom = 0.2 + (newValue * 2.8);
                                 root.chartZoom = newZoom;
                                 StateService.set("metricsChartZoom", newZoom);
                             }
@@ -851,14 +851,6 @@ Rectangle {
                                     StateService.set("metricsRefreshInterval", newInterval);
                                 }
                             }
-
-                            Behavior on color {
-                                enabled: Styling.animDuration > 0
-                                ColorAnimation {
-                                    duration: Styling.animDuration
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
                         }
 
                         Text {
@@ -893,14 +885,6 @@ Rectangle {
                                     const newInterval = SystemResources.updateInterval + 100;
                                     SystemResources.updateInterval = newInterval;
                                     StateService.set("metricsRefreshInterval", newInterval);
-                                }
-                            }
-
-                            Behavior on color {
-                                enabled: Styling.animDuration > 0
-                                ColorAnimation {
-                                    duration: Styling.animDuration
-                                    easing.type: Easing.OutCubic
                                 }
                             }
                         }

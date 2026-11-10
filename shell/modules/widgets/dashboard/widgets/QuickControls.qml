@@ -14,7 +14,7 @@ StyledRect {
     implicitHeight: columnLayout.implicitHeight + 8
     radius: Styling.radius(4)
     
-    property int expandedPanel: -1  // -1: none, 0: wifi, 1: bluetooth
+    property int expandedPanel: -1
     
     onVisibleChanged: {
         if (!visible) {
@@ -57,9 +57,9 @@ StyledRect {
                     iconName: {
                         if (!NetworkService.wifiEnabled)
                             return Icons.wifiOff;
+                        if (!NetworkService.active)
+                            return Icons.wifiNone;
                         const strength = NetworkService.networkStrength;
-                        if (strength === 0)
-                            return Icons.wifiHigh;
                         if (strength < 25)
                             return Icons.wifiNone;
                         if (strength < 50)
@@ -69,7 +69,7 @@ StyledRect {
                         return Icons.wifiHigh;
                     }
                     isActive: NetworkService.wifiEnabled || root.expandedPanel === 0
-                    tooltipText: NetworkService.wifiEnabled ? "Wi-Fi: On" : "Wi-Fi: Off"
+                    tooltipText: NetworkService.wifiEnabled ? (NetworkService.active ? ("Wi-Fi: " + NetworkService.active.ssid) : "Wi-Fi: Disconnected") : "Wi-Fi: Off"
                     onClicked: NetworkService.toggleWifi()
                     onRightClicked: root.togglePanel(0)
                     onLongPressed: root.togglePanel(0)
@@ -154,7 +154,7 @@ StyledRect {
                 Item {
                     id: panelStack
                     anchors.fill: parent
-                    anchors.margins: 8  // Extra margin for content
+                    anchors.margins: 8
                     
                     Loader {
                         id: wifiLoader

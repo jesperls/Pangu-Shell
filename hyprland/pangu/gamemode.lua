@@ -1,6 +1,5 @@
-local data = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")
+local data = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 local path = data .. "/pangu/gamemode.lua"
-local interval = 200
 
 local active = {}
 local listeners = {}
@@ -16,7 +15,7 @@ function M.on_change(callback)
   listeners[#listeners + 1] = callback
 end
 
-local function enable(id) -- Recreate rules because set_enabled does not re-evaluate windows.
+local function enable(id) -- recreate rules because set_enabled does not re-evaluate windows
   active[id] = {
     hl.workspace_rule({
       workspace = "r[" .. id .. "-" .. id .. "]s[0]",
@@ -58,13 +57,16 @@ local function apply(desired)
   end
 
   if changed then
+    if hl.exec_scheduled_prop_refresh_immediately then
+      hl.exec_scheduled_prop_refresh_immediately()
+    end
     for _, callback in ipairs(listeners) do
       callback()
     end
   end
 end
 
-local function poll()
+function M.reload()
   local file = io.open(path, "r")
   if not file then
     if last_text ~= nil then
@@ -101,8 +103,10 @@ local function poll()
   apply(desired)
 end
 
-poll()
+M.reload()
 
-hl.timer(poll, { timeout = interval, type = "repeat" })
+if hl.on then
+  hl.on("config.reloaded", M.reload)
+end
 
 return M

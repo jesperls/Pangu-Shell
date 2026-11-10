@@ -75,8 +75,6 @@ Rectangle {
             Layout.fillHeight: true
             spacing: 8
 
-            property bool circularControlDragging: false
-
             ColumnLayout {
                 id: brightnessContainer
                 Layout.fillHeight: true
@@ -105,10 +103,6 @@ Rectangle {
                         }
                         anchors.fill: parent
 
-                        Behavior on variant {
-                            enabled: Styling.animDuration > 0
-                        }
-
                         Text {
                             id: brightnessIcon
                             anchors.centerIn: parent
@@ -120,14 +114,10 @@ Rectangle {
                             scale: iconContainer.showingSyncFeedback ? 1 : brightnessIconScale
                             opacity: iconOpacity
 
-                            property real brightnessIconRotation: 0
-                            property real brightnessIconScale: 1
+                            readonly property real brightnessIconRotation: brightnessSlider.effectiveValue * 180
+                            readonly property real brightnessIconScale: 0.8 + brightnessSlider.effectiveValue * 0.2
                             property real iconOpacity: 1
                             property real syncIconRotation: 0
-
-                            Behavior on text {
-                                enabled: Styling.animDuration > 0
-                            }
 
                             Behavior on color {
                                 enabled: Styling.animDuration > 0
@@ -168,7 +158,6 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                let wasActive = Brightness.syncBrightness;
                                 Brightness.syncBrightness = !Brightness.syncBrightness;
 
                                 if (Brightness.syncBrightness) {
@@ -181,11 +170,8 @@ Rectangle {
                                 }
                             }
                             onWheel: wheel => {
-                                if (wheel.angleDelta.y > 0) {
-                                    brightnessSlider.value = Math.min(1, brightnessSlider.value + 0.1);
-                                } else {
-                                    brightnessSlider.value = Math.max(0, brightnessSlider.value - 0.1);
-                                }
+                                const delta = wheel.angleDelta.y > 0 ? 0.1 : -0.1;
+                                brightnessSlider.applyBrightness(brightnessSlider.effectiveValue + delta);
                             }
                         }
 
@@ -204,7 +190,7 @@ Rectangle {
                             onTriggered: {
                                 iconContainer.showingSyncFeedback = false;
                                 brightnessIcon.iconOpacity = 1;
-                                brightnessIcon.syncIconRotation = 0;  // Reset rotation
+                                brightnessIcon.syncIconRotation = 0;
                             }
                         }
                     }
@@ -221,7 +207,7 @@ Rectangle {
                         anchors.margins: 0
                         vertical: true
                         smoothDrag: true
-                        value: brightnessValue
+                        value: (currentMonitor && currentMonitor.ready) ? currentMonitor.brightness : 0
                         resizeParent: false
                         wavy: false
                         scroll: true
@@ -231,7 +217,6 @@ Rectangle {
                         icon: ""
                         progressColor: Styling.srItem("overprimary")
 
-                        property real brightnessValue: 0
                         property var currentMonitor: {
                             if (Brightness.monitors.length > 0) {
                                 let focusedName = Compositor.focusedMonitor?.name ?? "";
@@ -248,55 +233,21 @@ Rectangle {
                             return null;
                         }
 
-                        Component.onCompleted: {
-                            if (currentMonitor && currentMonitor.ready) {
-                                brightnessValue = currentMonitor.brightness;
-                                brightnessIcon.brightnessIconRotation = (brightnessValue / 1.0) * 180;
-                                brightnessIcon.brightnessIconScale = 0.8 + (brightnessValue / 1.0) * 0.2;
-                            }
-                        }
-
-                        onValueChanged: {
-                            brightnessValue = value;
-                            brightnessIcon.brightnessIconRotation = (value / 1.0) * 180;
-                            brightnessIcon.brightnessIconScale = 0.8 + (value / 1.0) * 0.2;
-
+                        function applyBrightness(targetValue) {
+                            const clamped = Math.max(0, Math.min(1, targetValue));
                             if (Brightness.syncBrightness) {
                                 for (let i = 0; i < Brightness.monitors.length; i++) {
                                     let mon = Brightness.monitors[i];
                                     if (mon && mon.ready) {
-                                        mon.setBrightness(value);
+                                        mon.setBrightness(clamped);
                                     }
                                 }
-                            } else {
-                                if (currentMonitor && currentMonitor.ready) {
-                                    currentMonitor.setBrightness(value);
-                                }
+                            } else if (currentMonitor && currentMonitor.ready) {
+                                currentMonitor.setBrightness(clamped);
                             }
                         }
 
-                        onIsDraggingChanged: {
-                            brightnessContainer.parent.circularControlDragging = isDragging;
-                        }
-
-                        Connections {
-                            target: brightnessSlider.currentMonitor
-                            ignoreUnknownSignals: true
-                            function onBrightnessChanged() {
-                                if (brightnessSlider.currentMonitor && brightnessSlider.currentMonitor.ready && !brightnessSlider.isDragging) {
-                                    brightnessSlider.brightnessValue = brightnessSlider.currentMonitor.brightness;
-                                    brightnessIcon.brightnessIconRotation = (brightnessSlider.brightnessValue / 1.0) * 180;
-                                    brightnessIcon.brightnessIconScale = 0.8 + (brightnessSlider.brightnessValue / 1.0) * 0.2;
-                                }
-                            }
-                            function onReadyChanged() {
-                                if (brightnessSlider.currentMonitor && brightnessSlider.currentMonitor.ready) {
-                                    brightnessSlider.brightnessValue = brightnessSlider.currentMonitor.brightness;
-                                    brightnessIcon.brightnessIconRotation = (brightnessSlider.brightnessValue / 1.0) * 180;
-                                    brightnessIcon.brightnessIconScale = 0.8 + (brightnessSlider.brightnessValue / 1.0) * 0.2;
-                                }
-                            }
-                        }
+                        onMoved: newValue => applyBrightness(newValue)
                     }
                 }
             }
@@ -329,10 +280,6 @@ Rectangle {
                     }
                 }
 
-                onDraggingChanged: isDragging => {
-                    parent.circularControlDragging = isDragging;
-                }
-
                 onToggled: {
                     if (Audio.sink?.audio) {
                         Audio.sink.audio.muted = !Audio.sink.audio.muted;
@@ -355,10 +302,6 @@ Rectangle {
                     if (Audio.source?.audio) {
                         Audio.source.audio.volume = newValue;
                     }
-                }
-
-                onDraggingChanged: isDragging => {
-                    parent.circularControlDragging = isDragging;
                 }
 
                 onToggled: {

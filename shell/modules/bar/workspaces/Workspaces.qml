@@ -18,14 +18,16 @@ Item {
     readonly property var monitor: Compositor.monitorFor(bar.screen)
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
 
-    readonly property int workspaceGroup: Math.floor(((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) - 1 || 0) / Config.workspaces.shown)
+    readonly property int shownCount: Math.max(1, Config.workspaces.shown || 1)
+    readonly property int workspaceGroup: Math.floor(Math.max(0, ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1) - 1) / shownCount)
     property var workspaceOccupied: []
     property var dynamicWorkspaceIds: []
-    property int effectiveWorkspaceCount: Config.workspaces.dynamic ? dynamicWorkspaceIds.length : Config.workspaces.shown
+    property int effectiveWorkspaceCount: Config.workspaces.dynamic ? Math.max(1, dynamicWorkspaceIds.length) : shownCount
     property int widgetPadding: 4
     property real radius: Styling.radius(0)
     property real startRadius: radius
     property real endRadius: radius
+    property bool flatStyle: Config.bar?.flatButtons ?? false
     
     property int baseSize: 36
     property int workspaceButtonSize: baseSize - widgetPadding * 2
@@ -34,20 +36,28 @@ Item {
     property real workspaceIconSizeShrinked: Math.round(workspaceButtonWidth * 0.5)
     property real workspaceIconOpacityShrinked: 1
     property real workspaceIconMarginShrinked: -4
-    property int workspaceIndexInGroup: Config.workspaces.dynamic ? dynamicWorkspaceIds.indexOf((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1) : ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) - 1 || 0) % Config.workspaces.shown
+    property int workspaceIndexInGroup: {
+        const activeId = (monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1;
+        if (Config.workspaces.dynamic) {
+            return Math.max(0, dynamicWorkspaceIds.indexOf(activeId));
+        }
+        return Math.max(0, (activeId - 1) % shownCount);
+    }
     property var occupiedRanges: []
 
     function updateWorkspaceOccupied() {
         if (Config.workspaces.dynamic) {
-            const occupiedIds = Compositor.workspaces.values.filter(ws => Compositor.workspaceOccupationMap[ws.id]).map(ws => ws.id).sort((a, b) => a - b).slice(0, Config.workspaces.shown);
-
             const activeId = (monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1;
+            const allOccupied = Compositor.workspaces.values
+                .filter(ws => ws.id > 0 && Compositor.workspaceOccupationMap[ws.id])
+                .map(ws => ws.id)
+                .sort((a, b) => a - b);
+
+            let occupiedIds = allOccupied.slice(0, shownCount);
             if (!occupiedIds.includes(activeId)) {
+                occupiedIds = allOccupied.slice(0, Math.max(0, shownCount - 1));
                 occupiedIds.push(activeId);
                 occupiedIds.sort((a, b) => a - b);
-                if (occupiedIds.length > Config.workspaces.shown) {
-                    occupiedIds.pop();
-                }
             }
 
             dynamicWorkspaceIds = occupiedIds;
@@ -56,9 +66,9 @@ Item {
             }, (_, i) => Compositor.workspaceOccupationMap[dynamicWorkspaceIds[i]]);
         } else {
             workspaceOccupied = Array.from({
-                length: Config.workspaces.shown
+                length: shownCount
             }, (_, i) => {
-                const wsId = workspaceGroup * Config.workspaces.shown + i + 1;
+                const wsId = workspaceGroup * shownCount + i + 1;
                 return Compositor.workspaceOccupationMap[wsId];
             });
         }
@@ -107,7 +117,7 @@ Item {
         if (Config.workspaces.dynamic) {
             return dynamicWorkspaceIds[index] || 1;
         }
-        return workspaceGroup * Config.workspaces.shown + index + 1;
+        return workspaceGroup * shownCount + index + 1;
     }
 
     Timer {
@@ -151,9 +161,9 @@ Item {
 
     StyledRect {
         id: bgRect
-        variant: "bg"
+        variant: workspacesWidget.flatStyle ? "transparent" : "bg"
         anchors.fill: parent
-        enableShadow: Config.showBackground && (!effectiveContainBar || Config.bar.keepBarShadow)
+        enableShadow: !workspacesWidget.flatStyle && Config.showBackground && (!effectiveContainBar || Config.bar.keepBarShadow)
         
         topLeftRadius: workspacesWidget.startRadius
         topRightRadius: orientation === "vertical" ? workspacesWidget.startRadius : workspacesWidget.endRadius
@@ -161,12 +171,20 @@ Item {
         bottomRightRadius: workspacesWidget.endRadius
     }
 
+    function switchOnMonitor(cmd) {
+        const monName = bar?.screen?.name ?? "";
+        if (monName && Compositor.focusedMonitor?.name !== monName) {
+            Compositor.dispatch(`focusmonitor ${monName}`);
+        }
+        Compositor.dispatch(cmd);
+    }
+
     WheelHandler {
         onWheel: event => {
             if (event.angleDelta.y < 0)
-                Compositor.dispatch(`workspace r+1`);
+                workspacesWidget.switchOnMonitor(`workspace r+1`);
             else if (event.angleDelta.y > 0)
-                Compositor.dispatch(`workspace r-1`);
+                workspacesWidget.switchOnMonitor(`workspace r-1`);
         }
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }
@@ -408,7 +426,7 @@ Item {
                 id: button
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillHeight: true
-                onPressed: Compositor.dispatch(`workspace ${workspaceValue}`)
+                onPressed: workspacesWidget.switchOnMonitor(`workspace ${workspaceValue}`)
                 width: workspaceButtonWidth
 
                 background: Item {
@@ -544,7 +562,7 @@ Item {
                 id: buttonVert
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillWidth: true
-                onPressed: Compositor.dispatch(`workspace ${workspaceValue}`)
+                onPressed: workspacesWidget.switchOnMonitor(`workspace ${workspaceValue}`)
                 height: workspaceButtonWidth
 
                 background: Item {

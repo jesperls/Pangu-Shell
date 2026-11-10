@@ -21,12 +21,16 @@ pkgs.writeShellApplication {
       mkdir -p -- "$(dirname -- "$file")"
       if [[ -e "$file" ]]; then source="$file"; fi
       temporary=$(mktemp -- "$file.XXXXXXXX")
-      jq -s --argjson overrides "$overrides" '
+      if ! jq -s --argjson overrides "$overrides" '
         if length == 0 then {}
         elif length == 1 and (.[0] | type) == "object" then .[0]
         else error("settings must contain one JSON object") end
         | . * $overrides
-      ' "$source" > "$temporary"
+      ' "$source" > "$temporary" 2>/dev/null; then
+        echo "pangu-apply-settings: backing up invalid JSON $file to $file.corrupt" >&2
+        cp -p -- "$file" "$file.corrupt"
+        jq -n --argjson overrides "$overrides" '{} * $overrides' > "$temporary"
+      fi
       if [[ -e "$file" ]]; then
         if cmp -s -- "$file" "$temporary"; then
           rm -- "$temporary"

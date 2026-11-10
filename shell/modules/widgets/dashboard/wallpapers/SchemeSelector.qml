@@ -261,11 +261,11 @@ Item {
                 Switch {
                     Layout.preferredWidth: 72
                     Layout.preferredHeight: 40
-                    checked: Config.theme.lightMode
+                    checkable: false
                     focusPolicy: Qt.NoFocus
 
-                    onCheckedChanged: {
-                        Config.theme.lightMode = checked;
+                    onClicked: {
+                        Config.theme.lightMode = !Config.theme.lightMode;
                     }
 
                     indicator: Rectangle {
@@ -394,8 +394,18 @@ Item {
                             width: schemeListView.width
                             height: 40
                             text: modelData.label
+                            hoverEnabled: !schemeListView.isScrolling
+
+                            onHoveredChanged: {
+                                if (hovered && !schemeListView.isScrolling) {
+                                    selectedSchemeIndex = index;
+                                    schemeListView.currentIndex = index;
+                                }
+                            }
 
                             onClicked: {
+                                if (schemeListView.isScrolling)
+                                    return;
                                 if (GlobalStates.wallpaperManager) {
                                     if (modelData.type === "preset") {
                                         GlobalStates.wallpaperManager.setColorPreset(modelData.id);
@@ -427,29 +437,6 @@ Item {
                                     }
                                 }
                             }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: !schemeListView.isScrolling
-                                onEntered: {
-                                    if (schemeListView.isScrolling)
-                                        return;
-                                    selectedSchemeIndex = index;
-                                    schemeListView.currentIndex = index;
-                                }
-                                onClicked: {
-                                    if (schemeListView.isScrolling)
-                                        return;
-                                    if (GlobalStates.wallpaperManager) {
-                                        if (modelData.type === "preset") {
-                                            GlobalStates.wallpaperManager.setColorPreset(modelData.id);
-                                        } else {
-                                            GlobalStates.wallpaperManager.setMatugenScheme(modelData.id);
-                                        }
-                                        schemeListExpanded = false;
-                                    }
-                                }
-                            }
                         }
 
                         highlight: StyledRect {
@@ -461,7 +448,7 @@ Item {
 
                         highlightMoveDuration: Styling.animDuration > 0 ? Styling.animDuration / 2 : 0
                         highlightMoveVelocity: -1
-                        highlightResizeDuration: Styling.animDuration / 2
+                        highlightResizeDuration: Styling.animDuration > 0 ? Styling.animDuration / 2 : 0
                         highlightResizeVelocity: -1
                     }
                 }

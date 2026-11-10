@@ -32,7 +32,7 @@ PanelWindow {
 
         const wins = Compositor.windowList;
         for (let i = 0; i < wins.length; i++) {
-            if (wins[i].monitor === monId && wins[i].fullscreen && wins[i].workspace.id === activeWorkspaceId) {
+            if (wins[i].monitor === monId && wins[i].fullscreen && wins[i].workspace?.id === activeWorkspaceId) {
                 activeWindowFullscreen = true;
                 return;
             }
@@ -57,7 +57,7 @@ PanelWindow {
 
     Component.onCompleted: updateFullscreen()
 
-    visible: Config.theme.enableCorners && Config.roundness > 0 && !activeWindowFullscreen
+    visible: Config.theme.enableCorners && Config.roundness > 0 && !(Config.bar?.frameEnabled ?? false) && !activeWindowFullscreen
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore

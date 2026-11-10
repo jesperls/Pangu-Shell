@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import qs.modules.theme
 import QtQuick.Effects
 import qs.modules.components
+import qs.modules.globals
 import qs.modules.services
 import qs.config
 
@@ -18,17 +19,60 @@ Rectangle {
     property string currentSection: "network"
     property int selectedIndex: 0
     property string searchQuery: ""
+    property bool _navigating: false
+
+    Keys.onEscapePressed: event => {
+        GlobalStates.settingsWindowVisible = false;
+        event.accepted = true;
+    }
 
     onFilteredSectionsChanged: {
+        if (_navigating)
+            return;
         if (searchQuery.trim().length > 0 || selectedIndex >= filteredSections.length)
             selectedIndex = 0;
         Qt.callLater(root.activateSelection);
     }
 
-    onSelectedIndexChanged: Qt.callLater(root.activateSelection)
+    onSelectedIndexChanged: {
+        if (!_navigating)
+            Qt.callLater(root.activateSelection);
+    }
 
     function focusSearchInput() {
         searchInput.focusInput();
+    }
+
+    function navigateToSection(section, subSection) {
+        if (!section)
+            return;
+        const idx = sectionModel.findIndex(s => s.section === section);
+        if (idx < 0)
+            return;
+        _navigating = true;
+        searchInput.clear();
+        searchQuery = "";
+        selectedIndex = idx;
+        pendingSubSection = subSection || "";
+        currentSection = section;
+        _navigating = false;
+        if (panelLoader.status === Loader.Ready && panelLoader.loadedSection === currentSection)
+            applySubSection();
+        scrollSidebarToSelection();
+        GlobalStates.pendingSettingsSection = "";
+        GlobalStates.pendingSettingsSubSection = "";
+    }
+
+    Component.onCompleted: {
+        if (GlobalStates.pendingSettingsSection)
+            navigateToSection(GlobalStates.pendingSettingsSection, GlobalStates.pendingSettingsSubSection);
+    }
+
+    Connections {
+        target: GlobalStates
+        function onSettingsSectionRequested(section, subSection) {
+            root.navigateToSection(section, subSection);
+        }
     }
 
     SettingsIndex {
@@ -191,8 +235,7 @@ Rectangle {
                     root.searchQuery = text;
                 }
                 onEscapePressed: {
-                    searchInput.focus = false;
-                    root.forceActiveFocus();
+                    GlobalStates.settingsWindowVisible = false;
                 }
 
                 onAccepted: root.activateSelection()
@@ -432,7 +475,7 @@ Rectangle {
                 {
                     component: "ShellPanel.qml",
                     section: "shell",
-                    configPrefixes: ["bar", "dashboard", "dock", "launcher", "lockscreen", "notch", "osd", "overview", "workspaces", "system.ocr"]
+                    configPrefixes: ["bar", "dashboard", "dock", "launcher", "lockscreen", "macros", "notch", "osd", "overview", "workspaces", "system.ocr"]
                 }
             ]
 

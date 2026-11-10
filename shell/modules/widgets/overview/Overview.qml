@@ -93,7 +93,7 @@ Item {
         }
 
         if (queryIndex !== query.length)
-            return -1;  // No match
+            return -1;
 
         return score + maxConsecutive * 5;
     }
@@ -129,7 +129,7 @@ Item {
         if (!win)
             return;
 
-        Visibilities.setActiveModule("", true);
+        Visibilities.setActiveModule("");
         Qt.callLater(() => {
             Compositor.dispatch(`focuswindow address:${win.address}`);
         });
@@ -330,7 +330,7 @@ Item {
                         overviewRoot.draggingFromWorkspace = -1;
                     }
                     onWindowClicked: {
-                        Visibilities.setActiveModule("", true);
+                        Visibilities.setActiveModule("");
                         Qt.callLater(() => {
                             Compositor.dispatch(`focuswindow address:${windowData.address}`);
                         });

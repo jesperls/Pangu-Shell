@@ -129,6 +129,8 @@ ShellRoot {
             qt = (root / "output/qt5ct/colors/pangu.colors").read_text()
             self.assertTrue(qt)
             self.assertEqual(qt, (root / "output/qt6ct/colors/pangu.colors").read_text())
+            self.assertIn("BackgroundNormal=#123456", qt)
+            self.assertNotIn("#80123456", qt)
             self.assertEqual(qt.count("[Colors:"), 8)
             for section in ("Button", "Complementary", "Header", "Selection", "Tooltip", "View", "Window"):
                 self.assertIn(f"[Colors:{section}]", qt)

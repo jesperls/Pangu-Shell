@@ -5,6 +5,7 @@ import Quickshell
 import qs.modules.services
 import qs.modules.components
 import qs.modules.theme
+import qs.modules.globals
 import qs.config
 
 Item {
@@ -67,7 +68,7 @@ Item {
             text: Icons.faders
             font.family: Icons.font
             font.pixelSize: 18
-            color: root.popupOpen ? buttonBg.item : Styling.srItem("overprimary")
+            color: root.popupOpen ? buttonBg.item : Colors.overBackground
         }
 
         MouseArea {
@@ -77,7 +78,8 @@ Item {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onClicked: mouse => {
                 if (mouse.button === Qt.RightButton) {
-                    ApplicationLauncher.launchCommand(["pavucontrol"]);
+                    controlsPopup.close();
+                    GlobalStates.openSettingsSection("mixer", "");
                     return;
                 } else if (mouse.button === Qt.LeftButton) {
                     controlsPopup.toggle();
@@ -93,7 +95,7 @@ Item {
         popupPadding: 16
 
         contentWidth: 220
-        contentHeight: 132 + popupPadding * 2
+        contentHeight: slidersColumn.implicitHeight + popupPadding * 2
 
         ColumnLayout {
             id: slidersColumn
@@ -106,43 +108,20 @@ Item {
                 Layout.preferredHeight: 36
                 Layout.rightMargin: 8
 
-                icon: {
-                    if (Audio.sink?.audio?.muted)
-                        return Icons.speakerSlash;
-                    const vol = Audio.sink?.audio?.volume ?? 0;
-                    if (vol < 0.01)
-                        return Icons.speakerX;
-                    if (vol < 0.19)
-                        return Icons.speakerNone;
-                    if (vol < 0.49)
-                        return Icons.speakerLow;
-                    return Icons.speakerHigh;
-                }
-                sliderValue: Audio.sink?.audio?.volume ?? 0
+                icon: Audio.volumeIcon(Audio.value, Audio.sink?.audio?.muted ?? false)
+                sliderValue: Audio.value / Audio.hardMaxValue
                 progressColor: Audio.sink?.audio?.muted ? Colors.outline : Styling.srItem("overprimary")
                 wavy: true
-                wavyAmplitude: Audio.sink?.audio?.muted ? 0.5 : 1.5 * sliderValue
-                wavyFrequency: Audio.sink?.audio?.muted ? 1.0 : 8.0 * sliderValue
+                wavyAmplitude: Audio.sink?.audio?.muted ? 0.5 : 1.5 * effectiveValue
+                wavyFrequency: Audio.sink?.audio?.muted ? 1.0 : 8.0 * effectiveValue
 
                 onValueChanged: newValue => {
-                    if (Audio.sink?.audio) {
-                        Audio.sink.audio.volume = newValue;
-                    }
+                    Audio.setVolume(newValue * Audio.hardMaxValue);
                 }
 
                 onIconClicked: {
                     if (Audio.sink?.audio) {
                         Audio.sink.audio.muted = !Audio.sink.audio.muted;
-                    }
-                }
-
-                Connections {
-                    target: Audio.sink?.audio ?? null
-                    ignoreUnknownSignals: true
-                    function onVolumeChanged() {
-                        if (Audio.sink?.audio) {
-                            volumeRow.sliderValue = Audio.sink.audio.volume;
-                        }
                     }
                 }
             }
@@ -154,31 +133,19 @@ Item {
                 Layout.rightMargin: 8
 
                 icon: Audio.source?.audio?.muted ? Icons.micSlash : Icons.mic
-                sliderValue: Audio.source?.audio?.volume ?? 0
+                sliderValue: Math.min(1, (Number.isFinite(Audio.source?.audio?.volume) ? Audio.source.audio.volume : 0) / Audio.hardMaxValue)
                 progressColor: Audio.source?.audio?.muted ? Colors.outline : Styling.srItem("overprimary")
                 wavy: true
-                wavyAmplitude: Audio.source?.audio?.muted ? 0.5 : 1.5 * sliderValue
-                wavyFrequency: Audio.source?.audio?.muted ? 1.0 : 8.0 * sliderValue
+                wavyAmplitude: Audio.source?.audio?.muted ? 0.5 : 1.5 * effectiveValue
+                wavyFrequency: Audio.source?.audio?.muted ? 1.0 : 8.0 * effectiveValue
 
                 onValueChanged: newValue => {
-                    if (Audio.source?.audio) {
-                        Audio.source.audio.volume = newValue;
-                    }
+                    Audio.setMicVolume(newValue * Audio.hardMaxValue);
                 }
 
                 onIconClicked: {
                     if (Audio.source?.audio) {
                         Audio.source.audio.muted = !Audio.source.audio.muted;
-                    }
-                }
-
-                Connections {
-                    target: Audio.source?.audio ?? null
-                    ignoreUnknownSignals: true
-                    function onVolumeChanged() {
-                        if (Audio.source?.audio) {
-                            micRow.sliderValue = Audio.source.audio.volume;
-                        }
                     }
                 }
             }
@@ -190,15 +157,16 @@ Item {
                 Layout.rightMargin: 8
 
                 property var currentMonitor: Brightness.getMonitorForScreen(root.bar.screen)
+                visible: currentMonitor?.ready ?? false
 
                 icon: Icons.sun
                 sliderValue: currentMonitor?.brightness ?? 0.5
                 progressColor: Styling.srItem("overprimary")
                 wavy: true
-                wavyAmplitude: 1.5 * sliderValue
-                wavyFrequency: 8.0 * sliderValue
-                iconRotation: (sliderValue / 1.0) * 180
-                iconScale: 0.8 + (sliderValue / 1.0) * 0.2
+                wavyAmplitude: 1.5 * effectiveValue
+                wavyFrequency: 8.0 * effectiveValue
+                iconRotation: effectiveValue * 180
+                iconScale: 0.8 + effectiveValue * 0.2
 
                 onValueChanged: newValue => {
                     if (Brightness.syncBrightness) {
@@ -214,31 +182,7 @@ Item {
                 }
 
                 onIconClicked: {}
-
-                Connections {
-                    target: brightnessRow.currentMonitor ?? null
-                    ignoreUnknownSignals: true
-                    function onBrightnessChanged() {
-                        if (brightnessRow.currentMonitor) {
-                            brightnessRow.sliderValue = brightnessRow.currentMonitor.brightness;
-                        }
-                    }
-                    function onReadyChanged() {
-                        if (brightnessRow.currentMonitor?.ready) {
-                            brightnessRow.sliderValue = brightnessRow.currentMonitor.brightness;
-                        }
-                    }
-                }
             }
         }
-    }
-
-    Component.onCompleted: {
-        if (Audio.sink?.audio)
-            volumeRow.sliderValue = Audio.sink.audio.volume;
-        if (Audio.source?.audio)
-            micRow.sliderValue = Audio.source.audio.volume;
-        if (brightnessRow.currentMonitor?.ready)
-            brightnessRow.sliderValue = brightnessRow.currentMonitor.brightness;
     }
 }

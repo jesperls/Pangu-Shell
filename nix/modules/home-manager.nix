@@ -23,7 +23,25 @@ let
     configDir = "${config.xdg.configHome}/pangu/config";
     dataDir = "${config.xdg.dataHome}/pangu";
   };
-  state = lib.recursiveUpdate (import ../../hyprland/defaults.nix) cfg.hyprland.preset.settings;
+  defaults = import ../../hyprland/defaults.nix;
+  unknownPresetPaths =
+    prefix: schema: user:
+    lib.concatLists (
+      lib.mapAttrsToList (
+        name: value:
+        let
+          path = prefix ++ [ name ];
+        in
+        if !(builtins.hasAttr name schema) then
+          [ (lib.concatStringsSep "." path) ]
+        else if builtins.isAttrs schema.${name} && schema.${name} != { } && builtins.isAttrs value then
+          unknownPresetPaths path schema.${name} value
+        else
+          [ ]
+      ) user
+    );
+  unknownPresetKeys = unknownPresetPaths [ ] defaults cfg.hyprland.preset.settings;
+  state = lib.recursiveUpdate defaults cfg.hyprland.preset.settings;
   paletteImport = ''
     @import url("file://${config.xdg.cacheHome}/pangu/gtk.css");
   '';
@@ -121,6 +139,10 @@ in
             message = "programs.pangu.settings contains unknown files; valid files: ${lib.concatStringsSep ", " cfg.package.configFiles}";
           }
           {
+            assertion = unknownPresetKeys == [ ];
+            message = "programs.pangu.hyprland.preset.settings contains unknown keys: ${lib.concatStringsSep ", " unknownPresetKeys}";
+          }
+          {
             assertion = !cfg.hyprland.enable || config.wayland.windowManager.hyprland.configType == "lua";
             message = "Pangu's Hyprland integration requires configType = lua and a Lua-capable Hyprland.";
           }
@@ -139,6 +161,7 @@ in
           Unit = {
             Description = "Pangu — desktop shell";
             After = [ cfg.systemd.target ];
+            BindsTo = [ cfg.systemd.target ];
             PartOf = [ cfg.systemd.target ];
             ConditionEnvironment = "WAYLAND_DISPLAY";
           };
@@ -150,7 +173,7 @@ in
             RuntimeDirectory = "pangu";
             Slice = "session.slice";
             Environment = [
-              "PANGU_WALLPAPERS=${lib.escapeShellArg cfg.wallpapers}"
+              "PANGU_WALLPAPERS=${cfg.wallpapers}"
             ]
             ++ lib.optional hasSettings "PANGU_NIX_OVERRIDES=${overrideMetadata}";
           };
@@ -162,7 +185,7 @@ in
           enable = lib.mkDefault true;
           configType = lib.mkDefault "lua";
           systemd.enable = lib.mkDefault true;
-          extraConfig =
+          extraConfig = lib.mkBefore (
             if cfg.hyprland.preset.enable then
               ''
                 require("pangu.init")
@@ -171,7 +194,8 @@ in
               ''
                 require("pangu.integration")
                 ${lib.optionalString cfg.hyprland.bindings.enable ''require("pangu.bindings")''}
-              '';
+              ''
+          );
         };
         xdg.configFile = {
           "hypr/pangu" = {
@@ -193,7 +217,7 @@ in
         qt.qt6ctSettings = qtPalette "qt6ct";
       })
       (lib.mkIf cfg.theme.kitty.enable {
-        programs.kitty.extraConfig = lib.mkAfter "include ${config.xdg.cacheHome}/pangu/kitty.conf";
+        programs.kitty.extraConfig = lib.mkAfter "globinclude ${config.xdg.cacheHome}/pangu/kitty.conf";
       })
     ]
   );

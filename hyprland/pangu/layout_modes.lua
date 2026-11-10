@@ -16,12 +16,8 @@ local rules = {}
 
 local function apply(id, target)
   local previous = rules[id]
-  if previous and previous.target == target then
-    previous.rule:set_enabled(true)
-    return
-  end
   if previous then
-    previous.rule:set_enabled(false)
+    previous.rule:set_enabled(false) -- set_enabled(true) does not re-evaluate existing workspaces
   end
   rules[id] = {
     target = target,
@@ -56,6 +52,14 @@ local function restore_workspace(workspace)
     local previous = rules[workspace.id]
     if previous then
       previous.rule:set_enabled(false)
+      rules[workspace.id] = nil
+    end
+    if workspace.tiled_layout == "lua:centered" then
+      local fallback = hl.workspace_rule({
+        workspace = "r[" .. workspace.id .. "-" .. workspace.id .. "]",
+        layout = state.layouts.default,
+      })
+      fallback:set_enabled(false)
     end
   else
     apply(workspace.id, target)
