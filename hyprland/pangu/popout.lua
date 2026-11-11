@@ -338,8 +338,12 @@ function M.toggle_app_scratchpad(spec)
   end
 
   if not existing then
-    local rule = string.format("[workspace %s; float; size %d %d; center] %s", special_name, size.x, size.y, spec.command)
-    hl.exec_cmd(rule)
+    hl.exec_cmd(spec.command, {
+      workspace = special_name,
+      float = true,
+      size = string.format("%d %d", size.x, size.y),
+      center = true,
+    })
     return
   end
 

@@ -229,6 +229,16 @@ end`, reply => {
         root.request("reload");
     }
 
+    function syncGaps() {
+        root.request('eval local ok, l = pcall(require, "pangu.layouts"); if ok and l and l.emit_gaps then l.emit_gaps(true) end');
+    }
+
+    Timer {
+        id: gapSyncTimer
+        interval: 150
+        onTriggered: root.syncGaps()
+    }
+
     Component {
         id: requestComponent
 
@@ -352,6 +362,8 @@ end`, reply => {
         function onRawEvent(event) {
             if (root.handleRawEvent(event))
                 return;
+            if (event.name === "configreloaded")
+                gapSyncTimer.restart();
             if (!root.ignoredRawEvents[event.name])
                 root.scheduleRefresh();
         }
@@ -377,6 +389,7 @@ end`, reply => {
         target: Hyprland.monitors
         function onValuesChanged() {
             root.scheduleSnapshot();
+            gapSyncTimer.restart();
         }
     }
 
@@ -414,5 +427,8 @@ end`, reply => {
         }
     }
 
-    Component.onCompleted: refresh.restart()
+    Component.onCompleted: {
+        refresh.restart();
+        gapSyncTimer.restart();
+    }
 }

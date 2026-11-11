@@ -350,7 +350,10 @@ if full_height then
   end)
 end
 
-hl.on("config.reloaded", schedule_scan)
+hl.on("config.reloaded", function()
+  emitted = {}
+  schedule_scan()
+end)
 schedule_scan()
 
 gamemode.on_change(schedule_scan)
@@ -446,6 +449,13 @@ end
 local M = {}
 
 M.schedule_scan = schedule_scan
+
+function M.emit_gaps(force)
+  if force then
+    emitted = {}
+  end
+  scan()
+end
 
 function M.center_active()
   local workspace = hl.get_active_workspace()

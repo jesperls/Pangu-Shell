@@ -113,7 +113,9 @@ screen)
 	case "${2:-}" in
 	on | off)
 		if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
-			hyprctl dispatch dpms "$2" >/dev/null 2>&1 || ipc pangu run "screen-$2"
+			hyprctl dispatch "hl.dsp.dpms({ action = \"$2\" })" >/dev/null 2>&1 \
+				|| hyprctl dispatch dpms "$2" >/dev/null 2>&1 \
+				|| ipc pangu run "screen-$2"
 		else
 			ipc pangu run "screen-$2"
 		fi

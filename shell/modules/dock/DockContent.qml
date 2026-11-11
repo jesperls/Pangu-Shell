@@ -307,8 +307,7 @@ Item {
                 }
 
                 layer.enabled: root.isDefault
-                layer.effect: Shadow {
-                    shadowEnabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
+                layer.effect: MultiEffect {
                     maskEnabled: true
                     maskSource: dockMask
                     maskThresholdMin: 0.5
@@ -388,7 +387,7 @@ Item {
                 variant: "bg"
                 radius: Styling.radius(4)
                 enableBorder: true
-                enableShadow: Config.showBackground
+                enableShadow: false
             }
 
             RowLayout {

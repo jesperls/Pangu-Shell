@@ -126,8 +126,7 @@ Item {
 
         layer.enabled: Config.notchTheme === "default"
         layer.smooth: true
-        layer.effect: Shadow {
-            shadowEnabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
+        layer.effect: MultiEffect {
             maskEnabled: true
             maskSource: notchFullMask
             maskThresholdMin: 0.5
@@ -224,7 +223,7 @@ Item {
             anchors.fill: parent
             clip: false
             enableBorder: true
-            enableShadow: Config.showBackground
+            enableShadow: false
             animateRadius: false
             backgroundOpacity: notchContainer.dashboardBgOpacity
 

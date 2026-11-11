@@ -111,7 +111,7 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
-    match = { namespace = "^pangu(:(osd|cheatsheet|overview))?$" },
+    match = { namespace = "^pangu(:(osd|cheatsheet|overview|context-menu))?$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = ${ignoreAlpha.toFixed(2)},

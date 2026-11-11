@@ -18,7 +18,7 @@ WlSessionLockSurface {
 
     property bool startAnim: false
     readonly property bool authenticating: LockscreenService.authenticating
-    readonly property bool isPrimaryScreen: Quickshell.screens.length <= 1 || root.screen === Quickshell.screens[0]
+    readonly property bool isPrimaryScreen: Compositor.focusedMonitor ? root.screen?.name === Compositor.focusedMonitor.name : (Quickshell.screens.length <= 1 || root.screen === Quickshell.screens[0])
 
     color: "transparent"
 
@@ -629,8 +629,7 @@ WlSessionLockSurface {
         target: LockscreenService
         function onUnlocked() {
             root.startAnim = false;
-            if (root.isPrimaryScreen)
-                unlockTimer.start();
+            unlockTimer.start();
         }
         function onAuthFailed() {
             passwordInput.text = "";

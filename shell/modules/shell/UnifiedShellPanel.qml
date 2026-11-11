@@ -143,6 +143,9 @@ PanelWindow {
         id: visualContent
         anchors.fill: parent
 
+        layer.enabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
+        layer.effect: Shadow {}
+
         ScreenFrameContent {
             id: frameContent
             anchors.fill: parent

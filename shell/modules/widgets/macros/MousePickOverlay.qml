@@ -23,6 +23,7 @@ PanelWindow {
     visible: GlobalStates.mousePickActive
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "pangu:mouse-pick"
     WlrLayershell.keyboardFocus: GlobalStates.mousePickActive ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Rectangle {

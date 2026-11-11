@@ -41,16 +41,22 @@ os.remove(session_dir)
 
 local state = {
   apps = {},
-  layouts = { centered = { master_width = 0.5, full_height = false, aspect = { 16, 9 }, height_resize_step = 0.15 } },
+  layouts = { centered = { master_width = 0.5, full_height = true, aspect = { 16, 9 }, height_resize_step = 0.15 } },
 }
 local slots = { [1] = { master = 10, left = { 11 }, right = { 12 } } }
 local weights = { [10] = 2, [11] = 3, [12] = 4, [20] = 2 }
+local custom_events = {}
 local layout
 package.preload["pangu.generated"] = function()
   return state
 end
 package.preload["pangu.gamemode"] = function()
-  return { on_change = function() end }
+  return {
+    on_change = function() end,
+    is_active = function()
+      return false
+    end,
+  }
 end
 package.preload["pangu.session"] = function()
   return {
@@ -62,6 +68,45 @@ package.preload["pangu.session"] = function()
 end
 hl = {
   on = function() end,
+  dsp = {
+    event = function(payload)
+      return payload
+    end,
+  },
+  dispatch = function(payload)
+    custom_events[#custom_events + 1] = payload
+  end,
+  get_monitors = function()
+    return {
+      {
+        name = "DP-2",
+        x = 0,
+        y = 0,
+        width = 5120,
+        height = 1440,
+        scale = 1,
+        transform = 0,
+        active_workspace = {
+          id = 1,
+          tiled_layout = "lua:centered",
+        },
+      },
+    }
+  end,
+  get_workspace_windows = function(id)
+    return id == 1 and { { stable_id = 10, floating = false, fullscreen = 0 } } or {}
+  end,
+  get_windows = function()
+    return {
+      { stable_id = 10, floating = false, fullscreen = 0, workspace = { id = 1 } },
+      { stable_id = 11, floating = false, fullscreen = 0, workspace = { id = 1 } },
+      { stable_id = 12, floating = false, fullscreen = 0, workspace = { id = 1 } },
+      { stable_id = 20, floating = false, fullscreen = 0, workspace = { id = 2 } },
+    }
+  end,
+  get_workspaces = function()
+    return { { id = 1 }, { id = 2 } }
+  end,
   timer = function()
     return { set_enabled = function() end }
   end,
@@ -71,7 +116,13 @@ hl = {
     end,
   },
 }
-dofile(source .. "/layouts.lua")
+local layouts_mod = dofile(source .. "/layouts.lua")
+layouts_mod.emit_gaps(false)
+assert(#custom_events == 1 and custom_events[1] == "centergap,DP-2,1280,2560,0", "Initial centergap was not emitted")
+layouts_mod.emit_gaps(false)
+assert(#custom_events == 1, "Unforced emit_gaps re-emitted unchanged centergap")
+layouts_mod.emit_gaps(true)
+assert(#custom_events == 2 and custom_events[2] == "centergap,DP-2,1280,2560,0", "Forced emit_gaps must re-emit centergap for restarted shell")
 layout.layout_msg({ targets = { { window = { workspace = { id = 1 } } } } }, "equalize")
 assert(weights[10] == nil and weights[11] == nil and weights[12] == nil)
 assert(weights[20] == 2, "Equalize changed another workspace")
@@ -99,7 +150,7 @@ local target = {
 layout.recalculate({ area = { x = 0, y = 44, w = 5120, h = 1396 }, targets = { target } })
 assert(placed.w == 2560 and placed.x == 1280, "Single centered window lost its width")
 
-local binds, dispatched, drag_started = {}, 0, 0
+local binds, bind_flags, dispatched, drag_started = {}, {}, 0, 0
 local floating = true
 local function dispatcher()
   return {}
@@ -107,6 +158,7 @@ end
 hl = {
   bind = function(_, callback, flags)
     binds[flags.description] = callback
+    bind_flags[flags.description] = flags
   end,
   dsp = setmetatable({
     window = setmetatable({}, {
@@ -152,6 +204,15 @@ package.preload["pangu.popout"] = function()
   return {}
 end
 dofile(source .. "/binds.lua")
+for _, desc in ipairs({
+  "Mouse: drag window",
+  "Mouse: resize window",
+  "Mouse: drag window (side button)",
+  "Mouse: resize window (side button)",
+}) do
+  local f = assert(bind_flags[desc], "Missing mouse bind: " .. desc)
+  assert(not f.drag and not f.release, desc .. " must fire on button-down, not drag/release")
+end
 binds["Mouse: resize window"]()
 binds["Mouse: resize window (side button)"]()
 assert(dispatched == 2 and drag_started == 0, "Floating windows cannot be resized in centered workspaces")

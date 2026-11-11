@@ -72,8 +72,8 @@ hl = {
       close_cb = cb
     end
   end,
-  exec_cmd = function(cmd)
-    execs[#execs + 1] = cmd
+  exec_cmd = function(cmd, rules)
+    execs[#execs + 1] = { cmd = cmd, rules = rules }
   end,
   get_active_monitor = function()
     return active_mon
@@ -215,7 +215,16 @@ close_cb(float_win)
 
 -- Named app scratchpad launches on first use
 popout.toggle_app_scratchpad({ name = "term", command = "kitty --class scratch-term", class = "scratch-term", width = 1000, height = 650 })
-assert(#execs == 1 and execs[1]:find("special:term", 1, true), "app scratchpad must launch into special workspace")
+assert(
+  #execs == 1
+    and execs[1].cmd == "kitty --class scratch-term"
+    and type(execs[1].rules) == "table"
+    and execs[1].rules.workspace == "special:term"
+    and execs[1].rules.float == true
+    and execs[1].rules.size == "1000 650"
+    and execs[1].rules.center == true,
+  "app scratchpad must launch via hl.exec_cmd rules table"
+)
 
 -- 2. Events: secondary-monitor pinned PiP & unconditional sync_fullscreen restore
 reset_modules()

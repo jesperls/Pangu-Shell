@@ -29,7 +29,6 @@ Item {
     readonly property int padding: bgOpacity < 0.01 ? 0 : (Config.bar.padding ?? 4)
 
     readonly property int outerMargin: effectiveContainBar ? 0 : (docked ? 0 : (Config.bar.margin ?? 4))
-    readonly property bool shadowsEnabled: Config.showBackground && (!effectiveContainBar || (Config.bar.keepBarShadow ?? false)) && (Config.theme?.shadowOpacity ?? 0) > 0
     readonly property bool maskNeeded: cornerSize > 0 || splitActive
 
     StyledRect {
@@ -45,10 +44,9 @@ Item {
         width: root.width + (isHorizontal ? 0 : cornerSize)
         height: root.height + (isHorizontal ? cornerSize : 0)
 
-        layer.enabled: root.maskNeeded || root.shadowsEnabled
-        layer.effect: Shadow {
-            shadowEnabled: root.shadowsEnabled
-            maskEnabled: root.maskNeeded
+        layer.enabled: root.maskNeeded
+        layer.effect: MultiEffect {
+            maskEnabled: true
             maskSource: barMask
             maskThresholdMin: 0.5
             maskSpreadAtMin: 1.0

@@ -217,7 +217,8 @@ in
         qt.qt6ctSettings = qtPalette "qt6ct";
       })
       (lib.mkIf cfg.theme.kitty.enable {
-        programs.kitty.extraConfig = lib.mkAfter "globinclude ${config.xdg.cacheHome}/pangu/kitty.conf";
+        programs.kitty.extraConfig = lib.mkAfter "include ${config.xdg.cacheHome}/pangu/kitty.conf";
+        systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/kitty.conf 0644 - - -" ];
       })
     ]
   );

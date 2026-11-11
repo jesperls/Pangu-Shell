@@ -29,6 +29,7 @@ PanelWindow {
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "pangu:context-menu"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     exclusiveZone: 0

@@ -1481,3 +1481,21 @@ ShellRoot {
     }
 }
 ''')
+
+    def test_no_shadow_effect_with_mask_enabled_and_panel_windows_namespaced(self):
+        shadow_block = re.compile(r"layer\.effect:\s*Shadow\s*\{([^}]*)\}", re.DOTALL)
+        for qml in sorted((SHELL / "modules").rglob("*.qml")):
+            content = qml.read_text()
+            for match in shadow_block.finditer(content):
+                self.assertNotIn(
+                    "maskEnabled",
+                    match.group(1),
+                    f"{qml.relative_to(SHELL)} combines Shadow with maskEnabled, stretching maskSource across shadow padding",
+                )
+            if re.search(r"\bPanelWindow\s*\{", content):
+                self.assertIn(
+                    "WlrLayershell.namespace:",
+                    content,
+                    f"{qml.relative_to(SHELL)} declares PanelWindow without WlrLayershell.namespace",
+                )
+
