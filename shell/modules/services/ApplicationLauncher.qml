@@ -10,11 +10,13 @@ Singleton {
     id: root
 
     function scopedCommand(command) {
-        const envArgs = ["env", "-u", "HL_INITIAL_WORKSPACE_TOKEN"];
+        const unsetArgs = ["-u", "HL_INITIAL_WORKSPACE_TOKEN"];
+        const setArgs = [];
         if (typeof Quickshell !== "undefined" && typeof Quickshell.env === "function") {
             const userPath = Quickshell.env("PANGU_USER_PATH");
+            const shellPath = Quickshell.env("PATH");
             if (userPath !== null && userPath !== "")
-                envArgs.push("PATH=" + userPath);
+                setArgs.push("PATH=" + (shellPath ? userPath + ":" + shellPath : userPath));
             for (const [saved, target] of [
                 ["PANGU_USER_QT_PLUGIN_PATH", "QT_PLUGIN_PATH"],
                 ["PANGU_USER_QML2_IMPORT_PATH", "QML2_IMPORT_PATH"],
@@ -22,16 +24,16 @@ Singleton {
             ]) {
                 const val = Quickshell.env(saved);
                 if (val === "__UNSET__")
-                    envArgs.push("-u", target);
+                    unsetArgs.push("-u", target); // GNU env stops parsing -u after the first NAME=VALUE operand.
                 else if (val !== null && val !== "")
-                    envArgs.push(target + "=" + val);
+                    setArgs.push(target + "=" + val);
             }
         }
         return [
             "systemd-run", "--user", "--scope", "--collect", "--quiet",
             "--slice=app.slice", "--property=PartOf=graphical-session.target",
-            "--expand-environment=no", "--"
-        ].concat(envArgs, command);
+            "--expand-environment=no", "--", "env"
+        ].concat(unsetArgs, setArgs, command);
     }
 
     function launchCommand(command) {

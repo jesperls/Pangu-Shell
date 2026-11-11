@@ -749,12 +749,39 @@ launchContext.launchApp({id: 'terminal-app.desktop', runInTerminal: true, comman
 assert.deepEqual(launchRequests, ['terminal-app.desktop']);
 launchContext.launchApp(null);
 assert.equal(launchRequests.length, 1);
-const scopeContext = {root: {}};
+const scopeContext = {
+    root: {},
+    Quickshell: {
+        env(key) {
+            return ({
+                PATH: '/nix/store/pangu-runtime/bin',
+                PANGU_USER_PATH: '/etc/profiles/per-user/test/bin:/run/current-system/sw/bin',
+                PANGU_USER_QT_PLUGIN_PATH: '/etc/profiles/per-user/test/lib/qt-6/plugins',
+                PANGU_USER_QML2_IMPORT_PATH: '/etc/profiles/per-user/test/lib/qt-6/qml',
+                PANGU_USER_QML_IMPORT_PATH: '__UNSET__'
+            })[key] ?? null;
+        }
+    }
+};
 serviceFunctions('ApplicationLauncher.qml', ['scopedCommand'], scopeContext);
 const scoped = scopeContext.scopedCommand(['xdg-open', '/path/with $literal and spaces']);
 assert.ok(scoped.includes('--expand-environment=no'));
 assert.ok(scoped.includes('--slice=app.slice'));
 assert.equal(scoped[scoped.length - 1], '/path/with $literal and spaces');
+const envIdx = scoped.indexOf('env');
+const cmdIdx = scoped.indexOf('xdg-open');
+const envTokens = scoped.slice(envIdx + 1, cmdIdx);
+let seenAssignment = false;
+for (let i = 0; i < envTokens.length; i++) {
+    if (envTokens[i] === '-u') {
+        assert.equal(seenAssignment, false, 'env -u flags must precede NAME=VALUE assignments');
+        i++;
+    } else {
+        assert.ok(envTokens[i].includes('='), `unexpected env token: ${envTokens[i]}`);
+        seenAssignment = true;
+    }
+}
+assert.ok(envTokens.includes('PATH=/etc/profiles/per-user/test/bin:/run/current-system/sw/bin:/nix/store/pangu-runtime/bin'));
 console.log('Application launches use desktop IDs and isolated scopes with literal arguments');
 
 const placementCalls = [];
