@@ -154,6 +154,7 @@ Item {
                         }
 
                         StyledRect {
+                            id: sinkToggleBtn
                             Layout.preferredWidth: 26
                             Layout.preferredHeight: 26
                             radius: Styling.radius(-4)
@@ -166,7 +167,7 @@ Item {
                                 text: root.showSinks ? Icons.caretUp : Icons.caretDown
                                 font.family: Icons.font
                                 font.pixelSize: 12
-                                color: parent.item
+                                color: sinkToggleBtn.item
                             }
 
                             MouseArea {
@@ -215,7 +216,7 @@ Item {
                                     spacing: 8
 
                                     Text {
-                                        text: sinkItem.active ? Icons.check : Icons.speakerHigh
+                                        text: sinkItem.active ? Icons.accept : Icons.speakerHigh
                                         font.family: Icons.font
                                         font.pixelSize: 13
                                         color: sinkItem.item
@@ -276,6 +277,7 @@ Item {
                         }
 
                         StyledRect {
+                            id: sourceToggleBtn
                             Layout.preferredWidth: 26
                             Layout.preferredHeight: 26
                             radius: Styling.radius(-4)
@@ -288,7 +290,7 @@ Item {
                                 text: root.showSources ? Icons.caretUp : Icons.caretDown
                                 font.family: Icons.font
                                 font.pixelSize: 12
-                                color: parent.item
+                                color: sourceToggleBtn.item
                             }
 
                             MouseArea {
@@ -337,7 +339,7 @@ Item {
                                     spacing: 8
 
                                     Text {
-                                        text: sourceItem.active ? Icons.check : Icons.mic
+                                        text: sourceItem.active ? Icons.accept : Icons.mic
                                         font.family: Icons.font
                                         font.pixelSize: 13
                                         color: sourceItem.item
@@ -462,6 +464,7 @@ Item {
                         }
 
                         StyledRect {
+                            id: eeBypassBtn
                             Layout.preferredWidth: 58
                             Layout.preferredHeight: 30
                             radius: Styling.radius(-4)
@@ -474,7 +477,7 @@ Item {
                                 font.family: Config.theme.font
                                 font.pixelSize: Styling.fontSize(-1)
                                 font.weight: Font.Bold
-                                color: parent.item
+                                color: eeBypassBtn.item
                             }
 
                             MouseArea {

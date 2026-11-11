@@ -34,7 +34,7 @@ Singleton {
         }
     }
 
-    function getDeviceBinding(isOutput: bool, deviceName: string) {
+    function getDeviceBinding(isOutput: bool, deviceName: string): var {
         if (!deviceName) return null;
         const group = isOutput ? (root.deviceBindings.output || {}) : (root.deviceBindings.input || {});
         return group[deviceName] ?? null;

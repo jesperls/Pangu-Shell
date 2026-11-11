@@ -98,13 +98,14 @@ Item {
     }
 
     StyledRect {
+        id: playerBgRect
         variant: compactPlayer.player ? "common" : "internalbg"
         anchors.fill: parent
         radius: Styling.radius(-4)
 
         Rectangle {
             anchors.fill: parent
-            radius: parent.radius
+            radius: playerBgRect.radius
             color: "transparent"
             border.width: 1
             border.color: Qt.rgba(Colors.primary.r, Colors.primary.g, Colors.primary.b, compactPlayer.isPlaying ? 0.32 : 0.0)

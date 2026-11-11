@@ -22,7 +22,6 @@ QtObject {
         const overPrimary = fmt(Colors.overPrimary);
         const border = rgba(Colors.outlineVariant, 0.55);
         const rim = rgba(Colors.overBackground, Config.theme.lightMode ? 0.12 : 0.08);
-        const font = Config.theme.font || "sans-serif";
 
         const css = `:root {
   --pangu-bg: ${bg};
@@ -63,7 +62,6 @@ QtObject {
 #navigator-toolbox {
   background-color: var(--pangu-bg) !important;
   border-bottom: 1px solid var(--pangu-border) !important;
-  font-family: "${font}", sans-serif !important;
 }
 
 #TabsToolbar, #toolbar-menubar {

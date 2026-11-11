@@ -121,7 +121,7 @@ ShellRoot {
             self.assertIn("active_tab_background ", kitty)
             firefox = (root / "cache/pangu/firefox.css").read_text()
             self.assertIn("--pangu-bg: #123456;", firefox)
-            self.assertIn('font-family: "Latest Font", sans-serif', firefox)
+            self.assertIn("#navigator-toolbox {", firefox)
             spicetify_ini = (root / "output/spicetify/Themes/Pangu/color.ini").read_text()
             spicetify_css = (root / "output/spicetify/Themes/Pangu/user.css").read_text()
             self.assertIn("[pangu]", spicetify_ini)
