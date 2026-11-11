@@ -52,6 +52,20 @@ let
       programs.pangu.systemd.enable = false;
       programs.pangu.hyprland.enable = false;
     }).config;
+  themedApps =
+    (home {
+      programs.firefox = {
+        enable = true;
+        profiles.default = {
+          id = 0;
+          isDefault = true;
+        };
+      };
+      programs.pangu.theme = {
+        firefox.enable = true;
+        spicetify.enable = true;
+      };
+    }).config;
   valid = c: builtins.all (entry: entry.assertion) c.assertions;
   apply = import ./lib/apply-settings.nix {
     inherit pkgs lib;
@@ -119,7 +133,15 @@ in
       && valid overrides
       && valid disabled
       && valid manual
-      && valid spacedWallpapers;
+      && valid spacedWallpapers
+      && valid themedApps;
+    assert
+      themedApps.programs.firefox.profiles.default.settings."toolkit.legacyUserProfileCustomizations.stylesheets";
+    assert lib.hasInfix "pangu/firefox.css" themedApps.programs.firefox.profiles.default.userChrome;
+    assert lib.hasInfix "pangu/firefox.css" themedApps.programs.firefox.profiles.default.userContent;
+    assert builtins.any (
+      rule: lib.hasInfix "spicetify/Themes/Pangu/color.ini" rule
+    ) themedApps.systemd.user.tmpfiles.rules;
     assert !invalid.success && !invalidPreset.success;
     assert builtins.elem "PANGU_WALLPAPERS=/home/pangu-test/My Wallpapers"
       spacedWallpapers.systemd.user.services.pangu.Service.Environment;

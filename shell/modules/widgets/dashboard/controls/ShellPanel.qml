@@ -861,6 +861,10 @@ Item {
                                 {
                                     label: "Docked",
                                     value: "docked"
+                                },
+                                {
+                                    label: "Islands",
+                                    value: "islands"
                                 }
                             ]
                             value: Config.bar.style ?? "floating"
@@ -910,6 +914,17 @@ Item {
                                 if (newValue !== Config.bar.padding) {
                                     GlobalStates.markShellChanged();
                                     Config.bar.padding = newValue;
+                                }
+                            }
+                        }
+
+                        ToggleRow {
+                            label: "Show Launcher Button"
+                            checked: Config.bar.showLauncherButton ?? true
+                            onToggled: value => {
+                                if (value !== Config.bar.showLauncherButton) {
+                                    GlobalStates.markShellChanged();
+                                    Config.bar.showLauncherButton = value;
                                 }
                             }
                         }
@@ -1112,6 +1127,17 @@ Item {
                         }
 
                         ToggleRow {
+                            label: "Show Weather Temp"
+                            checked: Config.bar.showWeatherTemp ?? true
+                            onToggled: value => {
+                                if (value !== Config.bar.showWeatherTemp) {
+                                    GlobalStates.markShellChanged();
+                                    Config.bar.showWeatherTemp = value;
+                                }
+                            }
+                        }
+
+                        ToggleRow {
                             label: "Enable Firefox Player"
                             checked: Config.bar.enableFirefoxPlayer ?? false
                             onToggled: value => {
@@ -1228,6 +1254,17 @@ Item {
                                 if (value !== Config.bar.availableOnFullscreen) {
                                     GlobalStates.markShellChanged();
                                     Config.bar.availableOnFullscreen = value;
+                                }
+                            }
+                        }
+
+                        ToggleRow {
+                            label: "Reserve Screen Space"
+                            checked: Config.bar.reserveSpace ?? true
+                            onToggled: value => {
+                                if (value !== Config.bar.reserveSpace) {
+                                    GlobalStates.markShellChanged();
+                                    Config.bar.reserveSpace = value;
                                 }
                             }
                         }
@@ -1535,6 +1572,11 @@ Item {
                                     label: "User@Host",
                                     value: "userHost",
                                     icon: Icons.user
+                                },
+                                {
+                                    label: "Window",
+                                    value: "focusedWindow",
+                                    icon: Icons.windowsLogo
                                 },
                                 {
                                     label: "Compositor",

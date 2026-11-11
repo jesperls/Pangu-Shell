@@ -18,9 +18,60 @@ Singleton {
 
     property string activeOutputPreset: ""
     property string activeInputPreset: ""
+    property var deviceBindings: ({ output: {}, input: {} })
 
     property int _replyIndex: 2
     property bool queryPending: false
+    property bool _pendingAutoApply: false
+
+    function _loadBindings() {
+        const saved = StateService.get("easyEffectsDevicePresets", null);
+        if (saved && typeof saved === "object") {
+            root.deviceBindings = {
+                output: Object.assign({}, saved.output || {}),
+                input: Object.assign({}, saved.input || {})
+            };
+        }
+    }
+
+    function getDeviceBinding(isOutput: bool, deviceName: string) {
+        if (!deviceName) return null;
+        const group = isOutput ? (root.deviceBindings.output || {}) : (root.deviceBindings.input || {});
+        return group[deviceName] ?? null;
+    }
+
+    function setDeviceBinding(isOutput: bool, deviceName: string, presetName: string, bypassState: bool) {
+        if (!deviceName) return;
+        const key = isOutput ? "output" : "input";
+        const nextGroup = Object.assign({}, root.deviceBindings[key] || {});
+        nextGroup[deviceName] = {
+            preset: presetName || "",
+            bypass: Boolean(bypassState)
+        };
+        const next = {
+            output: key === "output" ? nextGroup : Object.assign({}, root.deviceBindings.output || {}),
+            input: key === "input" ? nextGroup : Object.assign({}, root.deviceBindings.input || {})
+        };
+        root.deviceBindings = next;
+        if (StateService.initialized)
+            StateService.set("easyEffectsDevicePresets", next);
+    }
+
+    function _applyBindingsForCurrentDevices() {
+        if (!socket.connected || !(Config.system?.audio?.autoSwitchPresets ?? true))
+            return;
+        const sinkName = Audio.sink?.name ?? "";
+        const outBind = getDeviceBinding(true, sinkName);
+        if (outBind) {
+            socket.write("global_bypass:" + (outBind.bypass ? "1" : "0") + "\n");
+            if (!outBind.bypass && outBind.preset)
+                socket.write("load_preset:output:" + outBind.preset + "\n");
+        }
+        const sourceName = Audio.source?.name ?? "";
+        const inBind = getDeviceBinding(false, sourceName);
+        if (inBind && inBind.preset)
+            socket.write("load_preset:input:" + inBind.preset + "\n");
+    }
 
     function _query() {
         if (!socket.connected) return;
@@ -39,18 +90,31 @@ Singleton {
     function setBypass(enable: bool) {
         if (!socket.connected) return;
         socket.write("global_bypass:" + (enable ? "1" : "0") + "\n");
+        const sinkName = Audio.sink?.name ?? "";
+        if (sinkName) {
+            const prev = getDeviceBinding(true, sinkName);
+            setDeviceBinding(true, sinkName, prev?.preset || root.activeOutputPreset, enable);
+        }
         _query();
     }
 
     function loadOutputPreset(name: string) {
         if (!socket.connected) return;
+        if (root.bypassed)
+            socket.write("global_bypass:0\n");
         socket.write("load_preset:output:" + name + "\n");
+        const sinkName = Audio.sink?.name ?? "";
+        if (sinkName)
+            setDeviceBinding(true, sinkName, name, false);
         _query();
     }
 
     function loadInputPreset(name: string) {
         if (!socket.connected) return;
         socket.write("load_preset:input:" + name + "\n");
+        const sourceName = Audio.source?.name ?? "";
+        if (sourceName)
+            setDeviceBinding(false, sourceName, name, false);
         _query();
     }
 
@@ -80,8 +144,36 @@ Singleton {
 
     Timer {
         id: deviceChangeTimer
-        interval: 600
-        onTriggered: if (socket.connected) root._query()
+        interval: 650
+        onTriggered: {
+            if (!socket.connected) {
+                root._pendingAutoApply = true;
+                socket.connected = true;
+                return;
+            }
+            root._applyBindingsForCurrentDevices();
+            root._query();
+        }
+    }
+
+    Timer {
+        id: startupConnectTimer
+        interval: 1500
+        running: Config.initialLoadComplete && (Config.system?.audio?.autoSwitchPresets ?? true)
+        repeat: false
+        onTriggered: root.refresh()
+    }
+
+    Component.onCompleted: {
+        if (StateService.initialized)
+            root._loadBindings();
+    }
+
+    Connections {
+        target: StateService
+        function onStateLoaded() {
+            root._loadBindings();
+        }
     }
 
     Connections {
@@ -100,6 +192,10 @@ Singleton {
             root.queryPending = false;
             queryTimeout.stop();
             if (connected) {
+                if (root._pendingAutoApply) {
+                    root._pendingAutoApply = false;
+                    root._applyBindingsForCurrentDevices();
+                }
                 root._query();
             }
         }

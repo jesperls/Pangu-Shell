@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import qs.modules.globals
+import qs.modules.services
 import qs.modules.theme
 import qs.config
 
@@ -32,7 +33,32 @@ Singleton {
     }
 
     function buildActions() {
+        const clipUrl = MediaGrabberService.clipboardMediaUrl;
+        const mediaActions = clipUrl !== "" ? [
+            {
+                name: "Open Clipboard Link in PiP",
+                icon: Icons.pictureInPicture,
+                comment: "Float & pin " + MediaGrabberService.shortHost(clipUrl) + " in mpv",
+                keywords: ["pip", "mpv", "video", "stream", "watch", "clipboard"],
+                run: () => MediaGrabberService.openInPip(clipUrl)
+            },
+            {
+                name: "Download Clipboard Video (MP4)",
+                icon: Icons.downloadSimple,
+                comment: "Save " + MediaGrabberService.shortHost(clipUrl) + " video to ~/Downloads",
+                keywords: ["download", "yt-dlp", "mp4", "video", "grab", "save"],
+                run: () => MediaGrabberService.downloadVideo(clipUrl)
+            },
+            {
+                name: "Extract Clipboard Audio (MP3)",
+                icon: Icons.musicNotes,
+                comment: "Save " + MediaGrabberService.shortHost(clipUrl) + " audio to ~/Downloads",
+                keywords: ["download", "yt-dlp", "mp3", "audio", "music", "extract"],
+                run: () => MediaGrabberService.downloadAudio(clipUrl)
+            }
+        ] : [];
         return [
+            ...mediaActions,
             {
                 name: Notifications.silent ? "Do Not Disturb: Off" : "Do Not Disturb: On",
                 icon: Icons.bellZ,

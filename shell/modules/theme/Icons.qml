@@ -210,11 +210,32 @@ QtObject {
 
     readonly property string palette: paintBrush
     readonly property string cornersOut: arrowsOut
-    readonly property string drop: sparkle
+    readonly property string drop: "\ue210"
     readonly property string arrowsOutSimple: arrowsOut
+    readonly property string arrowsInSimple: "\ue09e"
     readonly property string squaresFour: layout
     readonly property string mapPin: globe
     readonly property string thermometer: temperature
     readonly property string windowsLogo: terminalWindow
     readonly property string frameCorners: crop
+
+    readonly property string cloud: "\ue1aa"
+    readonly property string cloudSun: "\ue540"
+    readonly property string cloudMoon: "\ue53e"
+    readonly property string cloudFog: "\ue53c"
+    readonly property string cloudRain: "\ue1b4"
+    readonly property string cloudSnow: "\ue1b8"
+    readonly property string cloudLightning: "\ue1b2"
+    readonly property string cloudArrowDown: "\ue1ac"
+    readonly property string moonStars: "\ue58e"
+    readonly property string sunDim: "\ue474"
+    readonly property string wind: "\ue5d2"
+    readonly property string snowflake: "\ue5aa"
+    readonly property string scissors: "\ueae0"
+    readonly property string downloadSimple: "\ue20c"
+    readonly property string musicNotes: "\ue340"
+    readonly property string pictureInPicture: "\ue64c"
+    readonly property string headset: "\ue584"
+    readonly property string filmStrip: "\ue792"
+    readonly property string fileVideo: "\uea22"
 }

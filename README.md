@@ -6,17 +6,17 @@ place, with settings you can change from the shell itself.
 
 ## Features
 
-- **Desktop:** configurable bar and dock, workspace overview, system tray with
-  persistent icon overflow and notifications.
-- **Launcher and dashboard:** application search, media controls, calendar,
+- **Desktop:** configurable bar (`docked`, `floating` or corner `islands`) and dock, workspace overview, system tray with
+  persistent icon overflow and notifications with unread tracking.
+- **Launcher and dashboard:** application search, clipboard media URL actions (`mpv` PiP and `yt-dlp` downloads), media controls, calendar,
   weather and system metrics.
-- **System controls:** audio, Wi-Fi, Bluetooth, brightness, power profiles and
+- **System controls:** per-app PipeWire audio mixer, per-device EasyEffects preset switching, wireless peripheral batteries, Wi-Fi, Bluetooth, brightness, power profiles and
   idle control.
 - **Personalization:** landscape wallpaper previews, adjustable gallery density,
   symlinked wallpaper collections, Wallpaper Engine property controls,
-  slideshows, color schemes and palettes for GTK, Qt and Kitty.
+  slideshows, color schemes and palettes for GTK, Qt, Kitty, Firefox, Spicetify and Discord.
 - **Capture:** screenshots, OCR and QR scanning with a shared frozen-screen
-  selector, screen recording and replay capture.
+  selector, screen recording and replay capture with inline clip trimming and compression.
 - **Utilities:** clipboard history, notes, macros, lockscreen and power menu.
 
 ## Requirements

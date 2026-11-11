@@ -26,10 +26,11 @@ Item {
 
     readonly property bool showUser: Config.notch.showUser ?? true
     readonly property bool showMedia: Config.notch.showMedia ?? true
+    readonly property bool showDownloadBadge: MediaGrabberService.activeDownload
     readonly property bool showNotifIndicator: Config.notch.showNotificationIndicator ?? true
     readonly property bool showSep1: showUser && showMedia
-    readonly property bool showSep2: showMedia && showNotifIndicator
-    readonly property int visibleChildCount: (showUser ? 1 : 0) + (showMedia ? 1 : 0) + (showNotifIndicator ? 1 : 0) + (showSep1 ? 1 : 0) + (showSep2 ? 1 : 0)
+    readonly property bool showSep2: showMedia && (showNotifIndicator || showDownloadBadge)
+    readonly property int visibleChildCount: (showUser ? 1 : 0) + (showMedia ? 1 : 0) + (showDownloadBadge ? 1 : 0) + (showNotifIndicator ? 1 : 0) + (showSep1 ? 1 : 0) + (showSep2 ? 1 : 0)
 
     HoverHandler {
         id: contentHoverHandler
@@ -70,13 +71,14 @@ Item {
     }
 
     readonly property real userW: showUser ? userInfo.width : 0
-    readonly property real mediaW: showMedia ? 200 : 0
+    readonly property real mediaW: showMedia ? (activePlayer ? 208 : Math.min(200, Math.max(92, compactPlayerItem.idleImplicitWidth))) : 0
+    readonly property real dlW: showDownloadBadge ? downloadBadge.width : 0
     readonly property real notifW: showNotifIndicator ? notifIndicator.width : 0
     readonly property real sep1W: showSep1 ? separator1.width : 0
     readonly property real sep2W: showSep2 ? separator2.width : 0
     readonly property int rowSpacingCount: Math.max(0, visibleChildCount - 1)
 
-    readonly property real mainRowContentWidth: userW + sep1W + mediaW + sep2W + notifW + (mainRow.spacing * rowSpacingCount) + mainRowMargin
+    readonly property real mainRowContentWidth: userW + sep1W + mediaW + sep2W + dlW + notifW + (mainRow.spacing * rowSpacingCount) + mainRowMargin
     readonly property real mainRowHeight: Config.showBackground ? (Config.notchTheme === "island" ? 36 : 44) : (Config.notchTheme === "island" ? 36 : 40)
     readonly property real notificationMinWidth: expandedState ? 420 : 320
     readonly property real notificationContainerHeight: notificationView.implicitHeight + notificationPaddingTop + notificationPaddingBottom
@@ -142,9 +144,10 @@ Item {
             }
 
             CompactPlayer {
+                id: compactPlayerItem
                 anchors.verticalCenter: parent.verticalCenter
                 visible: root.showMedia
-                width: parent.width - root.userW - root.sep1W - root.sep2W - root.notifW - (parent.spacing * root.rowSpacingCount)
+                width: parent.width - root.userW - root.sep1W - root.sep2W - root.dlW - root.notifW - (parent.spacing * root.rowSpacingCount)
                 height: 32
                 player: activePlayer
                 notchHovered: expandedState
@@ -155,6 +158,40 @@ Item {
                 visible: root.showSep2
                 vert: true
                 anchors.verticalCenter: parent.verticalCenter
+            }
+
+            StyledRect {
+                id: downloadBadge
+                visible: root.showDownloadBadge
+                anchors.verticalCenter: parent.verticalCenter
+                width: dlRow.implicitWidth + 14
+                height: 24
+                radius: Styling.radius(-4)
+                variant: "internalbg"
+                enableShadow: false
+
+                Row {
+                    id: dlRow
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    Text {
+                        text: Icons.downloadSimple
+                        font.family: Icons.font
+                        font.pixelSize: 13
+                        color: Colors.primary
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                        text: MediaGrabberService.progressPercent + "%"
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-2)
+                        font.weight: Font.Bold
+                        color: Colors.primary
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
 
             NotificationIndicator {

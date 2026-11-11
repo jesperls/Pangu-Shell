@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import qs.modules.theme
 import qs.modules.components
 import qs.config
@@ -17,28 +18,40 @@ Button {
         if (t.startsWith(":/// ")) {
             t = t.substring(5);
         }
+        t = t.replace(/__/g, "\x00").replace(/_/g, "").replace(/\x00/g, "_");
         return t.trim();
     }
 
     property var iconSource: ""
     property bool isImageIcon: false
     property bool isSeparator: false
+    property bool itemEnabled: true
     property bool hasSubmenu: false
     property bool expanded: false
     property int depth: 0
     property int buttonType: 0
     property int checkState: 0
 
-    readonly property color fgColor: !root.isSeparator && root.hovered ? bgRect.item : Colors.overBackground
+    readonly property string resolvedImageSource: {
+        const src = String(iconSource || "");
+        if (!src) return "";
+        if (isImageIcon || src.indexOf("/") !== -1 || src.indexOf(":") !== -1 || src.indexOf(".") !== -1)
+            return src;
+        if (src.length === 1 && src.charCodeAt(0) >= 0xe000)
+            return "";
+        return Quickshell.iconPath(src, true) || "";
+    }
+
+    readonly property color fgColor: !root.isSeparator && root.itemEnabled && root.hovered ? bgRect.item : Colors.overBackground
 
     implicitWidth: 200
     implicitHeight: isSeparator ? 10 : 36
-    enabled: !isSeparator
+    enabled: !isSeparator && itemEnabled
 
     padding: 0
     background: StyledRect {
         id: bgRect
-        variant: !root.isSeparator && root.hovered ? "focus" : "transparent"
+        variant: !root.isSeparator && root.itemEnabled && root.hovered ? "focus" : "transparent"
         enableShadow: false
         radius: Styling.radius(0)
 
@@ -54,6 +67,7 @@ Button {
     contentItem: RowLayout {
         spacing: 8
         visible: !root.isSeparator
+        opacity: root.itemEnabled ? 1.0 : 0.45
 
         anchors.fill: parent
         anchors.leftMargin: 8 + root.depth * 12
@@ -108,13 +122,13 @@ Button {
         Loader {
             Layout.preferredWidth: 16
             Layout.preferredHeight: 16
-            visible: root.iconSource !== "" && root.buttonType === 0
-            sourceComponent: root.isImageIcon ? imageIcon : fontIcon
+            visible: (root.resolvedImageSource !== "" || (String(root.iconSource || "").length === 1)) && root.buttonType === 0
+            sourceComponent: root.resolvedImageSource !== "" ? imageIcon : fontIcon
 
             Component {
                 id: fontIcon
                 Text {
-                    text: root.iconSource
+                    text: String(root.iconSource || "")
                     font.family: Icons.font
                     font.pixelSize: 14
                     color: root.fgColor
@@ -126,7 +140,7 @@ Button {
             Component {
                 id: imageIcon
                 Image {
-                    source: root.iconSource
+                    source: root.resolvedImageSource
                     fillMode: Image.PreserveAspectFit
                     mipmap: true
                 }

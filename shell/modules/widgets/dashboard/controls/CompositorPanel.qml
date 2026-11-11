@@ -562,6 +562,17 @@ Item {
                             }
 
                             ToggleRow {
+                                label: "Floating Windows Only"
+                                checked: Config.compositor.floatingShadowOnly ?? false
+                                enabled: Config.compositor.shadowEnabled ?? true
+                                opacity: enabled ? 1.0 : 0.5
+                                onToggled: value => {
+                                    GlobalStates.markCompositorChanged();
+                                    Config.compositor.floatingShadowOnly = value;
+                                }
+                            }
+
+                            ToggleRow {
                                 label: "Sync Color"
                                 checked: Config.compositor.syncShadowColor ?? false
                                 onToggled: value => {

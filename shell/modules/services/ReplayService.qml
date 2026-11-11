@@ -11,6 +11,12 @@ Singleton {
 
     property bool active: false
     property bool saving: false
+    property string lastSavedClip: ""
+    property string savedScreenName: ""
+    property double _saveRequestedAt: 0
+    property int _detectAttempts: 0
+
+    signal clipSaved(string path, string screenName)
     readonly property int bufferSeconds: Config.system.replay?.seconds ?? 60
     property string captureMode: "screen"
     property string captureRegion: ""
@@ -81,6 +87,9 @@ Singleton {
         if (!root.active || root.daemonPid <= 0 || root.saving)
             return;
         root.saving = true;
+        root.savedScreenName = Compositor.focusedMonitor?.name || Quickshell.screens[0]?.name || "";
+        root._saveRequestedAt = Date.now();
+        root._detectAttempts = 0;
         saveProcess.command = ["kill", "-USR1", "" + root.daemonPid];
         saveProcess.running = true;
     }
@@ -197,7 +206,7 @@ Singleton {
                 audioSources.push("default_input");
             if (audioSources.length > 0)
                 cmd.push("-a", audioSources.join("|"));
-            cmd.push("-r", "" + root.activeSeconds, "-c", "mp4", "-o", root.videosDir);
+            cmd.push("-sc", Paths.script("replay_saved.sh"), "-r", "" + root.activeSeconds, "-c", "mp4", "-o", root.videosDir);
             daemonProcess.command = cmd;
             daemonProcess.running = true;
         }
@@ -249,11 +258,7 @@ Singleton {
         running: false
         onExited: exitCode => {
             if (exitCode === 0) {
-                savingResetTimer.restart();
-                Notifications.notifyInternal({
-                    summary: "Replay",
-                    body: "Requested saving the last " + root.activeSeconds + "s to " + root.videosDir
-                });
+                saveDetectTimer.restart();
             } else {
                 root.saving = false;
                 Notifications.notifyInternal({
@@ -265,9 +270,46 @@ Singleton {
     }
 
     Timer {
-        id: savingResetTimer
-        interval: 1500
-        onTriggered: root.saving = false
+        id: saveDetectTimer
+        interval: 400
+        repeat: true
+        onTriggered: {
+            root._detectAttempts++;
+            if (!detectSavedProcess.running)
+                detectSavedProcess.running = true;
+            if (root._detectAttempts >= 14) {
+                saveDetectTimer.stop();
+                root.saving = false;
+            }
+        }
+    }
+
+    Process {
+        id: detectSavedProcess
+        command: [
+            "bash", "-c",
+            "rt=\"${XDG_RUNTIME_DIR:-/tmp}/pangu/last-replay\"; "
+            + "if [ -f \"$rt\" ]; then p=\"$(cat \"$rt\")\"; rm -f \"$rt\"; [ -f \"$p\" ] && { printf '%s\\n' \"$p\"; exit 0; }; fi; "
+            + "newest=\"$(find \"$1\" -maxdepth 1 -type f -name '*.mp4' -printf '%T@ %p\\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)\"; "
+            + "if [ -n \"$newest\" ]; then mtime=\"$(stat -c '%Y' -- \"$newest\" 2>/dev/null || echo 0)\"; "
+            + "[ \"$((mtime * 1000))\" -ge \"$2\" ] && printf '%s\\n' \"$newest\"; fi",
+            "pangu-replay-detect",
+            root.videosDir,
+            "" + Math.max(0, Math.floor(root._saveRequestedAt - 1500))
+        ]
+        running: false
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                const found = text.trim();
+                if (found !== "" && found !== root.lastSavedClip) {
+                    saveDetectTimer.stop();
+                    root.saving = false;
+                    root.lastSavedClip = found;
+                    root.clipSaved(found, root.savedScreenName || Compositor.focusedMonitor?.name || Quickshell.screens[0]?.name || "");
+                }
+            }
+        }
     }
 
     Timer {

@@ -104,6 +104,7 @@ MouseArea {
                             iconSource: modelData.icon || ""
                             isImageIcon: iconSource.indexOf("/") !== -1 || iconSource.indexOf(".") !== -1
                             isSeparator: modelData.isSeparator || false
+                            itemEnabled: modelData.enabled ?? true
                             hasSubmenu: modelData.hasChildren || false
                             expanded: parent.submenuExpanded
                             buttonType: modelData.buttonType || 0
@@ -146,6 +147,7 @@ MouseArea {
                                     iconSource: modelData.icon || ""
                                     isImageIcon: iconSource.indexOf("/") !== -1 || iconSource.indexOf(".") !== -1
                                     isSeparator: modelData.isSeparator || false
+                                    itemEnabled: modelData.enabled ?? true
                                     buttonType: modelData.buttonType || 0
                                     checkState: modelData.checkState || 0
 
@@ -168,6 +170,7 @@ MouseArea {
 
     TrayIcon {
         item: root.item
+        hovered: root.isHovered || systrayPopup.isOpen
         anchors.centerIn: parent
     }
 

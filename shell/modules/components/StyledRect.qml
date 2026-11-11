@@ -192,6 +192,41 @@ ClippingRectangle {
     layer.enabled: enableShadow && (Config.theme?.shadowOpacity ?? 0) > 0
     layer.effect: Shadow {}
 
+    readonly property int explicitBorderWidth: borderData && borderData.length > 1 ? borderData[1] : 0
+    readonly property bool showSpecularRim: root.enableBorder
+        && explicitBorderWidth <= 0
+        && (Config.theme?.specularRim ?? true)
+        && root.rectOpacity > 0.05
+        && (root.variant === "bg" || root.variant === "popup" || root.variant === "pane" || root.variant === "common" || root.variant === "surface" || root.variant === "barbg" || root.variant === "focus")
+
+    Loader {
+        anchors.fill: parent
+        active: root.showSpecularRim && root.visible && root.width > 0 && root.height > 0
+
+        sourceComponent: ShaderEffect {
+            property real canvasWidth: width
+            property real canvasHeight: height
+            property real topAlpha: Config.theme.lightMode ? 0.22 : 0.15
+            property real bottomAlpha: Config.theme.lightMode ? 0.06 : 0.02
+            property real strokeWidth: 1.0
+            property vector4d radii: {
+                const base = Math.max(0, root.radius || 0);
+                const tl = root.topLeftRadius !== undefined && root.topLeftRadius >= 0 ? root.topLeftRadius : base;
+                const tr = root.topRightRadius !== undefined && root.topRightRadius >= 0 ? root.topRightRadius : base;
+                const br = root.bottomRightRadius !== undefined && root.bottomRightRadius >= 0 ? root.bottomRightRadius : base;
+                const bl = root.bottomLeftRadius !== undefined && root.bottomLeftRadius >= 0 ? root.bottomLeftRadius : base;
+                return Qt.vector4d(tl, tr, br, bl);
+            }
+            property vector4d rimColor: {
+                const c = Config.theme.lightMode ? Colors.outline : Colors.overBackground;
+                return Qt.vector4d(c.r, c.g, c.b, 1.0);
+            }
+
+            vertexShader: "specular_rim.vert.qsb"
+            fragmentShader: "specular_rim.frag.qsb"
+        }
+    }
+
     ClippingRectangle {
         anchors.fill: parent
         radius: root.radius
@@ -201,7 +236,7 @@ ClippingRectangle {
         bottomRightRadius: root.bottomRightRadius
         color: "transparent"
         border.color: Colors.resolve(borderData && borderData.length > 0 ? borderData[0] : "transparent")
-        border.width: borderData && borderData.length > 1 ? borderData[1] : 0
+        border.width: root.explicitBorderWidth
         visible: root.enableBorder && border.width > 0
     }
 }

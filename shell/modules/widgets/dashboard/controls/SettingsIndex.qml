@@ -30,6 +30,9 @@ QtObject {
         { label: "Discord Theme Export", keywords: "vesktop discord vencord export theme", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
         { label: "NvChad Theme Export", keywords: "neovim nvim base46 export theme", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
         { label: "Pywal Export", keywords: "wal pywal sequences export theme", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
+        { label: "Firefox Theme Export", keywords: "firefox browser userchrome usercontent export theme", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
+        { label: "Spicetify Theme Export", keywords: "spotify spicetify music export theme", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
+        { label: "Specular Rim", keywords: "glass highlight rim edge shader frosted", section: "theme", subSection: "general", subLabel: "Theme > General", icon: Icons.palette, isIcon: true },
         
         { label: "Shadow Opacity", keywords: "darkness alpha transparency", section: "theme", subSection: "shadow", subLabel: "Theme > Shadow", icon: Icons.drop, isIcon: true },
         { label: "Shadow Blur", keywords: "softness diffusion", section: "theme", subSection: "shadow", subLabel: "Theme > Shadow", icon: Icons.drop, isIcon: true },
@@ -74,6 +77,7 @@ QtObject {
         { label: "System Resources", keywords: "cpu ram memory usage monitor disks", section: "system", subSection: "system", subLabel: "System > Resources", icon: Icons.circuitry, isIcon: true },
         { label: "Clipboard History Limit", keywords: "clipboard max items history sqlite prune", section: "system", subSection: "system", subLabel: "System > Resources", icon: Icons.circuitry, isIcon: true },
         { label: "Volume Over-Amplification", keywords: "audio volume 150 boost amplify overamplify sound", section: "system", subSection: "system", subLabel: "System > Resources", icon: Icons.faders, isIcon: true },
+        { label: "Auto-Switch EasyEffects Presets", keywords: "audio easyeffects preset device switch scarlett headset", section: "system", subSection: "system", subLabel: "System > Resources", icon: Icons.waveform, isIcon: true },
 
         { label: "Audio Visualizer", keywords: "cava bars media player performance", section: "system", subSection: "performance", subLabel: "System > Performance", icon: Icons.waveform, isIcon: true },
 
@@ -106,6 +110,7 @@ QtObject {
         { label: "Border Colors", keywords: "active inactive focus", section: "compositor", subSection: "colors", subLabel: "Compositor > Hyprland", icon: Icons.palette, isIcon: true },
 
         { label: "Shadows Enabled", keywords: "toggle on off", section: "compositor", subSection: "shadows", subLabel: "Compositor > Hyprland", icon: Icons.drop, isIcon: true },
+        { label: "Floating Windows Only", keywords: "floating tiled window shadow noshadow", section: "compositor", subSection: "shadows", subLabel: "Compositor > Shadows", icon: Icons.drop, isIcon: true },
         { label: "Sync Shadow Color", keywords: "match border", section: "compositor", subSection: "shadows", subLabel: "Compositor > Hyprland", icon: Icons.palette, isIcon: true },
         { label: "Sync Shadow Opacity", keywords: "match border alpha", section: "compositor", subSection: "shadows", subLabel: "Compositor > Hyprland", icon: Icons.drop, isIcon: true },
         { label: "Shadow Color", keywords: "window drop shadow color", section: "compositor", subSection: "shadows", subLabel: "Compositor > Shadows", icon: Icons.palette, isIcon: true },
@@ -144,7 +149,10 @@ QtObject {
         { label: "Launcher Icon Full Tint", keywords: "monochrome color", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.palette, isIcon: true },
         { label: "Launcher Icon Size", keywords: "width height pixels", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Pill Style", keywords: "squished roundness radius bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
-        { label: "Bar Style", keywords: "floating docked full width edge bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
+        { label: "Bar Style", keywords: "floating docked islands corner full width edge bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
+        { label: "Show Launcher Button", keywords: "launcher button logo hide show bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
+        { label: "Show Weather Temp", keywords: "weather temperature clock degrees bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.thermometer, isIcon: true },
+        { label: "Reserve Screen Space", keywords: "exclusive zone reserve space overlap bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Bar Margin", keywords: "gap distance edge offset bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Bar Spacing", keywords: "gap between widgets buttons bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Bar Padding", keywords: "inner padding content bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },

@@ -5,11 +5,13 @@ import Quickshell.Io
 import qs.config
 import qs.modules.globals
 import qs.modules.services
+import qs.modules.theme
 
 Singleton {
     id: root
 
     property string weatherSymbol: ""
+    property string weatherIcon: Icons.cloud
     property real currentTemp: 0
     property real maxTemp: 0
     property real minTemp: 0
@@ -182,6 +184,7 @@ Singleton {
 
     readonly property string effectiveWeatherEffect: getWeatherEffect(effectiveWeatherCode)
     readonly property real effectiveWeatherIntensity: getWeatherIntensity(effectiveWeatherCode)
+    readonly property string effectiveWeatherIcon: getWeatherCodeIcon(effectiveWeatherCode, effectiveIsDay)
 
     function getWeatherEffect(code) {
         if (code === 0 || code === 1)
@@ -361,6 +364,26 @@ Singleton {
         return "❓";
     }
 
+    function getWeatherCodeIcon(code, day = true) {
+        if (code === 0)
+            return day ? Icons.sun : Icons.moonStars;
+        if (code === 1)
+            return day ? Icons.sunDim : Icons.moonStars;
+        if (code === 2)
+            return day ? Icons.cloudSun : Icons.cloudMoon;
+        if (code === 3)
+            return Icons.cloud;
+        if (code === 45 || code === 48)
+            return Icons.cloudFog;
+        if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82))
+            return Icons.cloudRain;
+        if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86))
+            return Icons.cloudSnow;
+        if (code >= 95 && code <= 99)
+            return Icons.cloudLightning;
+        return Icons.cloud;
+    }
+
     function convertTemp(temp) {
         if (Config.weather?.unit === "F") {
             return (temp * 9 / 5) + 32;
@@ -377,6 +400,7 @@ Singleton {
             dayName: entry.dayName,
             weatherCode: entry.weatherCode,
             emoji: entry.emoji,
+            icon: entry.icon,
             maxTemp: convertTemp(entry.maxTempC),
             minTemp: convertTemp(entry.minTempC)
         }));
@@ -445,6 +469,7 @@ Singleton {
                             dayName: dayName,
                             weatherCode: code,
                             emoji: getWeatherCodeEmoji(code),
+                            icon: getWeatherCodeIcon(code, true),
                             maxTempC: daily.temperature_2m_max ? (parseFloat(daily.temperature_2m_max[i]) || 0) : 0,
                             minTempC: daily.temperature_2m_min ? (parseFloat(daily.temperature_2m_min[i]) || 0) : 0
                         });
@@ -452,9 +477,10 @@ Singleton {
                     root._rawForecastC = rawForecast;
                     root.applyConvertedTemps();
 
-                    root.weatherSymbol = getWeatherCodeEmoji(root.weatherCode);
-                    root.weatherDescription = getWeatherDescription(root.weatherCode);
                     root.calculateSunPosition();
+                    root.weatherSymbol = getWeatherCodeEmoji(root.weatherCode);
+                    root.weatherIcon = getWeatherCodeIcon(root.weatherCode, root.isDay);
+                    root.weatherDescription = getWeatherDescription(root.weatherCode);
                     root.dataAvailable = true;
                     root.isLoading = false;
                     root.hasFailed = false;

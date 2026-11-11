@@ -595,6 +595,16 @@ Item {
                                 Config.system.audio.overAmplify = checked;
                             }
                         }
+
+                        ToggleRow {
+                            Layout.fillWidth: true
+                            label: "Auto-Switch EasyEffects Presets"
+                            description: "Restore saved EasyEffects preset and bypass state per audio device"
+                            checked: Config.system.audio.autoSwitchPresets ?? true
+                            onToggled: checked => {
+                                Config.system.audio.autoSwitchPresets = checked;
+                            }
+                        }
                     }
 
                     ColumnLayout {

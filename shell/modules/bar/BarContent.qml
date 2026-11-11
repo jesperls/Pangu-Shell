@@ -31,7 +31,9 @@ Item {
     readonly property bool flatButtons: (Config.bar && Config.bar.flatButtons !== undefined ? Config.bar.flatButtons : false)
     readonly property string clockPosition: (Config.bar && Config.bar.clockPosition === "center" ? "center" : "right")
     readonly property bool showWorkspaces: (Config.bar && Config.bar.showWorkspaces !== undefined ? Config.bar.showWorkspaces : true)
+    readonly property bool showLauncherButton: (Config.bar && Config.bar.showLauncherButton !== undefined ? Config.bar.showLauncherButton : true)
     readonly property string launcherPosition: (Config.bar && Config.bar.launcherPosition === "end" ? "end" : "start")
+    readonly property bool islandsMode: (Config.bar && Config.bar.style === "islands")
 
     onPinnedChanged: {
         if (Config.bar && Config.bar.pinnedOnStartup !== pinned) {
@@ -169,10 +171,20 @@ Item {
     readonly property bool shadowsEnabled: Config.showBackground && (!actualContainBar || (Config.bar && Config.bar.keepBarShadow !== undefined ? Config.bar.keepBarShadow : false))
 
     readonly property var centerGap: (Config.bar && Config.bar.splitOnCenteredLayout !== undefined ? Config.bar.splitOnCenteredLayout : true) ? Compositor.gapFor(screenName) : null
-    readonly property bool splitActive: orientation === "horizontal" && centerGap !== null && width > 0
     readonly property int splitGapPadding: (centerGap && centerGap.square) ? 0 : (Config.bar && Config.bar.splitGapPadding !== undefined ? Config.bar.splitGapPadding : 4)
-    readonly property real splitStart: splitActive ? Math.max(0, centerGap.x - splitGapPadding) : 0
-    readonly property real splitEnd: splitActive ? Math.min(width, centerGap.x + centerGap.width + splitGapPadding) : 0
+    readonly property real barHorizontalOffset: frameOffset + leftOuterMargin
+    readonly property real barRightOffset: frameOffset + rightOuterMargin
+    readonly property real leftIslandContentWidth: (horizontalLoader.item && horizontalLoader.item.leftContentWidth !== undefined) ? horizontalLoader.item.leftContentWidth : 0
+    readonly property real rightIslandContentWidth: (horizontalLoader.item && horizontalLoader.item.rightContentWidth !== undefined) ? horizontalLoader.item.rightContentWidth : 0
+    readonly property real islandsSplitStart: leftIslandContentWidth > 0 ? (barHorizontalOffset + leftIslandContentWidth + 2 * barPadding) : 0
+    readonly property real islandsSplitEnd: rightIslandContentWidth > 0 ? Math.max(0, width - barRightOffset - (rightIslandContentWidth + 2 * barPadding)) : width
+    readonly property bool islandsSplitValid: islandsMode && orientation === "horizontal" && width > 0 && islandsSplitEnd > islandsSplitStart
+    readonly property bool gapSplitActive: orientation === "horizontal" && centerGap !== null && width > 0
+    readonly property real gapSplitStart: gapSplitActive ? Math.max(0, centerGap.x - splitGapPadding) : 0
+    readonly property real gapSplitEnd: gapSplitActive ? Math.min(width, centerGap.x + centerGap.width + splitGapPadding) : width
+    readonly property bool splitActive: islandsSplitValid || gapSplitActive
+    readonly property real splitStart: islandsSplitValid ? (gapSplitActive ? Math.min(islandsSplitStart, gapSplitStart) : islandsSplitStart) : gapSplitStart
+    readonly property real splitEnd: islandsSplitValid ? (gapSplitActive ? Math.max(islandsSplitEnd, gapSplitEnd) : islandsSplitEnd) : (gapSplitActive ? gapSplitEnd : 0)
 
     property alias barHitbox: barHitboxLeft
     property alias barHitboxRight: barHitboxRightItem
@@ -340,39 +352,78 @@ Item {
                 id: barBg
                 anchors.fill: parent
                 position: root.barPosition
-                splitStart: root.splitActive ? root.splitStart - (root.frameOffset + root.leftOuterMargin) : -1
-                splitEnd: root.splitActive ? root.splitEnd - (root.frameOffset + root.leftOuterMargin) : -1
+                splitStart: root.splitActive ? Math.max(0, root.splitStart - root.barHorizontalOffset) : -1
+                splitEnd: root.splitActive ? Math.max(0, root.splitEnd - root.barHorizontalOffset) : -1
 
                 Loader {
                     id: horizontalLoader
                     active: root.orientation === "horizontal"
                     anchors.fill: parent
                     sourceComponent: RowLayout {
+                        id: horizontalRow
                         spacing: root.barSpacing
 
                         readonly property var notchContainer: Visibilities.getNotchForScreen(root.screenName)
+                        readonly property real leftContentWidth: {
+                            const items = [launcherButton, workspacesItem, pinButtonLoader];
+                            let total = 0;
+                            let count = 0;
+                            for (let i = 0; i < items.length; i++) {
+                                const it = items[i];
+                                const w = it ? (it.Layout.preferredWidth > 0 ? it.Layout.preferredWidth : it.implicitWidth) : 0;
+                                if (it && it.visible && w > 0) {
+                                    total += w;
+                                    count++;
+                                }
+                            }
+                            if (root.dockAtStart && integratedDockItem.visible && integratedDockItem.implicitWidth > 0) {
+                                total += integratedDockItem.implicitWidth;
+                                count++;
+                            }
+                            return count > 0 ? total + Math.max(0, count - 1) * horizontalRow.spacing : 0;
+                        }
+                        readonly property real rightContentWidth: {
+                            const items = [toolsButton, sysTrayItem, recordingIndicatorItem, controlsButton, batteryIndicator, clockComponent, powerButton, launcherButtonEnd];
+                            let total = 0;
+                            let count = 0;
+                            if (root.dockAtEnd && integratedDockItem.visible && integratedDockItem.implicitWidth > 0) {
+                                total += integratedDockItem.implicitWidth;
+                                count++;
+                            }
+                            for (let i = 0; i < items.length; i++) {
+                                const it = items[i];
+                                const w = it ? (it.Layout.preferredWidth > 0 ? it.Layout.preferredWidth : it.implicitWidth) : 0;
+                                if (it && it.visible && w > 0) {
+                                    total += w;
+                                    count++;
+                                }
+                            }
+                            return count > 0 ? total + Math.max(0, count - 1) * horizontalRow.spacing : 0;
+                        }
 
                         LauncherButton {
                             id: launcherButton
                             screenName: root.screenName
-                            visible: root.launcherPosition !== "end"
+                            visible: root.showLauncherButton && root.launcherPosition !== "end"
                             startRadius: root.outerRadius
-                            endRadius: root.innerRadius
+                            endRadius: (!root.showWorkspaces && !pinButtonLoader.visible && !root.dockAtStart) ? root.outerRadius : root.innerRadius
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
                         Workspaces {
+                            id: workspacesItem
                             visible: root.showWorkspaces
                             orientation: root.orientation
                             bar: QtObject {
                                 property var screen: root.screen
                             }
-                            startRadius: root.innerRadius
-                            endRadius: root.innerRadius
+                            startRadius: (!root.showLauncherButton || root.launcherPosition === "end") ? root.outerRadius : root.innerRadius
+                            endRadius: (!pinButtonLoader.visible && !root.dockAtStart) ? root.outerRadius : root.innerRadius
                         }
 
                         Loader {
+                            id: pinButtonLoader
                             active: (Config.bar && Config.bar.showPinButton !== undefined ? Config.bar.showPinButton : true)
                             visible: active
                             Layout.alignment: Qt.AlignVCenter
@@ -387,7 +438,7 @@ Item {
                                     variant: root.pinned ? "primary" : "bg"
                                     enableShadow: root.shadowsEnabled
                                     
-                                    property real startRadius: root.innerRadius
+                                    property real startRadius: ((!root.showLauncherButton || root.launcherPosition === "end") && !root.showWorkspaces) ? root.outerRadius : root.innerRadius
                                     property real endRadius: root.dockAtStart ? root.innerRadius : root.outerRadius
                                     
                                     topLeftRadius: startRadius
@@ -449,6 +500,7 @@ Item {
                             visible: root.orientation === "horizontal" && integratedDockEnabled
 
                             Bar.IntegratedDock {
+                                id: integratedDockItem
                                 bar: root
                                 orientation: root.orientation
                                 anchors.verticalCenter: parent.verticalCenter
@@ -493,14 +545,16 @@ Item {
                         }
 
                         SysTray {
+                            id: sysTrayItem
                             bar: root
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
-                            startRadius: root.innerRadius
+                            startRadius: (!toolsButton.visible && !root.dockAtEnd) ? root.outerRadius : root.innerRadius
                             endRadius: root.innerRadius
                         }
 
                         RecordingIndicator {
+                            id: recordingIndicatorItem
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -539,7 +593,7 @@ Item {
                             id: powerButton
                             screenName: root.screenName
                             startRadius: root.innerRadius
-                            endRadius: root.outerRadius
+                            endRadius: (!root.showLauncherButton || root.launcherPosition !== "end") ? root.outerRadius : root.innerRadius
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
                         }
@@ -547,7 +601,7 @@ Item {
                         LauncherButton {
                             id: launcherButtonEnd
                             screenName: root.screenName
-                            visible: root.launcherPosition === "end"
+                            visible: root.showLauncherButton && root.launcherPosition === "end"
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             enableShadow: root.shadowsEnabled
@@ -566,7 +620,7 @@ Item {
                         LauncherButton {
                             id: launcherButtonVert
                             screenName: root.screenName
-                            visible: root.launcherPosition !== "end"
+                            visible: root.showLauncherButton && root.launcherPosition !== "end"
                             Layout.preferredHeight: 36
                             startRadius: root.outerRadius
                             endRadius: root.innerRadius
@@ -756,7 +810,7 @@ Item {
                             screenName: root.screenName
                             Layout.preferredHeight: 36
                             startRadius: root.innerRadius
-                            endRadius: root.outerRadius
+                            endRadius: (!root.showLauncherButton || root.launcherPosition !== "end") ? root.outerRadius : root.innerRadius
                             vertical: true
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
@@ -765,7 +819,7 @@ Item {
                         LauncherButton {
                             id: launcherButtonVertEnd
                             screenName: root.screenName
-                            visible: root.launcherPosition === "end"
+                            visible: root.showLauncherButton && root.launcherPosition === "end"
                             Layout.preferredHeight: 36
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius

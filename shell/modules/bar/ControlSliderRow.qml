@@ -13,6 +13,7 @@ Item {
 
     property string icon: ""
     property real sliderValue: 0
+    property real displayMultiplier: 100
     property real _dragValue: 0
     readonly property real effectiveValue: mouseArea.pressed ? _dragValue : sliderValue
     property color progressColor: Styling.srItem("overprimary")
@@ -186,7 +187,7 @@ Item {
 
             StyledToolTip {
                 delay: 0
-                tooltipText: `${Math.round(root.effectiveValue * 100)}%`
+                tooltipText: `${Math.round(root.effectiveValue * root.displayMultiplier)}%`
                 show: mouseArea.pressed
                 x: dragHandle.x + dragHandle.width / 2 - width / 2
                 y: dragHandle.y - height - 5

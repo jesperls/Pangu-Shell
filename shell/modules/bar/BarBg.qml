@@ -16,13 +16,19 @@ Item {
     readonly property bool effectiveContainBar: Config.bar.containBar && (Config.bar.frameEnabled ?? false)
 
     readonly property string style: (Config.bar && Config.bar.style !== undefined) ? Config.bar.style : "floating"
-    readonly property bool docked: style === "docked"
+    readonly property bool docked: style === "docked" || style === "islands"
 
     property real splitStart: -1
     property real splitEnd: -1
     readonly property bool splitActive: isHorizontal && splitStart >= 0 && splitEnd > splitStart
+    readonly property real leftSegmentWidth: splitActive ? Math.max(0, Math.min(splitStart, width)) : width
+    readonly property real rightSegmentWidth: splitActive ? Math.max(0, width - splitEnd) : 0
 
     readonly property int cornerSize: (Config.theme.enableCorners && root.outerMargin === 0) ? Styling.radius(4) : 0
+    readonly property int leftCornerSize: (!splitActive || leftSegmentWidth > 0) ? cornerSize : 0
+    readonly property int rightCornerSize: (!splitActive || rightSegmentWidth > 0) ? cornerSize : 0
+    readonly property int splitLeftFilletSize: (splitActive && leftSegmentWidth > 0 && leftSegmentWidth + cornerSize <= splitEnd) ? cornerSize : 0
+    readonly property int splitRightFilletSize: (splitActive && rightSegmentWidth > 0 && splitEnd - cornerSize >= leftSegmentWidth) ? cornerSize : 0
     readonly property bool isHorizontal: position === "top" || position === "bottom"
 
     readonly property real bgOpacity: Config.theme.srBarBg.opacity
@@ -74,10 +80,10 @@ Item {
             color: "white"
             x: root.position === "right" ? cornerSize : 0
             y: root.position === "bottom" ? cornerSize : 0
-            width: root.splitActive ? Math.max(0, Math.min(root.splitStart, root.width)) : root.width
+            width: root.leftSegmentWidth
             height: root.height
-            topRightRadius: root.splitActive ? Styling.radius(4) : 0
-            bottomRightRadius: root.splitActive ? Styling.radius(4) : 0
+            topRightRadius: root.splitActive && (root.outerMargin > 0 || root.position === "bottom") ? Styling.radius(4) : 0
+            bottomRightRadius: root.splitActive && (root.outerMargin > 0 || root.position === "top") ? Styling.radius(4) : 0
         }
 
         Rectangle {
@@ -85,16 +91,46 @@ Item {
             color: "white"
             x: root.splitEnd
             y: root.position === "bottom" ? cornerSize : 0
-            width: root.splitActive ? Math.max(0, root.width - root.splitEnd) : 0
+            width: root.rightSegmentWidth
             height: root.height
-            topLeftRadius: Styling.radius(4)
-            bottomLeftRadius: Styling.radius(4)
+            topLeftRadius: (root.outerMargin > 0 || root.position === "bottom") ? Styling.radius(4) : 0
+            bottomLeftRadius: (root.outerMargin > 0 || root.position === "top") ? Styling.radius(4) : 0
+        }
+
+        Item {
+            id: splitLeftFilletMask
+            x: root.leftSegmentWidth
+            y: root.position === "bottom" ? root.height : 0
+            width: root.splitLeftFilletSize
+            height: root.splitLeftFilletSize
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: root.position === "bottom" ? RoundCorner.CornerEnum.BottomLeft : RoundCorner.CornerEnum.TopLeft
+                size: Math.max(root.splitLeftFilletSize, 1)
+                color: "white"
+            }
+        }
+
+        Item {
+            id: splitRightFilletMask
+            x: root.splitEnd - root.splitRightFilletSize
+            y: root.position === "bottom" ? root.height : 0
+            width: root.splitRightFilletSize
+            height: root.splitRightFilletSize
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: root.position === "bottom" ? RoundCorner.CornerEnum.BottomRight : RoundCorner.CornerEnum.TopRight
+                size: Math.max(root.splitRightFilletSize, 1)
+                color: "white"
+            }
         }
 
         Item {
             id: cornerLeftMask
-            width: cornerSize
-            height: cornerSize
+            width: root.leftCornerSize
+            height: root.leftCornerSize
 
             states: [
                 State {
@@ -147,15 +183,15 @@ Item {
                     if (root.position === "right")
                         return RoundCorner.CornerEnum.TopRight;
                 }
-                size: Math.max(cornerSize, 1)
+                size: Math.max(root.leftCornerSize, 1)
                 color: "white"
             }
         }
 
         Item {
             id: cornerRightMask
-            width: cornerSize
-            height: cornerSize
+            width: root.rightCornerSize
+            height: root.rightCornerSize
 
             states: [
                 State {
@@ -163,7 +199,7 @@ Item {
                     when: root.position === "top"
                     PropertyChanges {
                         target: cornerRightMask
-                        x: root.width - cornerSize
+                        x: root.width - root.rightCornerSize
                         y: root.height
                     }
                 },
@@ -172,7 +208,7 @@ Item {
                     when: root.position === "bottom"
                     PropertyChanges {
                         target: cornerRightMask
-                        x: root.width - cornerSize
+                        x: root.width - root.rightCornerSize
                         y: 0
                     }
                 },
@@ -182,7 +218,7 @@ Item {
                     PropertyChanges {
                         target: cornerRightMask
                         x: root.width
-                        y: root.height - cornerSize
+                        y: root.height - root.rightCornerSize
                     }
                 },
                 State {
@@ -191,7 +227,7 @@ Item {
                     PropertyChanges {
                         target: cornerRightMask
                         x: 0
-                        y: root.height - cornerSize
+                        y: root.height - root.rightCornerSize
                     }
                 }
             ]
@@ -208,7 +244,7 @@ Item {
                     if (root.position === "right")
                         return RoundCorner.CornerEnum.BottomRight;
                 }
-                size: Math.max(cornerSize, 1)
+                size: Math.max(root.rightCornerSize, 1)
                 color: "white"
             }
         }

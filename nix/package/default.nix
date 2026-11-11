@@ -9,6 +9,7 @@
   kdePackages,
   qt6,
 
+  aria2,
   bash,
   bluez,
   brightnessctl,
@@ -25,6 +26,7 @@
   gnused,
   gpu-screen-recorder,
   grim,
+  headsetcontrol,
   hypridle,
   hyprpicker,
   imagemagick,
@@ -62,6 +64,7 @@
   zbar,
   zenity,
   ydotool,
+  yt-dlp,
 
   version ? "1.1.5",
   ocrLanguages ? [
@@ -166,6 +169,7 @@ let
   runtimeInputs = [
     quickshell
 
+    aria2
     bash
     bluez
     brightnessctl
@@ -182,6 +186,7 @@ let
     gnused
     (gpu-screen-recorder.override { wrapperDir = "/run/wrappers/bin"; }) # execs the setcap gsr-kms-server for promptless capture
     grim
+    headsetcontrol
     hypridle
     hyprpicker
     imagemagick
@@ -216,6 +221,7 @@ let
     zbar
     zenity
     ydotool
+    yt-dlp
   ];
 in
 writeShellApplication {

@@ -87,9 +87,9 @@ Item {
                 id: volumeSlider
                 Layout.fillWidth: true
                 Layout.preferredHeight: 20
-                value: root.volume
+                value: Math.min(1, root.volume / Audio.hardMaxValue)
                 scroll: false
-                tooltipText: `${Math.round(effectiveValue * 100)}%`
+                tooltipText: `${Math.round(effectiveValue * Audio.hardMaxValue * 100)}%`
                 progressColor: {
                     if (root.isMuted)
                         return Colors.outline;
@@ -100,7 +100,7 @@ Item {
 
                 onMoved: newValue => {
                     if (root.node?.audio) {
-                        Audio.setNodeVolume(root.node, newValue);
+                        Audio.setNodeVolume(root.node, newValue * Audio.hardMaxValue);
                     }
                 }
 
@@ -148,7 +148,7 @@ Item {
             }
 
             Text {
-                text: `${Math.round(volumeSlider.effectiveValue * 100)}%`
+                text: `${Math.round(volumeSlider.effectiveValue * Audio.hardMaxValue * 100)}%`
                 font.family: Config.theme.font
                 font.pixelSize: Styling.fontSize(-2)
                 color: Colors.overSurfaceVariant

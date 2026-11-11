@@ -20,6 +20,7 @@ Item {
 
     readonly property bool showDate: (Config.bar && Config.bar.showDate !== undefined) ? Config.bar.showDate : false
     readonly property bool showSeconds: (Config.bar && Config.bar.showSeconds !== undefined) ? Config.bar.showSeconds : false
+    readonly property bool showWeatherTemp: (Config.bar && Config.bar.showWeatherTemp !== undefined) ? Config.bar.showWeatherTemp : true
     readonly property bool dayIsSymbol: !root.showDate && root.weatherAvailable
 
     required property var bar
@@ -80,13 +81,27 @@ Item {
             anchors.centerIn: parent
             spacing: 8
 
-            Text {
-                id: dayDisplay
-                text: root.showDate ? root.currentDate : (root.weatherAvailable ? WeatherService.weatherSymbol : root.currentDayAbbrev)
-                color: root.popupOpen ? buttonBg.item : Colors.overBackground
-                font.pixelSize: root.dayIsSymbol ? 16 : Config.theme.fontSize
-                font.family: Config.theme.font
-                font.bold: !root.dayIsSymbol
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    id: dayDisplay
+                    text: root.showDate ? root.currentDate : (root.weatherAvailable ? WeatherService.effectiveWeatherIcon : root.currentDayAbbrev)
+                    color: root.popupOpen ? buttonBg.item : (root.dayIsSymbol ? Colors.primary : Colors.overBackground)
+                    font.pixelSize: root.dayIsSymbol ? 16 : Config.theme.fontSize
+                    font.family: root.dayIsSymbol ? Icons.font : Config.theme.font
+                    font.bold: !root.dayIsSymbol
+                }
+
+                Text {
+                    visible: root.dayIsSymbol && root.showWeatherTemp
+                    text: Math.round(WeatherService.currentTemp) + "\u00B0"
+                    color: root.popupOpen ? buttonBg.item : Colors.overSurfaceVariant
+                    font.pixelSize: Config.theme.fontSize
+                    font.family: Config.theme.font
+                    font.weight: Font.Medium
+                }
             }
 
             Separator {
@@ -113,10 +128,10 @@ Item {
 
             Text {
                 id: dayDisplayV
-                text: root.showDate ? root.currentDate : (root.weatherAvailable ? WeatherService.weatherSymbol : root.currentDayAbbrev)
-                color: root.popupOpen ? buttonBg.item : Colors.overBackground
+                text: root.showDate ? root.currentDate : (root.weatherAvailable ? WeatherService.effectiveWeatherIcon : root.currentDayAbbrev)
+                color: root.popupOpen ? buttonBg.item : (root.dayIsSymbol ? Colors.primary : Colors.overBackground)
                 font.pixelSize: root.dayIsSymbol ? 16 : Config.theme.fontSize
-                font.family: Config.theme.font
+                font.family: root.dayIsSymbol ? Icons.font : Config.theme.font
                 font.bold: !root.dayIsSymbol
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.NoWrap
@@ -377,8 +392,10 @@ Item {
 
                                             Text {
                                                 anchors.horizontalCenter: parent.horizontalCenter
-                                                text: forecastDayRow.modelData.emoji
-                                                font.pixelSize: Styling.fontSize(4)
+                                                text: forecastDayRow.modelData.icon || forecastDayRow.modelData.emoji
+                                                font.family: forecastDayRow.modelData.icon ? Icons.font : Config.theme.font
+                                                font.pixelSize: forecastDayRow.modelData.icon ? 18 : Styling.fontSize(4)
+                                                color: Colors.primary
                                             }
 
                                             Text {

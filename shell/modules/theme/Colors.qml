@@ -26,6 +26,8 @@ FileView {
         Config.theme.exports?.kitty ?? true,
         Config.theme.exports?.nvchad ?? true,
         Config.theme.exports?.discord ?? true,
+        Config.theme.exports?.firefox ?? true,
+        Config.theme.exports?.spicetify ?? true,
         GlobalStates.wallpaperManager?.currentWallpaper ?? ""
     ])
     onExportSettingsChanged: generationTimer.restart()
@@ -59,6 +61,14 @@ FileView {
         id: discordGenerator
     }
 
+    property FirefoxGenerator firefoxGenerator: FirefoxGenerator {
+        id: firefoxGenerator
+    }
+
+    property SpicetifyGenerator spicetifyGenerator: SpicetifyGenerator {
+        id: spicetifyGenerator
+    }
+
     property Timer generationTimer: Timer {
         id: generationTimer
         interval: 100
@@ -77,6 +87,10 @@ FileView {
                 nvChadGenerator.generate(colors);
             if (Config.theme.exports?.discord ?? true)
                 discordGenerator.generate(colors);
+            if (Config.theme.exports?.firefox ?? true)
+                firefoxGenerator.generate(colors);
+            if (Config.theme.exports?.spicetify ?? true)
+                spicetifyGenerator.generate(colors);
         }
     }
 
@@ -182,13 +196,16 @@ FileView {
     }
 
     function _oledTint(alpha) {
-        return Qt.tint("#000000", Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, alpha));
+        const r = adapter.overBackground.r * 0.65 + adapter.primary.r * 0.35;
+        const g = adapter.overBackground.g * 0.65 + adapter.primary.g * 0.35;
+        const b = adapter.overBackground.b * 0.65 + adapter.primary.b * 0.35;
+        return Qt.tint("#000000", Qt.rgba(r, g, b, alpha));
     }
 
     property color background: Config.oledMode ? "#000000" : adapter.background
 
-    property color surface: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.1))
-    property color surfaceBright: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.2))
+    property color surface: Config.oledMode ? _oledTint(0.08) : Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.1))
+    property color surfaceBright: Config.oledMode ? _oledTint(0.18) : Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.2))
     property color surfaceContainer: Config.oledMode ? _oledTint(0.07) : adapter.surfaceContainer
     property color surfaceContainerHigh: Config.oledMode ? _oledTint(0.11) : adapter.surfaceContainerHigh
     property color surfaceContainerHighest: Config.oledMode ? _oledTint(0.15) : adapter.surfaceContainerHighest

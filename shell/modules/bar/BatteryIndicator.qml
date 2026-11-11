@@ -167,7 +167,10 @@ Item {
 
         StyledToolTip {
             show: root.isHovered && !root.popupOpen
-            tooltipText: Battery.available ? ("Battery: " + Math.round(Battery.percentage) + "%" + (Battery.isCharging ? " (Charging)" : "")) : ("Power Profile: " + PowerProfile.getProfileDisplayName(PowerProfile.currentProfile))
+            tooltipText: Battery.available
+                ? ("Battery: " + Math.round(Battery.percentage) + "%" + (Battery.isCharging ? " (Charging)" : ""))
+                : ("Power Profile: " + PowerProfile.getProfileDisplayName(PowerProfile.currentProfile)
+                    + (PeripheralBatteryService.devices.length > 0 ? " · " + PeripheralBatteryService.devices[0].name + " " + PeripheralBatteryService.devices[0].percentage + "%" : ""))
         }
     }
 
@@ -177,7 +180,12 @@ Item {
         bar: root.bar
 
         contentWidth: Math.max(280, mainColumn.implicitWidth + batteryPopup.popupPadding * 2)
-        contentHeight: (Battery.available ? 64 : 0) + 36 + batteryPopup.popupPadding * 2
+        contentHeight: mainColumn.implicitHeight + batteryPopup.popupPadding * 2
+
+        onIsOpenChanged: {
+            if (isOpen)
+                PeripheralBatteryService.refresh();
+        }
 
         ColumnLayout {
             id: mainColumn
@@ -248,10 +256,56 @@ Item {
                 }
             }
 
+            Repeater {
+                model: PeripheralBatteryService.devices
+
+                delegate: StyledRect {
+                    id: periphDeviceCard
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 38
+                    variant: "common"
+                    enableShadow: false
+                    radius: Styling.radius(0)
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 10
+
+                        Text {
+                            text: periphDeviceCard.modelData.icon
+                            font.family: Icons.font
+                            font.pixelSize: 16
+                            color: periphDeviceCard.modelData.percentage <= 20 ? Colors.error : Colors.primary
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: periphDeviceCard.modelData.name
+                            textFormat: Text.PlainText
+                            font.family: Styling.defaultFont
+                            font.pixelSize: Styling.fontSize(-1)
+                            color: Colors.overBackground
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: periphDeviceCard.modelData.percentage + "%" + (periphDeviceCard.modelData.charging ? " ⚡" : "")
+                            font.family: Styling.defaultFont
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.bold: true
+                            color: periphDeviceCard.modelData.percentage <= 20 ? Colors.error : Colors.overSurfaceVariant
+                        }
+                    }
+                }
+            }
+
             RowLayout {
                 id: profilesRow
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: 36
                 spacing: 4
 
                 Repeater {

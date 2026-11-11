@@ -94,12 +94,30 @@ Item {
                         spacing: 4
                         visible: EasyEffectsService.available && EasyEffectsService.outputPresets.length > 0
 
-                        Text {
-                            text: "Output Presets"
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
-                            color: Colors.overSurfaceVariant
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "Output Presets"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-1)
+                                font.weight: Font.Medium
+                                color: Colors.overSurfaceVariant
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                visible: (Config.system?.audio?.autoSwitchPresets ?? true) && Audio.sink !== null
+                                text: Audio.friendlyDeviceName(Audio.sink)
+                                textFormat: Text.PlainText
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-2)
+                                color: Colors.primary
+                                elide: Text.ElideRight
+                                Layout.maximumWidth: 220
+                            }
                         }
 
                         Flow {
@@ -189,12 +207,30 @@ Item {
                         spacing: 4
                         visible: EasyEffectsService.available && EasyEffectsService.inputPresets.length > 0
 
-                        Text {
-                            text: "Input Presets"
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
-                            color: Colors.overSurfaceVariant
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "Input Presets"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-1)
+                                font.weight: Font.Medium
+                                color: Colors.overSurfaceVariant
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                visible: (Config.system?.audio?.autoSwitchPresets ?? true) && Audio.source !== null
+                                text: Audio.friendlyDeviceName(Audio.source)
+                                textFormat: Text.PlainText
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-2)
+                                color: Colors.primary
+                                elide: Text.ElideRight
+                                Layout.maximumWidth: 220
+                            }
                         }
 
                         Flow {

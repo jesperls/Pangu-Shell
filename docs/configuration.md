@@ -14,6 +14,8 @@ programs.pangu = {
     gtk.enable = true;
     qt.enable = true;
     kitty.enable = true;
+    firefox.enable = false;
+    spicetify.enable = false;
   };
   systemd.target = "hyprland-session.target";
   hyprland.bindings.enable = false;
@@ -124,10 +126,11 @@ until the next service start. Removing an override leaves its last saved value.
 Arrays replace arrays. `pinnedapps` overrides target the data directory,
 matching the shell's storage. Unknown file names fail module validation; nested
 settings follow the QML schema. Override metadata lets the UI identify
-Nix-managed values. Theme exports (`theme.exports.{gtk,qt,kitty,discord,nvchad,pywal}`),
-clipboard history pruning (`system.clipboard.maxItems`), and audio volume
-over-amplification (`system.audio.overAmplify`) can be configured either here
-or in the Settings window.
+Nix-managed values. Theme exports (`theme.exports.{gtk,qt,kitty,discord,nvchad,pywal,firefox,spicetify}`),
+clipboard history pruning (`system.clipboard.maxItems`), audio volume
+over-amplification (`system.audio.overAmplify`), and per-device EasyEffects
+preset switching (`system.audio.autoSwitchPresets`) can be configured either
+here or in the Settings window.
 
 The Shell settings panel exposes tray icon size (16–32 pixels), spacing
 (0–24 pixels) and color style (`theme`, `original` or `monochrome`). `theme`

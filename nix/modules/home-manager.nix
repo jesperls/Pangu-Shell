@@ -121,7 +121,29 @@ in
         default = false;
         description = "Import Pangu's palette into Kitty.";
       };
+      firefox.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Import Pangu's palette into Firefox profiles.";
+      };
+      spicetify.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Prepare Pangu's Spicetify theme directory.";
+      };
     };
+  };
+
+  options.programs.firefox.profiles = lib.mkOption {
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        config = lib.mkIf (cfg.enable && cfg.theme.firefox.enable) {
+          settings."toolkit.legacyUserProfileCustomizations.stylesheets" = lib.mkDefault true;
+          userChrome = lib.mkBefore ''@import url("file://${config.xdg.cacheHome}/pangu/firefox.css");'';
+          userContent = lib.mkBefore ''@import url("file://${config.xdg.cacheHome}/pangu/firefox.css");'';
+        };
+      }
+    );
   };
 
   config = lib.mkIf cfg.enable (
@@ -219,6 +241,16 @@ in
       (lib.mkIf cfg.theme.kitty.enable {
         programs.kitty.extraConfig = lib.mkAfter "include ${config.xdg.cacheHome}/pangu/kitty.conf";
         systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/kitty.conf 0644 - - -" ];
+      })
+      (lib.mkIf cfg.theme.firefox.enable {
+        systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/firefox.css 0644 - - -" ];
+      })
+      (lib.mkIf cfg.theme.spicetify.enable {
+        systemd.user.tmpfiles.rules = [
+          "d ${config.xdg.configHome}/spicetify/Themes/Pangu 0755 - - -"
+          "f ${config.xdg.configHome}/spicetify/Themes/Pangu/color.ini 0644 - - -"
+          "f ${config.xdg.configHome}/spicetify/Themes/Pangu/user.css 0644 - - -"
+        ];
       })
     ]
   );

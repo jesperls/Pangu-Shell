@@ -317,6 +317,17 @@ Item {
                                 }
                             }
 
+                            ToggleRow {
+                                label: "Specular Rim"
+                                checked: Config.theme.specularRim ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.specularRim) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.specularRim = value;
+                                    }
+                                }
+                            }
+
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
@@ -656,6 +667,28 @@ Item {
                                     if (value !== Config.theme.exports.pywal) {
                                         GlobalStates.markThemeChanged();
                                         Config.theme.exports.pywal = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Firefox Theme Export"
+                                checked: Config.theme.exports.firefox ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.firefox) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.firefox = value;
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Spicetify Theme Export"
+                                checked: Config.theme.exports.spicetify ?? true
+                                onToggled: value => {
+                                    if (value !== Config.theme.exports.spicetify) {
+                                        GlobalStates.markThemeChanged();
+                                        Config.theme.exports.spicetify = value;
                                     }
                                 }
                             }

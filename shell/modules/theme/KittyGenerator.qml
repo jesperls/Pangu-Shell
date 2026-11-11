@@ -12,14 +12,22 @@ QtObject {
             return;
         const fmt = c => c.toString();
 
-        const cursor = fmt(Colors.overSurface);
-        const cursorText = fmt(Colors.overSurfaceVariant);
+        const cursor = fmt(Colors.primary);
+        const cursorText = fmt(Colors.overPrimary);
 
         const foreground = fmt(Colors.overSurface);
         const background = fmt(Colors.background);
-        const selectionForeground = fmt(Colors.overSecondary);
-        const selectionBackground = fmt(Colors.secondaryFixedDim);
-        const urlColor = fmt(Colors.primary);
+        const selectionForeground = fmt(Colors.overPrimary);
+        const selectionBackground = fmt(Colors.primary);
+        const urlColor = fmt(Colors.secondary);
+        const activeBorderColor = fmt(Colors.primary);
+        const inactiveBorderColor = fmt(Colors.outlineVariant);
+        const bellBorderColor = fmt(Colors.tertiary);
+        const activeTabForeground = fmt(Colors.overPrimary);
+        const activeTabBackground = fmt(Colors.primary);
+        const inactiveTabForeground = fmt(Colors.overSurfaceVariant);
+        const inactiveTabBackground = fmt(Colors.surfaceContainer);
+        const tabBarBackground = fmt(Colors.surfaceContainerLowest);
         const backgroundOpacity = Config.theme.srBg.opacity;
 
         const color0 = fmt(Colors.surfaceContainerLow);
@@ -55,7 +63,15 @@ QtObject {
         conf += `background_opacity ${backgroundOpacity}\n`;
         conf += `selection_foreground ${selectionForeground}\n`;
         conf += `selection_background ${selectionBackground}\n`;
-        conf += `url_color ${urlColor}\n\n`;
+        conf += `url_color ${urlColor}\n`;
+        conf += `active_border_color ${activeBorderColor}\n`;
+        conf += `inactive_border_color ${inactiveBorderColor}\n`;
+        conf += `bell_border_color ${bellBorderColor}\n`;
+        conf += `active_tab_foreground ${activeTabForeground}\n`;
+        conf += `active_tab_background ${activeTabBackground}\n`;
+        conf += `inactive_tab_foreground ${inactiveTabForeground}\n`;
+        conf += `inactive_tab_background ${inactiveTabBackground}\n`;
+        conf += `tab_bar_background ${tabBarBackground}\n\n`;
 
         conf += `# black\n`;
         conf += `color0 ${color0}\n`;

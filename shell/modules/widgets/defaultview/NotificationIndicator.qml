@@ -59,19 +59,36 @@ Item {
         Text {
             id: iconText
             anchors.centerIn: parent
-            text: Notifications.silent ? Icons.bellZ : (Notifications.list.length > 0 ? Icons.bellRinging : Icons.bell)
+            text: Notifications.silent ? Icons.bellZ : (Notifications.unreadCount > 0 ? Icons.bellRinging : Icons.bell)
             textFormat: Text.RichText
             font.family: Icons.font
             font.pixelSize: 18
-            color: hovered ? Styling.srItem("overprimary") : (Notifications.list.length > 0 ? Colors.error : Colors.overBackground)
+            color: hovered ? Styling.srItem("overprimary") : (Notifications.silent ? Colors.outline : (Notifications.unreadCount > 0 ? Colors.primary : Colors.overSurfaceVariant))
 
             HoverHandler {
                 onHoveredChanged: root.hovered = hovered
             }
 
             TapHandler {
-                onTapped: Notifications.silent = !Notifications.silent
+                onTapped: {
+                    if (Notifications.unreadCount > 0)
+                        Notifications.markAllRead();
+                    else
+                        Notifications.silent = !Notifications.silent;
+                }
             }
+        }
+
+        Rectangle {
+            visible: !Notifications.silent && Notifications.unreadCount > 0
+            width: 6
+            height: 6
+            radius: 3
+            color: Colors.primary
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 3
+            anchors.rightMargin: 2
         }
     }
 

@@ -22,6 +22,7 @@ Item {
     property real position: player?.position ?? 0.0
     property real length: player?.length ?? 1.0
     property bool hasArtwork: (player?.trackArtUrl ?? "") !== ""
+    readonly property bool showMediaArt: player !== null && (hasArtwork || wallpaperPath !== "")
     property string wallpaperPath: {
         if (!GlobalStates.wallpaperManager) return "";
         let path = GlobalStates.wallpaperManager.currentWallpaper;
@@ -68,8 +69,9 @@ Item {
 
     readonly property string noMediaText: {
         const displayType = Config.notch.noMediaDisplay ?? "userHost";
+        if (displayType === "focusedWindow") return focusedTitle || userHostText;
         if (displayType === "userHost") return userHostText;
-        if (displayType === "compositor") return "Compositor";
+        if (displayType === "compositor") return "Hyprland";
         return Config.notch.customText ?? "Pangu";
     }
 
@@ -77,7 +79,15 @@ Item {
         if (player) {
             return (player.trackArtist ? player.trackArtist + " - " : "") + (player.trackTitle || "Unknown");
         }
-        return focusedTitle || noMediaText;
+        return noMediaText;
+    }
+
+    readonly property real idleImplicitWidth: Math.ceil(idleMetrics.advanceWidth) + 28
+
+    TextMetrics {
+        id: idleMetrics
+        font: mediaTitle.font
+        text: compactPlayer.displayedTitle
     }
 
     Timer {
@@ -88,20 +98,36 @@ Item {
     }
 
     StyledRect {
-        variant: "common"
+        variant: compactPlayer.player ? "common" : "internalbg"
         anchors.fill: parent
         radius: Styling.radius(-4)
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(Colors.primary.r, Colors.primary.g, Colors.primary.b, compactPlayer.isPlaying ? 0.32 : 0.0)
+
+            Behavior on border.color {
+                enabled: Styling.animDuration > 0
+                ColorAnimation {
+                    duration: Styling.animDuration
+                }
+            }
+        }
 
         Text {
             id: mediaTitle
             anchors.centerIn: parent
-            width: parent.width - 32
+            width: parent.width - 24
             text: compactPlayer.displayedTitle
             textFormat: Text.PlainText
             font.family: Config.theme.font
             font.pixelSize: Styling.fontSize(0)
-            font.bold: true
-            color: Colors.overBackground
+            font.bold: compactPlayer.player !== null
+            font.weight: compactPlayer.player !== null ? Font.Bold : Font.Medium
+            color: compactPlayer.player !== null ? Colors.overBackground : Colors.overSurfaceVariant
             elide: Text.ElideRight
             visible: opacity > 0
             opacity: (compactPlayer.notchHovered && compactPlayer.player) ? 0.0 : 1.0
@@ -126,7 +152,7 @@ Item {
                 mipmap: true
                 id: backgroundArt
                 anchors.fill: parent
-                source: (compactPlayer.player?.trackArtUrl ?? "") !== "" ? compactPlayer.player.trackArtUrl : compactPlayer.wallpaperPath
+                source: compactPlayer.showMediaArt ? ((compactPlayer.player?.trackArtUrl ?? "") !== "" ? compactPlayer.player.trackArtUrl : compactPlayer.wallpaperPath) : ""
                 sourceSize: Qt.size(64, 64)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
@@ -136,11 +162,11 @@ Item {
             MultiEffect {
                 anchors.fill: backgroundArt
                 source: backgroundArt
-                blurEnabled: hasArtwork || wallpaperPath !== ""
+                blurEnabled: compactPlayer.showMediaArt
                 blurMax: 32
                 blur: 0.75
                 autoPaddingEnabled: false
-                opacity: (hasArtwork || wallpaperPath !== "") ? 1.0 : 0.0
+                opacity: compactPlayer.showMediaArt ? 1.0 : 0.0
                 Behavior on opacity {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
@@ -153,7 +179,7 @@ Item {
             StyledRect {
                 anchors.fill: parent
                 variant: "internalbg"
-                opacity: (hasArtwork || wallpaperPath !== "") ? 0.5 : 0.0
+                opacity: compactPlayer.showMediaArt ? 0.5 : 0.0
                 radius: Styling.radius(-4)
                 Behavior on opacity {
                     enabled: Styling.animDuration > 0
@@ -265,7 +291,7 @@ Item {
                         color: playPauseHover.hovered ? Styling.srItem("overprimary") : Colors.overBackground
                         font.pixelSize: 16
                         font.family: Icons.font
-                        opacity: (compactPlayer.player?.canPause ?? false) && compactPlayer.notchHovered ? 1.0 : 0.0
+                        opacity: ((compactPlayer.player?.canPause || compactPlayer.player?.canPlay || compactPlayer.player?.canTogglePlaying) ?? false) && compactPlayer.notchHovered ? 1.0 : 0.0
                         scale: 1.0
                         layer.enabled: true
                         layer.effect: BgShadow {}
@@ -577,7 +603,7 @@ Item {
         id: playerPopup
         anchorItem: playerIcon
         bar: ({
-                position: Config.bar?.position ?? "top"
+                barPosition: Config.notchPosition ?? "top"
             })
 
         contentWidth: 250

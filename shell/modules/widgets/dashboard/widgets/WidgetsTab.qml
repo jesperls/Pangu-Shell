@@ -13,11 +13,27 @@ import qs.config
 import "calendar"
 
 Rectangle {
+    id: rootTab
     color: "transparent"
     implicitWidth: 760
     implicitHeight: 750
 
     property int leftPanelWidth: 0
+
+    onVisibleChanged: {
+        Notifications.viewingHistory = visible;
+        if (visible)
+            Notifications.markAllRead();
+    }
+
+    Component.onCompleted: {
+        if (visible) {
+            Notifications.viewingHistory = true;
+            Notifications.markAllRead();
+        }
+    }
+
+    Component.onDestruction: Notifications.viewingHistory = false
 
     RowLayout {
         anchors.fill: parent

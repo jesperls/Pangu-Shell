@@ -224,6 +224,9 @@ Rectangle {
             }
 
             let apps = searchText.length > 0 ? AppSearch.fuzzyQuery(searchText) : AppSearch.getAllApps();
+            const mediaEntries = MediaGrabberService.entriesForLauncher(searchText);
+            if (mediaEntries.length > 0)
+                apps = mediaEntries.concat(apps);
             if (calcExpr.length > 0 && calcResult.length > 0)
                 apps = [calcEntry()].concat(apps);
             filteredApps = apps;
@@ -313,6 +316,14 @@ Rectangle {
             target: AppSearch
             function onResultsChanged() {
                 if (appLauncher.visible) appLauncher.updateFilteredApps();
+            }
+        }
+
+        Connections {
+            target: MediaGrabberService
+            function onClipboardMediaUrlChanged() {
+                if (appLauncher.visible && appLauncher.searchText.length === 0)
+                    appLauncher.updateFilteredApps();
             }
         }
 

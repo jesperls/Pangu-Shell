@@ -147,6 +147,19 @@ ShellRoot {
         }
     }
 
+    Variants {
+        model: Quickshell.screens
+
+        Loader {
+            id: replayOverlayLoader
+            active: SuspendManager.wakeReady
+            required property ShellScreen modelData
+            sourceComponent: ReplayOverlay {
+                targetScreen: replayOverlayLoader.modelData
+            }
+        }
+    }
+
     Loader {
         id: screenRecordLoader
         active: SuspendManager.wakeReady && GlobalStates.screenRecordToolVisible
@@ -252,6 +265,9 @@ ShellRoot {
         void WallpaperSlideshowService.enabled;
         void AutoThemeService.enabled;
         void ReplayService.active;
+        void EasyEffectsService.available;
+        void PeripheralBatteryService.devices;
+        void MediaGrabberService.clipboardMediaUrl;
         void MacroService.enabled;
         void PomodoroService.isRunning;
     })

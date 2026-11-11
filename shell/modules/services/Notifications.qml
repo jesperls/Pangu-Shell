@@ -126,11 +126,17 @@ Singleton {
     }
 
     property bool silent: false
+    property int unreadCount: 0
+    property bool viewingHistory: false
     property list<Notif> list: []
     property var popupList: list.filter(notif => notif.popup)
     property bool popupInhibited: silent
     property var latestTimeForApp: ({})
     property var hoveredScreens: ({})
+
+    function markAllRead() {
+        root.unreadCount = 0;
+    }
 
     onSilentChanged: if (StateService.initialized) StateService.set("dnd", root.silent)
 
@@ -327,6 +333,8 @@ Singleton {
 
             Qt.callLater(() => {
                 root.appendNotification(newNotifObject);
+                if (!root.viewingHistory)
+                    root.unreadCount++;
                 saveNotifications();
             });
 
@@ -386,6 +394,8 @@ Singleton {
         }
 
         root.appendNotification(newNotifObject);
+        if (!root.viewingHistory && options.silentUnread !== true)
+            root.unreadCount++;
         saveNotifications();
         root.notify(newNotifObject);
         return newNotifObject;
@@ -397,6 +407,7 @@ Singleton {
         if (index !== -1) {
             const removed = root.list[index];
             root.list.splice(index, 1);
+            root.unreadCount = Math.min(root.unreadCount, root.list.length);
             triggerListChange();
             saveNotifications();
             root.scheduleDestroy(removed);
@@ -422,6 +433,7 @@ Singleton {
         if (removedCount > 0) {
             const removed = root.list.filter(notif => idsMap[notif.id]);
             root.list = newList;
+            root.unreadCount = Math.min(root.unreadCount, root.list.length);
             triggerListChange();
             saveNotifications();
             removed.forEach(notif => root.scheduleDestroy(notif));
@@ -439,6 +451,7 @@ Singleton {
     function discardAllNotifications() {
         const removed = root.list.slice(0);
         root.list = [];
+        root.unreadCount = 0;
         triggerListChange();
         saveNotifications();
         removed.forEach(notif => root.scheduleDestroy(notif));

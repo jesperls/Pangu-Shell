@@ -115,6 +115,7 @@ Singleton {
             property int monoFontSize: 14
             property bool tintIcons: false
             property bool enableCorners: true
+            property bool specularRim: true
             property int animDuration: 300
             property real shadowOpacity: 0.5
             property string shadowColor: "shadow"
@@ -471,6 +472,8 @@ Singleton {
                 property bool discord: true
                 property bool pywal: true
                 property bool nvchad: true
+                property bool firefox: true
+                property bool spicetify: true
             }
         }
     }
@@ -486,6 +489,7 @@ Singleton {
             property int margin: 4
             property int spacing: 4
             property int padding: 4
+            property bool showLauncherButton: true
             property string launcherIcon: ""
             property bool launcherIconTint: false
             property bool launcherIconFullTint: false
@@ -511,6 +515,8 @@ Singleton {
             property bool use12hFormat: false
             property bool showSeconds: false
             property bool showDate: false
+            property bool showWeatherTemp: true
+            property bool reserveSpace: true
             property bool containBar: false
             property bool keepBarShadow: false
             property bool keepBarBorder: false
@@ -572,7 +578,7 @@ Singleton {
         name: "compositor"
 
         adapter: JsonAdapter {
-            property var activeBorderColor: ["primary"]
+            property var activeBorderColor: ["primary", "tertiary"]
             property int borderAngle: 45
             property var inactiveBorderColor: ["surface"]
             property int inactiveBorderAngle: 45
@@ -586,6 +592,7 @@ Singleton {
             property int gapsIn: 2
             property int gapsOut: 4
             property bool shadowEnabled: true
+            property bool floatingShadowOnly: false
             property int shadowRange: 8
             property int shadowRenderPower: 3
             property bool shadowSharp: false
@@ -731,6 +738,7 @@ Singleton {
             }
             property JsonObject audio: JsonObject {
                 property bool overAmplify: false
+                property bool autoSwitchPresets: true
             }
         }
     }

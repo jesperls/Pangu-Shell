@@ -111,13 +111,13 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
-    match = { namespace = "^pangu(:(osd|cheatsheet|overview|context-menu))?$" },
+    match = { namespace = "^pangu(:(osd|cheatsheet|overview|context-menu|screenshot-overlay|replay-overlay))?$" },
     blur = true,
     blur_popups = true,
     ignore_alpha = ${ignoreAlpha.toFixed(2)},
 })
 
-hl.layer_rule({ match = { namespace = "selection" }, no_anim = true }) -- Animations lag behind slurp's drag.
+${c.shadowEnabled && c.floatingShadowOnly ? `hl.window_rule({ match = { float = false }, no_shadow = true })\n\n` : ""}hl.layer_rule({ match = { namespace = "selection" }, no_anim = true }) -- Animations lag behind slurp's drag.
 `;
     }
 

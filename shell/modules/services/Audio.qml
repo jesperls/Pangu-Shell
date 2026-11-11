@@ -81,6 +81,11 @@ Singleton {
                 root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
             }
         }
+        function onVolumesChanged() {
+            if (root._sinkSettled && root.sink?.ready && SuspendManager.wakeReady && Number.isFinite(root.sink.audio.volume)) {
+                root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
+            }
+        }
         function onMutedChanged() {
             if (root._sinkSettled && root.sink?.ready && SuspendManager.wakeReady && Number.isFinite(root.sink.audio.volume)) {
                 root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
@@ -92,6 +97,11 @@ Singleton {
         target: root.source?.audio ?? null
         ignoreUnknownSignals: true
         function onVolumeChanged() {
+            if (root._sourceSettled && root.source?.ready && SuspendManager.wakeReady && Number.isFinite(root.source.audio.volume)) {
+                root.micVolumeChanged(root.source.audio.volume, root.source.audio.muted, root.source);
+            }
+        }
+        function onVolumesChanged() {
             if (root._sourceSettled && root.source?.ready && SuspendManager.wakeReady && Number.isFinite(root.source.audio.volume)) {
                 root.micVolumeChanged(root.source.audio.volume, root.source.audio.muted, root.source);
             }
@@ -116,6 +126,19 @@ Singleton {
         if (!name) return true;
         if (name.startsWith("alsa_input.hw_") || name.startsWith("alsa_output.hw_")) return true;
         if (name.includes(".split") || name.includes("/Internal") || name.startsWith("loopback-")) return true;
+        if (name === "easyeffects_sink" || name === "easyeffects_source" || name.startsWith("ee_soe_") || name.startsWith("ee_sie_")) return true;
+        return false;
+    }
+
+    function isInternalStream(node) {
+        const name = (node?.name ?? "").toLowerCase();
+        const app = (node?.properties?.["application.name"] ?? "").toLowerCase();
+        if (name.startsWith("ee_") || name.includes(".split") || name.startsWith("loopback-"))
+            return true;
+        if (app === "quickshell" || app === "cava" || app === "easyeffects" || app === "easy effects" || app === "gpu-screen-recorder")
+            return true;
+        if (name === "quickshell" || name === "cava" || name === "gpu-screen-recorder")
+            return true;
         return false;
     }
 
@@ -124,7 +147,7 @@ Singleton {
     }
 
     function appNodes(isSink) {
-        return Pipewire.nodes.values.filter(node => root.correctType(node, isSink) && node.isStream);
+        return Pipewire.nodes.values.filter(node => root.correctType(node, isSink) && node.isStream && !root.isInternalStream(node));
     }
 
     function devices(isSink) {

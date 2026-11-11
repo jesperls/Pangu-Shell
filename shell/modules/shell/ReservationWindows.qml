@@ -35,7 +35,7 @@ Item {
     function reservationZone(edge) {
         if (!Config.barReady) return 0;
         let zone = actualFrameSize;
-        if (barEnabled && barPosition === edge && barPinned) {
+        if (barEnabled && (Config.bar?.reserveSpace ?? true) && barPosition === edge && barPinned) {
             zone += barSize + barOuterMargin;
             if (containBar && frameEnabled) zone += actualFrameSize;
         }
