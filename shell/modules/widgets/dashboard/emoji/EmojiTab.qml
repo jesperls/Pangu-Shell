@@ -672,7 +672,7 @@ Rectangle {
                             Text {
                                 width: parent.width - 40
                                 height: parent.height
-                                text: emojiData.search
+                                text: emojiData.name
                                 color: isSelected ? (root.expandedItemIndex === index ? Colors.overSurface : Styling.srItem("primary")) : Colors.overSurface
                                 font.family: Config.theme.font
                                 font.weight: Font.Bold

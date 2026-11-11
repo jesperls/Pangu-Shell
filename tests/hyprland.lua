@@ -105,7 +105,7 @@ hl = {
     }
   end,
   get_workspaces = function()
-    return { { id = 1 }, { id = 2 } }
+    return { { id = 1 }, { id = 2 }, { name = "special:scratchpad", id = nil, special = true } }
   end,
   timer = function()
     return { set_enabled = function() end }
@@ -150,15 +150,19 @@ local target = {
 layout.recalculate({ area = { x = 0, y = 44, w = 5120, h = 1396 }, targets = { target } })
 assert(placed.w == 2560 and placed.x == 1280, "Single centered window lost its width")
 
-local binds, bind_flags, dispatched, drag_started = {}, {}, 0, 0
+local binds, bind_flags, dispatched, drag_started, release_binds = {}, {}, 0, 0, 0
 local floating = true
 local function dispatcher()
   return {}
 end
 hl = {
   bind = function(_, callback, flags)
-    binds[flags.description] = callback
-    bind_flags[flags.description] = flags
+    if flags.description then
+      binds[flags.description] = callback
+      bind_flags[flags.description] = flags
+    elseif flags.release then
+      release_binds = release_binds + 1
+    end
   end,
   dsp = setmetatable({
     window = setmetatable({}, {
@@ -213,6 +217,7 @@ for _, desc in ipairs({
   local f = assert(bind_flags[desc], "Missing mouse bind: " .. desc)
   assert(not f.drag and not f.release, desc .. " must fire on button-down, not drag/release")
 end
+assert(release_binds == 2, "Mouse release cleanup binds must omit description so cheatsheet hides them")
 binds["Mouse: resize window"]()
 binds["Mouse: resize window (side button)"]()
 assert(dispatched == 2 and drag_started == 0, "Floating windows cannot be resized in centered workspaces")

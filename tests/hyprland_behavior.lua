@@ -115,7 +115,7 @@ hl = {
     elseif d.kind == "move" and d.args.workspace then
       local ws_name = tostring(d.args.workspace)
       if ws_name:sub(1, 8) == "special:" then
-        d.args.window.workspace = { id = -99, name = ws_name, monitor = active_mon }
+        d.args.window.workspace = { id = nil, special = true, name = ws_name, monitor = active_mon }
         special_windows[ws_name] = special_windows[ws_name] or {}
         table.insert(special_windows[ws_name], d.args.window)
       else
@@ -125,13 +125,16 @@ hl = {
       d.args.window.at = { x = d.args.x, y = d.args.y }
     elseif d.kind == "toggle_special" then
       local sname = "special:" .. d.args
+      if active_mon.active_special_workspace and active_mon.active_special_workspace.name == sname then
+        active_mon.active_special_workspace = nil
+        return
+      end
       for _, m in ipairs({ dp2, dp3 }) do
         if m.active_special_workspace and m.active_special_workspace.name == sname then
           m.active_special_workspace = nil
-          return
         end
       end
-      active_mon.active_special_workspace = { id = -99, name = sname }
+      active_mon.active_special_workspace = { id = nil, special = true, name = sname }
     end
   end,
   dsp = {

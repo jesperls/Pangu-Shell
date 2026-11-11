@@ -29,7 +29,7 @@ end
 local function workspace_id(ctx)
   for _, target in ipairs(ctx.targets) do
     local window = target.window
-    if window and window.workspace then
+    if window and window.workspace and window.workspace.id then
       return window.workspace.id
     end
   end
@@ -278,10 +278,12 @@ local function prune_session()
   local live_ws = {}
   local live_windows = {}
   for _, ws in ipairs(hl.get_workspaces()) do
-    live_ws[ws.id] = true
-    if not hl.get_windows then
-      for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
-        live_windows[window.stable_id] = true
+    if ws.id then -- special workspaces have ws.id == nil
+      live_ws[ws.id] = true
+      if not hl.get_windows then
+        for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
+          live_windows[window.stable_id] = true
+        end
       end
     end
   end
@@ -459,7 +461,7 @@ end
 
 function M.center_active()
   local workspace = hl.get_active_workspace()
-  if workspace then
+  if workspace and workspace.id then
     promote_pending[workspace.id] = true
   end
 end

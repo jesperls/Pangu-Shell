@@ -1498,4 +1498,24 @@ ShellRoot {
                     content,
                     f"{qml.relative_to(SHELL)} declares PanelWindow without WlrLayershell.namespace",
                 )
+            for mask_match in re.finditer(r"\bItem\s*\{\s*id:\s*(\w*Mask\w*)\b", content):
+                start = mask_match.start()
+                depth = 0
+                end = start
+                for idx in range(start, len(content)):
+                    if content[idx] == "{":
+                        depth += 1
+                    elif content[idx] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = idx + 1
+                            break
+                mask_body = content[start:end]
+                if re.search(r"^\s*visible:\s*false\b", mask_body, re.MULTILINE):
+                    vis_lines = re.findall(r"^\s*visible:\s*(.+)$", mask_body, re.MULTILINE)
+                    self.assertEqual(
+                        vis_lines,
+                        ["false"],
+                        f"{qml.relative_to(SHELL)} {mask_match.group(1)} has child visible bindings inside a visible:false layer",
+                    )
 

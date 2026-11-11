@@ -355,15 +355,17 @@ Rectangle {
                                 spacing: 4
 
                                 Text {
+                                    Layout.maximumWidth: Math.max(40, parent.width - 78)
                                     text: SystemResources.cpuModel || "CPU"
                                     font.family: Config.theme.font
                                     font.pixelSize: Styling.fontSize(-2)
                                     color: Colors.overBackground
-                                    elide: Text.ElideMiddle
+                                    elide: Text.ElideRight
                                 }
 
                                 Separator {
                                     Layout.preferredHeight: 2
+                                    Layout.minimumWidth: 6
                                     Layout.fillWidth: true
                                 }
 
@@ -411,6 +413,7 @@ Rectangle {
                                 spacing: 4
 
                                 Text {
+                                    Layout.maximumWidth: Math.max(40, parent.width - 48)
                                     text: {
                                         const usedGB = (SystemResources.ramUsed / 1024 / 1024).toFixed(1);
                                         const totalGB = (SystemResources.ramTotal / 1024 / 1024).toFixed(1);
@@ -419,11 +422,12 @@ Rectangle {
                                     font.family: Config.theme.font
                                     font.pixelSize: Styling.fontSize(-2)
                                     color: Colors.overBackground
-                                    elide: Text.ElideMiddle
+                                    elide: Text.ElideRight
                                 }
 
                                 Separator {
                                     Layout.preferredHeight: 2
+                                    Layout.minimumWidth: 6
                                     Layout.fillWidth: true
                                 }
 
@@ -479,6 +483,7 @@ Rectangle {
                                     spacing: 4
 
                                     Text {
+                                        Layout.maximumWidth: Math.max(40, parent.width - ((SystemResources.gpuTemps[index] ?? -1) >= 0 ? 78 : 48))
                                         text: {
                                             const name = SystemResources.gpuNames[index] || "";
                                             return name || "GPU";
@@ -486,11 +491,12 @@ Rectangle {
                                         font.family: Config.theme.font
                                         font.pixelSize: Styling.fontSize(-2)
                                         color: Colors.overBackground
-                                        elide: Text.ElideMiddle
+                                        elide: Text.ElideRight
                                     }
 
                                     Separator {
                                         Layout.preferredHeight: 2
+                                        Layout.minimumWidth: 6
                                         Layout.fillWidth: true
                                     }
 
@@ -566,15 +572,17 @@ Rectangle {
                                     spacing: 4
 
                                     Text {
+                                        Layout.maximumWidth: Math.max(40, parent.width - 48)
                                         text: modelData
                                         font.family: Config.theme.font
                                         font.pixelSize: Styling.fontSize(-2)
                                         color: Colors.overBackground
-                                        elide: Text.ElideMiddle
+                                        elide: Text.ElideRight
                                     }
 
                                     Separator {
                                         Layout.preferredHeight: 2
+                                        Layout.minimumWidth: 6
                                         Layout.fillWidth: true
                                     }
 

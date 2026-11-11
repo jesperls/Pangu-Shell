@@ -137,11 +137,10 @@ Item {
             id: maskRect
             x: root.leftThickness
             y: frameMask.topInset
-            width: parent.width - (root.leftThickness + root.rightThickness)
-            height: parent.height - (frameMask.topInset + frameMask.bottomInset)
+            width: Math.max(0, parent.width - (root.leftThickness + root.rightThickness))
+            height: Math.max(0, parent.height - (frameMask.topInset + frameMask.bottomInset))
             radius: root.innerRadius
             color: "white"
-            visible: width > 0 && height > 0
         }
     }
 

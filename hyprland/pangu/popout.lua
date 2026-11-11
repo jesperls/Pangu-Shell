@@ -49,6 +49,11 @@ local function origin(window)
   end
 end
 
+local function is_special(ws)
+  return ws ~= nil
+    and (ws.special == true or (ws.id ~= nil and ws.id < 0) or tostring(ws.name or ""):sub(1, 8) == "special:")
+end
+
 local function monitor_work_area(monitor)
   if not monitor then
     return nil
@@ -133,7 +138,7 @@ local function pin(window)
   local monitor = (workspace and workspace.monitor) or window.monitor or hl.get_active_monitor()
   local home
 
-  if workspace and workspace.id and workspace.id < 0 then
+  if is_special(workspace) then
     home = tostring(workspace.name or ""):match("^special:(.+)$")
     if home then
       hl.dispatch(hl.dsp.window.tag({ tag = "+" .. HOME_PREFIX .. home, window = window }))
@@ -202,7 +207,7 @@ local function unpin(window)
       hl.dispatch(hl.dsp.window.resize({ x = M.scratchpad_size.x, y = M.scratchpad_size.y, window = window }))
     end
     hl.dispatch(hl.dsp.window.move({ workspace = "special:" .. home, follow = false, window = window }))
-  elseif was_tiled and (not window.workspace or window.workspace.id > 0) then
+  elseif was_tiled and not is_special(window.workspace) then
     hl.dispatch(hl.dsp.window.float({ action = "disable", window = window }))
   elseif saved then
     hl.dispatch(hl.dsp.window.resize({ x = saved.size.x, y = saved.size.y, window = window }))
@@ -227,21 +232,11 @@ function M.toggle_special(name, custom_size)
   local special_name = "special:" .. name
   local active_mon = hl.get_active_monitor()
 
-  if active_mon and hl.get_monitors then
-    for _, mon in ipairs(hl.get_monitors()) do
-      local active_special = mon.active_special_workspace
-      if mon.name ~= active_mon.name and active_special and active_special.name == special_name then
-        hl.dispatch(hl.dsp.workspace.toggle_special(name)) -- close on other monitor first so second toggle opens here
-        break
-      end
-    end
-  end
-
   local was_open = active_mon
     and active_mon.active_special_workspace
     and active_mon.active_special_workspace.name == special_name
 
-  hl.dispatch(hl.dsp.workspace.toggle_special(name))
+  hl.dispatch(hl.dsp.workspace.toggle_special(name)) -- single call also moves special ws open on another monitor
   if was_open then
     return
   end
@@ -279,10 +274,10 @@ function M.toggle_scratchpad(window, name, custom_size)
   end
 
   local ws = window.workspace
-  if ws and ws.id and ws.id < 0 then
+  if is_special(ws) then
     local mon = window.monitor or hl.get_active_monitor()
     local target_ws = mon and mon.active_workspace or hl.get_active_workspace()
-    if not target_ws or (target_ws.id and target_ws.id < 0) then
+    if not target_ws or is_special(target_ws) then
       return
     end
     local restore_tiled = has_tag(window, SCRATCHPAD_TILED_TAG)

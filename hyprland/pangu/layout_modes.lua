@@ -41,7 +41,7 @@ for id, target in pairs(modes) do
 end
 
 local function restore_workspace(workspace)
-  if not workspace then
+  if not workspace or workspace.special or not workspace.id then
     return
   end
   local target = modes[workspace.id]

@@ -108,12 +108,12 @@ end
 
 bind(mainMod, "mouse:272", hl.dsp.window.drag(), "Mouse: drag window")
 bind(mainMod, "mouse:273", resize_or_weight_drag, "Mouse: resize window")
-bind(mainMod, "mouse:273", layouts.end_drag, "Centered: end weight drag", { release = true })
+bind(mainMod, "mouse:273", layouts.end_drag, nil, { release = true })
 
 if binds_cfg.mouse_side_buttons ~= false then
   bind("", "mouse:275", hl.dsp.window.drag(), "Mouse: drag window (side button)")
   bind("", "mouse:276", resize_or_weight_drag, "Mouse: resize window (side button)")
-  bind("", "mouse:276", layouts.end_drag, "Centered: end weight drag", { release = true })
+  bind("", "mouse:276", layouts.end_drag, nil, { release = true })
   bind("", "mouse:277", hl.dsp.window.close(), "Mouse: close window (side button)")
 end
 

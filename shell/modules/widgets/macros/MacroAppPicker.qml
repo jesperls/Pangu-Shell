@@ -207,14 +207,29 @@ Item {
                         anchors.rightMargin: 8
                         spacing: 10
 
-                        Image {
+                        Item {
                             Layout.preferredWidth: 18
                             Layout.preferredHeight: 18
-                            source: root.iconSource(row.modelData.icon)
-                            sourceSize: Qt.size(36, 36)
-                            fillMode: Image.PreserveAspectFit
-                            smooth: true
-                            asynchronous: true
+
+                            Image {
+                                id: appIcon
+                                anchors.fill: parent
+                                source: root.iconSource(row.modelData.icon)
+                                sourceSize: Qt.size(36, 36)
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                                asynchronous: true
+                                visible: status === Image.Ready
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                visible: appIcon.status !== Image.Ready
+                                text: Icons.appWindow
+                                font.family: Icons.font
+                                font.pixelSize: 15
+                                color: row.isCurrent ? row.item : Colors.outline
+                            }
                         }
 
                         ColumnLayout {

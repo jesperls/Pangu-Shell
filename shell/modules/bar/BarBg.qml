@@ -81,8 +81,7 @@ Item {
         }
 
         Rectangle {
-            id: centerMaskRight
-            visible: root.splitActive
+            id: centerMaskRight // barMask has visible: false; toggling child visible skips QQuickItemLayer dirty
             color: "white"
             x: root.splitEnd
             y: root.position === "bottom" ? cornerSize : 0
