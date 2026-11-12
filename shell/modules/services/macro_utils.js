@@ -4,6 +4,7 @@ var STEP_TYPES = ["key", "text", "command", "launch", "sound", "delay", "click",
 var TRIGGER_TYPES = ["none", "hotkey", "sequence", "sound", "app", "notification", "clipboard", "system", "timer", "startup"];
 var LOOP_MODES = ["none", "count", "infinite"];
 var CLICK_BUTTONS = ["left", "right", "middle"];
+var DELAY_MODES = ["fixed", "range", "gaussian"];
 var SOUND_MODES = ["sample", "frequency"];
 var SOUND_SOURCES = ["desktop", "mic", "both"];
 var APP_EVENTS = ["launch", "focus", "close", "title", "fullscreen"];
@@ -153,7 +154,7 @@ function blankStep(type) {
     case "sound":
         return { type: "sound", path: "" };
     case "delay":
-        return { type: "delay", ms: 500 };
+        return { type: "delay", mode: "fixed", ms: 500, maxMs: 750, stdDevMs: 75 };
     case "click":
         return { type: "click", button: "left" };
     case "focus":
@@ -182,7 +183,10 @@ function normalizeStep(step) {
         out.path = String(step.path !== undefined && step.path !== null ? step.path : "");
         break;
     case "delay":
+        out.mode = pick(DELAY_MODES, step.mode, "fixed");
         out.ms = clampInt(step.ms, 0, 3600000, 500);
+        out.maxMs = clampInt(step.maxMs, 0, 3600000, Math.min(3600000, Math.max(out.ms + 250, 750)));
+        out.stdDevMs = clampInt(step.stdDevMs, 0, 1800000, Math.max(15, Math.round(out.ms * 0.15)));
         break;
     case "click":
         out.button = pick(CLICK_BUTTONS, step.button, "left");
@@ -370,6 +374,47 @@ function normalizeMacros(list) {
     return asArray(list).map(normalizeMacro);
 }
 
+function delayBounds(step) {
+    var mode = pick(DELAY_MODES, step && step.mode, "fixed");
+    var ms = clampInt(step && step.ms, 0, 3600000, 500);
+    if (mode === "range") {
+        var maxMs = clampInt(step && step.maxMs, 0, 3600000, Math.min(3600000, Math.max(ms + 250, 750)));
+        return { min: Math.min(ms, maxMs), max: Math.max(ms, maxMs) };
+    }
+    if (mode === "gaussian") {
+        var sd = clampInt(step && step.stdDevMs, 0, 1800000, Math.max(15, Math.round(ms * 0.15)));
+        if (sd <= 0 || ms <= 0)
+            return { min: ms, max: ms };
+        var minFloor = Math.min(10, Math.floor(ms * 0.25));
+        return {
+            min: Math.max(minFloor, Math.round(ms - 3 * sd)),
+            max: Math.min(3600000, Math.round(ms + 3 * sd))
+        };
+    }
+    return { min: ms, max: ms };
+}
+
+function sampleDelayMs(step, rng) {
+    var rand = typeof rng === "function" ? rng : Math.random;
+    var clean = normalizeStep(Object.assign({}, step, { type: "delay" }));
+    var bounds = delayBounds(clean);
+    if (clean.mode === "range") {
+        if (bounds.max <= bounds.min)
+            return bounds.min;
+        return bounds.min + Math.floor(rand() * (bounds.max - bounds.min + 1));
+    }
+    if (clean.mode === "gaussian") {
+        if (clean.stdDevMs <= 0 || clean.ms <= 0)
+            return clean.ms;
+        var u1 = Math.max(1e-7, Math.min(1 - 1e-7, rand()));
+        var u2 = rand();
+        var z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        var sampled = Math.round(clean.ms + z * clean.stdDevMs);
+        return Math.max(bounds.min, Math.min(bounds.max, sampled));
+    }
+    return clean.ms;
+}
+
 function stepTitle(step) {
     switch (step.type) {
     case "key":
@@ -382,8 +427,14 @@ function stepTitle(step) {
         return step.command || "Launch app";
     case "sound":
         return step.path ? step.path.split("/").pop() : "Play sound";
-    case "delay":
+    case "delay": {
+        var bounds = delayBounds(step);
+        if (step.mode === "range")
+            return bounds.min + "–" + bounds.max + " ms wait";
+        if (step.mode === "gaussian")
+            return step.ms + " ± " + step.stdDevMs + " ms bell wait";
         return step.ms + " ms wait";
+    }
     case "click":
         return step.button + " click" + (typeof step.x === "number" ? " @ " + step.x + "," + step.y : "");
     case "focus":

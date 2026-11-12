@@ -303,7 +303,7 @@ Singleton {
         switch (step.type) {
         case "delay":
             root.stepToken = token;
-            stepTimer.interval = step.ms;
+            stepTimer.interval = MacroUtils.sampleDelayMs(step);
             stepTimer.restart();
             break;
         case "command":

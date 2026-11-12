@@ -1868,6 +1868,12 @@ ShellRoot {
             step: ({ type: "notify", title: "Bell", body: "Ready" })
             onStepEdited: s => notifyRow.step = s
         }
+        MacroStepRow {
+            id: delayRow
+            width: 680
+            step: ({ type: "delay", mode: "gaussian", ms: 500, maxMs: 750, stdDevMs: 80 })
+            onStepEdited: s => delayRow.step = s
+        }
     }
     Timer {
         interval: 120; running: true
@@ -1887,7 +1893,10 @@ ShellRoot {
                 && sndEditor.liveScore === 84
                 && sndEditor.livePeakHz === 1482
                 && focusRow.step.type === "focus"
-                && notifyRow.step.type === "notify";
+                && notifyRow.step.type === "notify"
+                && delayRow.delayMode === "gaussian"
+                && delayRow.delayMsVal === 500
+                && delayRow.delayStdVal === 80;
             console.log(ok ? "CHECK_PASSED" : "CHECK_FAILED " + JSON.stringify({
                 samplePath: sndEditor.trigger.samplePath,
                 trimStart: sndEditor.trigger.trimStart,

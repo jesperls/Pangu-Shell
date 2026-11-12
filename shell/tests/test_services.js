@@ -1047,7 +1047,7 @@ const macroSource = fs.readFileSync(path.join(__dirname, '../modules/services/ma
     .replace(/^\.pragma library\n/, '');
 const macroContext = vm.createContext({module: {exports: {}}, console});
 vm.runInContext(macroSource
-    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle, matchesQuery, matchesOptionalQuery, clientMatches, conditionMet, describeSystemEvent, normalizeTimeOfDay, asArray};',
+    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle, matchesQuery, matchesOptionalQuery, clientMatches, conditionMet, describeSystemEvent, normalizeTimeOfDay, asArray, delayBounds, sampleDelayMs};',
     macroContext, {filename: 'macro_utils.js'});
 const macroUtils = macroContext.module.exports;
 const macro = macroUtils.normalizeMacro({
@@ -1329,3 +1329,30 @@ assert.equal(sndCfg.rules.length, 1);
 assert.equal(sndCfg.rules[0].threshold, 64, 'Open editor draft overrides live sound telemetry parameters');
 assert.equal(sndCfg.rules[0].telemetryOnly, true, 'Disabled draft streams telemetry without firing');
 console.log('Event scripting triggers, guards, cooldowns, loop prevention and live sound config tests passed');
+
+assert.equal(macroUtils.sampleDelayMs({type: 'delay', ms: 350}), 350, 'Legacy fixed delay returns exact ms');
+assert.equal(macroUtils.stepTitle(macroUtils.normalizeStep({type: 'delay', ms: 350})), '350 ms wait');
+const rangeStep = macroUtils.normalizeStep({type: 'delay', mode: 'range', ms: 800, maxMs: 300});
+assert.equal(macroUtils.stepTitle(rangeStep), '300–800 ms wait', 'Range title orders swapped bounds');
+assert.equal(macroUtils.sampleDelayMs(rangeStep, () => 0), 300);
+assert.equal(macroUtils.sampleDelayMs(rangeStep, () => 0.999999), 800);
+
+const bellStep = macroUtils.normalizeStep({type: 'delay', mode: 'gaussian', ms: 500, stdDevMs: 80});
+assert.equal(macroUtils.stepTitle(bellStep), '500 ± 80 ms bell wait');
+assert.deepEqual({...macroUtils.delayBounds(bellStep)}, {min: 260, max: 740});
+assert.ok(Number.isFinite(macroUtils.sampleDelayMs(bellStep, () => 0)), 'u1=0 does not produce Infinity/NaN');
+assert.equal(macroUtils.delayBounds({type: 'delay', mode: 'gaussian', ms: 100, stdDevMs: 50}).min, 10,
+    'Wide bell curve near zero keeps a human non-zero floor');
+
+let lcg = 123456789;
+const nextRng = () => {
+    lcg = (1664525 * lcg + 1013904223) >>> 0;
+    return lcg / 4294967296;
+};
+const bellSamples = Array.from({length: 4000}, () => macroUtils.sampleDelayMs(bellStep, nextRng));
+const bellMean = bellSamples.reduce((acc, v) => acc + v, 0) / bellSamples.length;
+const bellVar = bellSamples.reduce((acc, v) => acc + (v - bellMean) ** 2, 0) / bellSamples.length;
+assert.ok(Math.abs(bellMean - 500) < 4, `Expected bell mean near 500, got ${bellMean}`);
+assert.ok(Math.abs(Math.sqrt(bellVar) - 80) < 4, `Expected bell stdDev near 80, got ${Math.sqrt(bellVar)}`);
+assert.ok(bellSamples.every(v => v >= 260 && v <= 740), 'All bell samples stay inside ±3σ bounds');
+console.log('Fixed, uniform range and Gaussian bell-curve delay sampling tests passed');

@@ -30,6 +30,71 @@ Rectangle {
 
     property bool picking: false
     readonly property bool hasPosition: typeof step.x === "number" && typeof step.y === "number"
+    readonly property string delayMode: step.mode || "fixed"
+    readonly property int delayMsVal: typeof step.ms === "number" ? step.ms : 500
+    readonly property int delayMaxVal: typeof step.maxMs === "number" ? step.maxMs : Math.max(delayMsVal + 250, 750)
+    readonly property int delayStdVal: typeof step.stdDevMs === "number" ? step.stdDevMs : Math.max(15, Math.round(delayMsVal * 0.15))
+
+    component DelayNumberBox: StyledRect {
+        id: numBox
+        property int value: 0
+        property int minValue: 0
+        property int maxValue: 3600000
+        property string tooltip: ""
+        signal valueEdited(int newValue)
+
+        variant: numInput.activeFocus ? "focus" : "common"
+        implicitWidth: 66
+        implicitHeight: 28
+        radius: Styling.radius(-4)
+
+        onValueChanged: {
+            if (!numInput.activeFocus && numInput.text !== String(numBox.value))
+                numInput.text = String(numBox.value);
+        }
+        Component.onCompleted: numInput.text = String(numBox.value)
+
+        TextInput {
+            id: numInput
+            anchors.fill: parent
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
+            clip: true
+            selectByMouse: true
+            verticalAlignment: TextInput.AlignVCenter
+            horizontalAlignment: TextInput.AlignHCenter
+            font.family: Config.theme.monoFont
+            font.pixelSize: Styling.fontSize(-1)
+            color: Colors.overBackground
+            validator: IntValidator {
+                bottom: numBox.minValue
+                top: numBox.maxValue
+            }
+            onActiveFocusChanged: {
+                if (!activeFocus && !acceptableInput)
+                    text = String(numBox.value);
+            }
+            onEditingFinished: {
+                if (!acceptableInput) {
+                    text = String(numBox.value);
+                    return;
+                }
+                const parsed = parseInt(text, 10);
+                if (!isNaN(parsed) && parsed !== numBox.value)
+                    numBox.valueEdited(parsed);
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.NoButton
+            hoverEnabled: numBox.tooltip !== ""
+            StyledToolTip {
+                show: parent.containsMouse && !numInput.activeFocus && numBox.tooltip !== ""
+                tooltipText: numBox.tooltip
+            }
+        }
+    }
 
     function withField(step, key, value) {
         const out = {};
@@ -168,15 +233,96 @@ Rectangle {
             }
         }
 
-        SettingsNumberInputRow {
+        RowLayout {
             visible: root.step.type === "delay"
             Layout.fillWidth: true
-            label: "Wait"
-            suffix: "ms"
-            value: root.step.ms || 0
-            minValue: 0
-            maxValue: 3600000
-            onValueEdited: value => root.stepEdited(root.withField(root.step, "ms", value))
+            spacing: 6
+
+            Row {
+                spacing: 4
+
+                Repeater {
+                    model: [
+                        { id: "fixed", label: "Fixed" },
+                        { id: "range", label: "Range" },
+                        { id: "gaussian", label: "Bell" }
+                    ]
+
+                    MacroButton {
+                        required property var modelData
+                        text: modelData.label
+                        implicitHeight: 26
+                        tone: root.delayMode === modelData.id ? "primary" : "common"
+                        onClicked: root.stepEdited(root.withField(root.step, "mode", modelData.id))
+                    }
+                }
+            }
+
+            DelayNumberBox {
+                value: root.delayMsVal
+                tooltip: root.delayMode === "range"
+                    ? "Minimum wait (ms)"
+                    : (root.delayMode === "gaussian" ? "Mean wait μ (ms)" : "Exact wait (ms)")
+                onValueEdited: val => root.stepEdited(root.withField(root.step, "ms", val))
+            }
+
+            Text {
+                visible: root.delayMode === "range"
+                text: "–"
+                font.family: Config.theme.monoFont
+                font.pixelSize: Styling.fontSize(0)
+                color: Colors.overSurfaceVariant
+            }
+
+            DelayNumberBox {
+                visible: root.delayMode === "range"
+                value: root.delayMaxVal
+                tooltip: "Maximum wait (ms)"
+                onValueEdited: val => root.stepEdited(root.withField(root.step, "maxMs", val))
+            }
+
+            Text {
+                visible: root.delayMode === "gaussian"
+                text: "±"
+                font.family: Config.theme.monoFont
+                font.pixelSize: Styling.fontSize(0)
+                color: Colors.overSurfaceVariant
+            }
+
+            DelayNumberBox {
+                visible: root.delayMode === "gaussian"
+                value: root.delayStdVal
+                maxValue: 1800000
+                tooltip: "Standard deviation σ (ms)"
+                onValueEdited: val => root.stepEdited(root.withField(root.step, "stdDevMs", val))
+            }
+
+            Text {
+                text: "ms"
+                font.family: Config.theme.font
+                font.pixelSize: Styling.fontSize(-1)
+                color: Colors.overSurfaceVariant
+            }
+
+            Text {
+                visible: root.delayMode === "gaussian" && root.delayStdVal > 0 && root.delayMsVal > 0
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: {
+                    const floor = Math.min(10, Math.floor(root.delayMsVal * 0.25));
+                    const lo = Math.max(floor, Math.round(root.delayMsVal - 3 * root.delayStdVal));
+                    const hi = Math.min(3600000, Math.round(root.delayMsVal + 3 * root.delayStdVal));
+                    return "(~" + lo + "–" + hi + " ms)";
+                }
+                font.family: Config.theme.monoFont
+                font.pixelSize: Styling.fontSize(-2)
+                color: Colors.overSurfaceVariant
+            }
+
+            Item {
+                visible: root.delayMode !== "gaussian" || root.delayStdVal <= 0 || root.delayMsVal <= 0
+                Layout.fillWidth: true
+            }
         }
 
         Row {
