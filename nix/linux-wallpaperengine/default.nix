@@ -1,7 +1,6 @@
 { linux-wallpaperengine, nodejs }:
 linux-wallpaperengine.overrideAttrs (old: {
   patches = (old.patches or [ ]) ++ [
-    ./web-texture.patch
     ./web-shutdown.patch
     ./web-properties.patch
   ];

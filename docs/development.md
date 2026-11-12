@@ -84,12 +84,10 @@ consumer that exposes a `pangu` package. This leaves its lock file unchanged.
 
 ## Tests and debugging
 
-Pangu's default Wallpaper Engine dependency backports the web texture fix from
-[upstream PR #639](https://github.com/Almamu/linux-wallpaperengine/pull/639) and
-the CEF shutdown ownership fix from
-[upstream issue #680](https://github.com/Almamu/linux-wallpaperengine/issues/680).
-The patches live in `nix/linux-wallpaperengine`; remove each when the pinned
-nixpkgs package includes its fix. The web property bridge patch also delivers
+Pangu's default Wallpaper Engine dependency backports the CEF shutdown ownership
+fix from [upstream issue #680](https://github.com/Almamu/linux-wallpaperengine/issues/680).
+The patches live in `nix/linux-wallpaperengine`; remove the backport when the
+pinned nixpkgs package includes its fix. The web property bridge patch also delivers
 typed defaults and CLI overrides to `wallpaperPropertyListener` after the main
 page loads, including listeners registered later by asynchronous scripts.
 Its tests verify payload types, delayed listeners and rendered colors under

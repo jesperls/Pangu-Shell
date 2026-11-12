@@ -192,13 +192,13 @@ recorder package to the shell's recorder package so its privileged helper and
 client match. `nvidia-smi` is provided by the installed driver, while optional
 EasyEffects and pywal integrations use the session PATH.
 
-For a driver requiring the older NVENC API, select a compatible recorder in
-both modules, for example:
+When overriding a bundled dependency such as `gpu-screen-recorder`, select the
+same package in both modules:
 
 ```nix
 let
   shell = inputs.pangu-shell.packages.${pkgs.stdenv.hostPlatform.system}.pangu.override {
-    gpu-screen-recorder = pkgs.gpu-screen-recorder.override { ffmpeg = pkgs.ffmpeg_8; };
+    gpu-screen-recorder = customRecorder;
   };
 in {
   programs.pangu.package = shell;
