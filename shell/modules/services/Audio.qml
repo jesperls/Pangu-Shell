@@ -135,9 +135,9 @@ Singleton {
         const app = (node?.properties?.["application.name"] ?? "").toLowerCase();
         if (name.startsWith("ee_") || name.includes(".split") || name.startsWith("loopback-"))
             return true;
-        if (app === "quickshell" || app === "cava" || app === "easyeffects" || app === "easy effects" || app === "gpu-screen-recorder")
+        if (app === "quickshell" || app === "cava" || app === "easyeffects" || app === "easy effects" || app === "gpu-screen-recorder" || app === "pangu-macro-audio")
             return true;
-        if (name === "quickshell" || name === "cava" || name === "gpu-screen-recorder")
+        if (name === "quickshell" || name === "cava" || name === "gpu-screen-recorder" || name === "pangu-macro-audio")
             return true;
         return false;
     }

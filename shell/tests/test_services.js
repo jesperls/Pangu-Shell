@@ -1047,7 +1047,7 @@ const macroSource = fs.readFileSync(path.join(__dirname, '../modules/services/ma
     .replace(/^\.pragma library\n/, '');
 const macroContext = vm.createContext({module: {exports: {}}, console});
 vm.runInContext(macroSource
-    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle};',
+    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle, matchesQuery, matchesOptionalQuery, clientMatches, conditionMet, describeSystemEvent, normalizeTimeOfDay, asArray};',
     macroContext, {filename: 'macro_utils.js'});
 const macroUtils = macroContext.module.exports;
 const macro = macroUtils.normalizeMacro({
@@ -1181,3 +1181,151 @@ assert.equal(macroServiceRoot.currentMacro.loop.mode, 'none', 'A loop edit is ad
 assert.equal(macroServiceRoot.repeatLeft, -1);
 assert.equal(macroServiceRoot.playing, true, 'A loop edit does not interrupt the current pass');
 console.log('Macro playback queue, loop counts, urgent toggling, run tokens and live edits are consistent');
+
+assert.equal(macroUtils.matchesQuery('Order #4821 ready', '4821'), true);
+assert.equal(macroUtils.matchesQuery('Order #4821 ready', '/order #\\d+/i'), true);
+assert.equal(macroUtils.matchesQuery('Order #4821 ready', '/^#[0-9]+/'), false);
+assert.equal(macroUtils.matchesQuery('anything', '/[unclosed/'), false, 'Invalid regex fails closed');
+assert.equal(macroUtils.matchesQuery('anything', '   '), false, 'Empty required query fails closed');
+assert.equal(macroUtils.matchesOptionalQuery('anything', ''), true, 'Empty optional query passes');
+
+const legacyFocusApp = macroUtils.normalizeTrigger({type: 'app', match: 'firefox', onFocus: true});
+assert.equal(legacyFocusApp.event, 'focus');
+assert.equal(legacyFocusApp.onFocus, true);
+assert.equal(macroUtils.describeTrigger(legacyFocusApp), 'Focus firefox');
+const titleTrigger = macroUtils.normalizeTrigger({type: 'app', event: 'title', match: 'discord', titleMatch: '/\\([1-9]\\)/'});
+assert.equal(titleTrigger.onFocus, false);
+assert.equal(macroUtils.describeTrigger(titleTrigger), 'Title /\\([1-9]\\)/');
+
+const soundTrigger = macroUtils.normalizeTrigger({
+    type: 'sound', mode: 'sample', source: 'both', samplePath: '/tmp/bell.wav',
+    trimStart: 1.2, trimEnd: 0.5, minHz: 3000, maxHz: 2000, threshold: 999, cooldownMs: 20
+});
+assert.equal(soundTrigger.trimStart, 1.2);
+assert.equal(soundTrigger.trimEnd, 0, 'Inverted trimEnd resets cleanly');
+assert.ok(soundTrigger.maxHz > soundTrigger.minHz, 'Sound frequency range stays ordered');
+assert.equal(soundTrigger.threshold, 98);
+assert.equal(soundTrigger.cooldownMs, 100);
+assert.equal(macroUtils.describeTrigger(soundTrigger), 'Sound: bell.wav');
+
+assert.equal(macroUtils.stepTitle(macroUtils.normalizeStep({type: 'focus', match: 'vesktop'})), 'Focus vesktop');
+assert.equal(macroUtils.stepTitle(macroUtils.normalizeStep({type: 'notify', title: 'Bell detected', body: 'Done'})), 'Bell detected');
+assert.equal(macroUtils.describeTrigger(macroUtils.normalizeTrigger({type: 'timer', mode: 'daily', at: '7:05'})), 'Daily at 07:05');
+assert.equal(macroUtils.normalizeTimeOfDay('25:99', '08:30'), '08:30');
+
+const sampleClients = [{class: 'kitty', title: 'nvim'}, {class: 'steam_app_123', title: 'Elden Ring'}];
+assert.equal(macroUtils.conditionMet({appMode: 'focused', appMatch: 'steam_app'}, sampleClients, sampleClients[1]), true);
+assert.equal(macroUtils.conditionMet({appMode: 'focused', appMatch: 'steam_app'}, sampleClients, sampleClients[0]), false);
+assert.equal(macroUtils.conditionMet({appMode: 'running', appMatch: 'elden'}, sampleClients, sampleClients[0]), true);
+assert.equal(macroUtils.conditionMet({appMode: 'not_focused', appMatch: 'kitty'}, sampleClients, sampleClients[1]), true);
+
+const firedEvents = [];
+let fakeNow = 10000;
+const eventMacros = [
+    macroUtils.normalizeMacro({
+        id: 'm_notif', name: 'Notif', enabled: true, cooldownMs: 500,
+        condition: {appMode: 'focused', appMatch: 'game'},
+        trigger: {type: 'notification', appMatch: 'vesktop', textMatch: '/raid|bell/i', urgency: 'normal'},
+        steps: [{type: 'notify', title: 'Ack'}]
+    }),
+    macroUtils.normalizeMacro({
+        id: 'm_clip', name: 'Clip', enabled: true,
+        trigger: {type: 'clipboard', match: '/^https:\\/\\//'},
+        steps: [{type: 'key', keys: 'Return'}]
+    }),
+    macroUtils.normalizeMacro({
+        id: 'm_title', name: 'Title', enabled: true,
+        trigger: {type: 'app', event: 'title', match: 'firefox', titleMatch: 'Queue Ready'},
+        steps: [{type: 'focus', match: 'firefox'}]
+    }),
+    macroUtils.normalizeMacro({
+        id: 'm_daily', name: 'Daily', enabled: true,
+        trigger: {type: 'timer', mode: 'daily', at: '14:30'},
+        steps: [{type: 'key', keys: 'F5'}]
+    }),
+    macroUtils.normalizeMacro({
+        id: 'm_snd', name: 'Bell', enabled: true,
+        trigger: {type: 'sound', mode: 'sample', source: 'desktop', samplePath: '/tmp/bell.wav', threshold: 72},
+        steps: [{type: 'click', button: 'left', x: 100, y: 200}]
+    })
+];
+const eventRoot = {
+    enabled: true, playing: false, activeId: '', lastFiredAt: {}, lastTriggerInfo: {},
+    dailyFiredStamp: {}, clientSnapshots: {}, clientsInitialized: false, lastFocusedAddress: '',
+    maxClipboardId: -1, clipboardInitialized: false,
+    list: () => eventMacros,
+    findMacro: id => eventMacros.find(m => m.id === id) || null,
+    run(id, urgent) { firedEvents.push({id, urgent}); },
+    stop() { firedEvents.push({stop: true}); }
+};
+const eventCtx = {
+    root: eventRoot,
+    MacroUtils: macroUtils,
+    Config: {initialLoadComplete: true},
+    Compositor: {clients: {values: [{address: '0x1', class: 'game', title: 'Arena', fullscreen: false}]}, focusedClient: {address: '0x1', class: 'game', title: 'Arena'}},
+    ClipboardService: {items: [{id: '10', preview: 'https://old.example', isImage: false}]},
+    Date: class extends Date {
+        constructor(...args) { super(...(args.length ? args : [fakeNow])); }
+        static now() { return fakeNow; }
+    },
+    console
+};
+serviceFunctions('MacroService.qml', [
+    '_guardsPass', '_recordFire', '_fireTrigger', 'triggerHotkey',
+    '_snapshotClient', '_syncAppClients', '_fireAppEvent', '_checkClientEvents',
+    '_handleNotification', '_handleClipboardUpdate', '_checkDailyTimers',
+    '_soundRuleFromMacro', '_buildSoundConfig'
+], eventCtx);
+
+eventCtx._handleNotification({appName: 'Pangu Macros', summary: 'Bell raid', body: '', urgency: 2});
+assert.equal(firedEvents.length, 0, 'Internal macro notifications must never self-trigger');
+eventCtx._handleNotification({appName: 'vesktop', summary: 'Bell check', body: 'join now', urgency: 1});
+assert.equal(firedEvents.length, 1 && firedEvents[0].id === 'm_notif' ? 1 : 0, 1);
+eventCtx._handleNotification({appName: 'vesktop', summary: 'Bell check 2', body: '', urgency: 1});
+assert.equal(firedEvents.length, 1, 'Macro cooldown suppresses rapid duplicate triggers');
+fakeNow += 600;
+eventCtx.Compositor.focusedClient = {address: '0x2', class: 'kitty', title: 'shell'};
+eventCtx._handleNotification({appName: 'vesktop', summary: 'Bell check 3', body: '', urgency: 1});
+assert.equal(firedEvents.length, 1, 'Focused-window guard blocks trigger when another app is focused');
+eventRoot.playing = true;
+eventRoot.activeId = 'm_notif';
+eventCtx.triggerHotkey('m_notif');
+assert.deepEqual(firedEvents.at(-1), {stop: true}, 'Hotkey still stops active playback even if guard no longer matches');
+eventRoot.playing = false;
+eventRoot.activeId = '';
+
+eventCtx._handleClipboardUpdate();
+assert.equal(firedEvents.length, 2, 'Initial clipboard history snapshot must not fire triggers');
+eventCtx.ClipboardService.items = [
+    {id: '12', preview: 'https://pangu.example', fullContent: 'https://pangu.example', isImage: false},
+    {id: '10', preview: 'https://old.example', isImage: false}
+];
+eventCtx._handleClipboardUpdate();
+assert.equal(firedEvents.at(-1).id, 'm_clip');
+
+eventCtx._syncAppClients();
+eventCtx.Compositor.clients.values = [
+    {address: '0x1', class: 'game', title: 'Arena', fullscreen: false},
+    {address: '0x9', class: 'firefox', title: 'Lobby', fullscreen: false}
+];
+eventCtx._checkClientEvents();
+assert.equal(firedEvents.length, 3);
+eventCtx.Compositor.clients.values[1].title = 'Queue Ready - Match 1';
+eventCtx._checkClientEvents();
+assert.equal(firedEvents.at(-1).id, 'm_title');
+const countAfterTitle = firedEvents.length;
+eventCtx.Compositor.clients.values[1].title = 'Queue Ready - Match 2';
+eventCtx._checkClientEvents();
+assert.equal(firedEvents.length, countAfterTitle, 'Staying in a matching title does not spam-fire');
+
+const at1430 = new Date(2026, 10, 12, 14, 30, 5);
+eventCtx._checkDailyTimers(at1430);
+eventCtx._checkDailyTimers(new Date(2026, 10, 12, 14, 30, 40));
+assert.equal(firedEvents.filter(e => e.id === 'm_daily').length, 1, 'Daily schedule fires once per day');
+
+const disabledDraft = Object.assign({}, eventMacros[4], {enabled: false, trigger: Object.assign({}, eventMacros[4].trigger, {threshold: 64})});
+const sndCfg = eventCtx._buildSoundConfig(eventMacros, true, disabledDraft, true);
+assert.equal(sndCfg.rules.length, 1);
+assert.equal(sndCfg.rules[0].threshold, 64, 'Open editor draft overrides live sound telemetry parameters');
+assert.equal(sndCfg.rules[0].telemetryOnly, true, 'Disabled draft streams telemetry without firing');
+console.log('Event scripting triggers, guards, cooldowns, loop prevention and live sound config tests passed');

@@ -34,11 +34,32 @@ FloatingWindow {
     readonly property var triggerTypeDefs: [
         { type: "none", label: "Manual", icon: Icons.handGrab },
         { type: "hotkey", label: "Hotkey", icon: Icons.keyboard },
-        { type: "timer", label: "Timer", icon: Icons.timer },
-        { type: "app", label: "App", icon: Icons.apps },
         { type: "sequence", label: "Sequence", icon: Icons.list },
+        { type: "sound", label: "Sound", icon: Icons.waveform },
+        { type: "app", label: "Window", icon: Icons.apps },
+        { type: "notification", label: "Notification", icon: Icons.bellRinging },
+        { type: "clipboard", label: "Clipboard", icon: Icons.clipboard },
+        { type: "system", label: "System", icon: Icons.lightning },
+        { type: "timer", label: "Schedule", icon: Icons.timer },
         { type: "startup", label: "Startup", icon: Icons.power }
     ]
+    readonly property var systemEventDefs: [
+        { id: "unlock", label: "Unlock" },
+        { id: "lock", label: "Lock" },
+        { id: "resume", label: "Wake" },
+        { id: "suspend", label: "Sleep" },
+        { id: "gamemode_on", label: "Game mode on" },
+        { id: "gamemode_off", label: "Game mode off" },
+        { id: "wifi_connected", label: "Wi-Fi connect" },
+        { id: "wifi_disconnected", label: "Wi-Fi disconnect" },
+        { id: "bt_connected", label: "BT connect" },
+        { id: "bt_disconnected", label: "BT disconnect" },
+        { id: "audio_output", label: "Audio output" }
+    ]
+
+    function syncPreviewDraft() {
+        MacroService.previewDraft = (root.visible && root.hasSelection) ? root.draft : null;
+    }
 
     function refreshFilter() {
         const query = searchText.trim().toLowerCase();
@@ -48,12 +69,16 @@ FloatingWindow {
     }
 
     function selectMacro(id) {
+        if (MacroService.recordingMacroId !== "" && MacroService.recordingMacroId !== id)
+            MacroService.stopSoundRecord();
+        MacroService.stopSoundPreview();
         const macro = id ? MacroService.findMacro(id) : null;
         root.selectedId = macro ? id : "";
         root.hasSelection = macro !== null;
         root.draft = macro ? MacroUtils.normalizeMacro(macro) : MacroUtils.blankMacro("");
         root.recording = false;
         root.confirmingDelete = false;
+        root.syncPreviewDraft();
     }
 
     function mutate(fn) {
@@ -61,16 +86,20 @@ FloatingWindow {
             return;
         const next = MacroUtils.normalizeMacro(root.draft);
         fn(next);
-        root.draft = next;
-        MacroService.replaceMacro(next);
+        const clean = MacroUtils.normalizeMacro(next);
+        root.draft = clean;
+        MacroService.replaceMacro(clean);
+        root.syncPreviewDraft();
     }
 
     function toggleEnabled(macro) {
         const next = MacroUtils.normalizeMacro(macro);
         next.enabled = !next.enabled;
         MacroService.replaceMacro(next);
-        if (root.selectedId === next.id && root.hasSelection)
+        if (root.selectedId === next.id && root.hasSelection) {
             root.draft = next;
+            root.syncPreviewDraft();
+        }
     }
 
     function toggleMaster() {
@@ -78,6 +107,9 @@ FloatingWindow {
     }
 
     function close() {
+        if (MacroService.recordingMacroId !== "")
+            MacroService.stopSoundRecord();
+        MacroService.stopSoundPreview();
         root.recording = false;
         root.confirmingDelete = false;
         GlobalStates.macrosWindowVisible = false;
@@ -162,8 +194,12 @@ FloatingWindow {
             if (root.selectedId && MacroService.findMacro(root.selectedId))
                 root.selectMacro(root.selectedId);
         } else {
+            if (MacroService.recordingMacroId !== "")
+                MacroService.stopSoundRecord();
+            MacroService.stopSoundPreview();
             root.recording = false;
         }
+        root.syncPreviewDraft();
     }
 
     Shortcut {
@@ -490,6 +526,24 @@ FloatingWindow {
                                     onTextEdited: value => root.mutate(next => next.name = value)
                                 }
 
+                                StyledRect {
+                                    readonly property var fireInfo: MacroService.lastTriggerInfo[root.draft.id] || null
+                                    visible: fireInfo !== null
+                                    variant: "common"
+                                    radius: Styling.radius(-4)
+                                    implicitWidth: lastFireText.implicitWidth + 16
+                                    implicitHeight: 36
+
+                                    Text {
+                                        id: lastFireText
+                                        anchors.centerIn: parent
+                                        text: parent.fireInfo ? ("Last: " + parent.fireInfo.time + " · " + parent.fireInfo.detail) : ""
+                                        font.family: Config.theme.monoFont
+                                        font.pixelSize: Styling.fontSize(-2)
+                                        color: Colors.overSurfaceVariant
+                                    }
+                                }
+
                                 Rectangle {
                                     implicitWidth: 96
                                     implicitHeight: 36
@@ -557,49 +611,220 @@ FloatingWindow {
                                 onValueEdited: value => root.mutate(next => next.trigger.keys = value)
                             }
 
-                            RowLayout {
+                            SoundTriggerEditor {
                                 Layout.fillWidth: true
-                                visible: root.draft.trigger.type === "timer"
-                                spacing: 12
+                                visible: root.draft.trigger.type === "sound"
+                                macroId: root.draft.id
+                                trigger: root.draft.trigger
+                                onTriggerEdited: value => root.mutate(next => next.trigger = MacroUtils.normalizeTrigger(value))
+                            }
 
-                                SettingsNumberInputRow {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type === "app"
+                                spacing: 8
+
+                                Flow {
                                     Layout.fillWidth: true
-                                    Layout.minimumWidth: 200
-                                    label: "Interval"
-                                    suffix: "s"
-                                    value: root.draft.trigger.seconds || 60
-                                    minValue: 1
-                                    maxValue: 86400
-                                    onValueEdited: value => root.mutate(next => next.trigger.seconds = value)
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: [
+                                            { id: "launch", label: "On launch" },
+                                            { id: "focus", label: "On focus" },
+                                            { id: "close", label: "On close" },
+                                            { id: "title", label: "Title match" },
+                                            { id: "fullscreen", label: "Fullscreen" }
+                                        ]
+
+                                        MacroButton {
+                                            required property var modelData
+                                            text: modelData.label
+                                            implicitHeight: 32
+                                            tone: (root.draft.trigger.event || "launch") === modelData.id ? "primary" : "common"
+                                            onClicked: root.mutate(next => {
+                                                next.trigger.event = modelData.id;
+                                                next.trigger.onFocus = modelData.id === "focus";
+                                            })
+                                        }
+                                    }
                                 }
 
-                                SettingsToggleRow {
-                                    Layout.preferredWidth: 160
-                                    Layout.maximumWidth: 160
-                                    label: qsTr("Repeat")
-                                    checked: root.draft.trigger.repeat !== false
-                                    onToggled: value => root.mutate(next => next.trigger.repeat = value)
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    MacroAppPicker {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 220
+                                        value: root.draft.trigger.match || ""
+                                        onSelected: value => root.mutate(next => next.trigger.match = value)
+                                    }
+
+                                    MacroTextField {
+                                        Layout.fillWidth: true
+                                        value: root.draft.trigger.titleMatch || ""
+                                        placeholder: "Window title filter or /regex/i (optional)"
+                                        onTextEdited: value => root.mutate(next => next.trigger.titleMatch = value)
+                                    }
                                 }
                             }
 
-                            RowLayout {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                visible: root.draft.trigger.type === "app"
-                                spacing: 12
+                                visible: root.draft.trigger.type === "notification"
+                                spacing: 8
 
-                                MacroAppPicker {
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    Layout.minimumWidth: 240
-                                    value: root.draft.trigger.match || ""
-                                    onSelected: value => root.mutate(next => next.trigger.match = value)
+                                    spacing: 6
+
+                                    Text {
+                                        text: qsTr("Urgency")
+                                        font.family: Config.theme.font
+                                        font.pixelSize: Styling.fontSize(-1)
+                                        color: Colors.overSurfaceVariant
+                                    }
+
+                                    Repeater {
+                                        model: [
+                                            { id: "any", label: "Any" },
+                                            { id: "normal", label: "Normal+" },
+                                            { id: "critical", label: "Critical only" }
+                                        ]
+
+                                        MacroButton {
+                                            required property var modelData
+                                            text: modelData.label
+                                            implicitHeight: 32
+                                            tone: (root.draft.trigger.urgency || "any") === modelData.id ? "primary" : "common"
+                                            onClicked: root.mutate(next => next.trigger.urgency = modelData.id)
+                                        }
+                                    }
+
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
                                 }
 
-                                SettingsToggleRow {
-                                    Layout.preferredWidth: 160
-                                    Layout.maximumWidth: 160
-                                    label: qsTr("On focus")
-                                    checked: root.draft.trigger.onFocus === true
-                                    onToggled: value => root.mutate(next => next.trigger.onFocus = value)
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    MacroTextField {
+                                        Layout.preferredWidth: 220
+                                        value: root.draft.trigger.appMatch || ""
+                                        placeholder: "Sender app (e.g. vesktop)"
+                                        onTextEdited: value => root.mutate(next => next.trigger.appMatch = value)
+                                    }
+
+                                    MacroTextField {
+                                        Layout.fillWidth: true
+                                        value: root.draft.trigger.textMatch || ""
+                                        placeholder: "Title or body text, or /regex/i"
+                                        onTextEdited: value => root.mutate(next => next.trigger.textMatch = value)
+                                    }
+                                }
+                            }
+
+                            MacroTextField {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type === "clipboard"
+                                value: root.draft.trigger.match || ""
+                                placeholder: "Copied text substring or /regex/i (e.g. /^https:\\/\\/youtu/)"
+                                onTextEdited: value => root.mutate(next => next.trigger.match = value)
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type === "system"
+                                spacing: 8
+
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: root.systemEventDefs
+
+                                        MacroButton {
+                                            required property var modelData
+                                            text: modelData.label
+                                            implicitHeight: 32
+                                            tone: (root.draft.trigger.event || "unlock") === modelData.id ? "primary" : "common"
+                                            onClicked: root.mutate(next => next.trigger.event = modelData.id)
+                                        }
+                                    }
+                                }
+
+                                MacroTextField {
+                                    Layout.fillWidth: true
+                                    visible: ["wifi_connected", "wifi_disconnected", "bt_connected", "bt_disconnected", "audio_output"].indexOf(root.draft.trigger.event || "") !== -1
+                                    value: root.draft.trigger.match || ""
+                                    placeholder: {
+                                        const ev = root.draft.trigger.event || "";
+                                        if (ev.indexOf("wifi_") === 0)
+                                            return "Wi-Fi SSID filter (leave blank for any network)";
+                                        if (ev.indexOf("bt_") === 0)
+                                            return "Bluetooth device name filter (leave blank for any device)";
+                                        return "Audio output name filter (leave blank for any device)";
+                                    }
+                                    onTextEdited: value => root.mutate(next => next.trigger.match = value)
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type === "timer"
+                                spacing: 8
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: [
+                                            { id: "interval", label: "Interval" },
+                                            { id: "daily", label: "Daily time" }
+                                        ]
+
+                                        MacroButton {
+                                            required property var modelData
+                                            text: modelData.label
+                                            implicitHeight: 32
+                                            tone: (root.draft.trigger.mode || "interval") === modelData.id ? "primary" : "common"
+                                            onClicked: root.mutate(next => next.trigger.mode = modelData.id)
+                                        }
+                                    }
+
+                                    SettingsNumberInputRow {
+                                        Layout.fillWidth: true
+                                        visible: (root.draft.trigger.mode || "interval") === "interval"
+                                        Layout.minimumWidth: 180
+                                        label: "Every"
+                                        suffix: "s"
+                                        value: root.draft.trigger.seconds || 60
+                                        minValue: 1
+                                        maxValue: 86400
+                                        onValueEdited: value => root.mutate(next => next.trigger.seconds = value)
+                                    }
+
+                                    SettingsToggleRow {
+                                        Layout.preferredWidth: 150
+                                        Layout.maximumWidth: 150
+                                        visible: (root.draft.trigger.mode || "interval") === "interval"
+                                        label: qsTr("Repeat")
+                                        checked: root.draft.trigger.repeat !== false
+                                        onToggled: value => root.mutate(next => next.trigger.repeat = value)
+                                    }
+
+                                    MacroTextField {
+                                        Layout.fillWidth: true
+                                        visible: root.draft.trigger.mode === "daily"
+                                        value: root.draft.trigger.at || "09:00"
+                                        placeholder: "24h time (HH:MM, e.g. 09:00)"
+                                        onTextEdited: value => root.mutate(next => next.trigger.at = MacroUtils.normalizeTimeOfDay(value, next.trigger.at))
+                                    }
                                 }
                             }
 
@@ -661,6 +886,61 @@ FloatingWindow {
                                     font.pixelSize: Styling.fontSize(-2)
                                     color: Colors.overSurfaceVariant
                                     wrapMode: Text.WordWrap
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type !== "none"
+                                spacing: 8
+
+                                Text {
+                                    text: qsTr("Guard")
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(1)
+                                    font.bold: true
+                                    color: Colors.overBackground
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: [
+                                            { id: "any", label: "Always" },
+                                            { id: "focused", label: "App focused" },
+                                            { id: "running", label: "App open" },
+                                            { id: "not_focused", label: "App not focused" }
+                                        ]
+
+                                        MacroButton {
+                                            required property var modelData
+                                            text: modelData.label
+                                            implicitHeight: 32
+                                            tone: (root.draft.condition?.appMode || "any") === modelData.id ? "primary" : "common"
+                                            onClicked: root.mutate(next => next.condition.appMode = modelData.id)
+                                        }
+                                    }
+
+                                    MacroAppPicker {
+                                        Layout.fillWidth: true
+                                        visible: (root.draft.condition?.appMode || "any") !== "any"
+                                        value: root.draft.condition?.appMatch || ""
+                                        onSelected: value => root.mutate(next => next.condition.appMatch = value)
+                                    }
+
+                                    SettingsNumberInputRow {
+                                        Layout.fillWidth: (root.draft.condition?.appMode || "any") === "any"
+                                        Layout.preferredWidth: 200
+                                        visible: root.draft.trigger.type !== "sound"
+                                        label: "Cooldown"
+                                        suffix: "ms"
+                                        value: root.draft.cooldownMs || 0
+                                        minValue: 0
+                                        maxValue: 300000
+                                        onValueEdited: value => root.mutate(next => next.cooldownMs = value)
+                                    }
                                 }
                             }
 

@@ -19,7 +19,9 @@ Rectangle {
         { type: "launch", icon: Icons.launch, label: "Launch app" },
         { type: "sound", icon: Icons.speaker, label: "Play sound" },
         { type: "delay", icon: Icons.timer, label: "Delay" },
-        { type: "click", icon: Icons.cursor, label: "Mouse click" }
+        { type: "click", icon: Icons.cursor, label: "Mouse click" },
+        { type: "focus", icon: Icons.popOpen, label: "Focus window" },
+        { type: "notify", icon: Icons.bell, label: "Notification" }
     ]
 
     signal stepEdited(var step)
@@ -137,6 +139,33 @@ Rectangle {
             Layout.fillWidth: true
             value: root.step.path || ""
             onValueEdited: value => root.stepEdited(root.withField(root.step, "path", value))
+        }
+
+        MacroAppPicker {
+            visible: root.step.type === "focus"
+            Layout.fillWidth: true
+            value: root.step.match || ""
+            onSelected: value => root.stepEdited(root.withField(root.step, "match", value))
+        }
+
+        RowLayout {
+            visible: root.step.type === "notify"
+            Layout.fillWidth: true
+            spacing: 6
+
+            MacroTextField {
+                Layout.preferredWidth: 160
+                value: root.step.title || ""
+                placeholder: "Alert title"
+                onTextEdited: value => root.stepEdited(root.withField(root.step, "title", value))
+            }
+
+            MacroTextField {
+                Layout.fillWidth: true
+                value: root.step.body || ""
+                placeholder: "Notification body"
+                onTextEdited: value => root.stepEdited(root.withField(root.step, "body", value))
+            }
         }
 
         SettingsNumberInputRow {

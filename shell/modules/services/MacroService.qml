@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.modules.components
+import qs.modules.globals
 import Quickshell
 import Quickshell.Io
 import qs.config
@@ -30,6 +31,23 @@ Singleton {
     property int runToken: 0
     property int stepToken: -1
     property var processes: []
+
+    property var lastFiredAt: ({})
+    property var lastTriggerInfo: ({})
+
+    property var soundScores: ({})
+    property var soundLevels: ({})
+    property var soundPeakHz: ({})
+    property var previewDraft: null
+    property string recordingMacroId: ""
+    property string recordingTargetPath: ""
+    property real recordingLevel: 0
+    property real recordingSeconds: 0
+    property bool previewPlaying: false
+    property bool soundDaemonRetried: false
+
+    signal soundSampleReady(string macroId, string samplePath, var meta)
+    signal soundSampleInspected(string samplePath, var meta)
 
     function list() {
         return MacroUtils.asArray(root.macros);
@@ -71,6 +89,45 @@ Singleton {
             root._dequeue();
         }
         root.saveList(root.list().filter(macro => macro.id !== id));
+    }
+
+    function _guardsPass(macro, nowMs) {
+        if (!macro || macro.enabled === false || !root.enabled)
+            return false;
+        const cd = Math.max(0, macro.cooldownMs || 0);
+        if (cd > 0 && root.lastFiredAt[macro.id] && (nowMs - root.lastFiredAt[macro.id]) < cd)
+            return false;
+        const clients = Compositor.clients.values || [];
+        return MacroUtils.conditionMet(macro.condition, clients, Compositor.focusedClient);
+    }
+
+    function _recordFire(id, nowMs, detail) {
+        const dt = new Date(nowMs);
+        const hh = ("0" + dt.getHours()).slice(-2);
+        const mm = ("0" + dt.getMinutes()).slice(-2);
+        const ss = ("0" + dt.getSeconds()).slice(-2);
+        root.lastFiredAt = Object.assign({}, root.lastFiredAt, { [id]: nowMs });
+        root.lastTriggerInfo = Object.assign({}, root.lastTriggerInfo, {
+            [id]: { time: hh + ":" + mm + ":" + ss, detail: detail || "Triggered" }
+        });
+    }
+
+    function _fireTrigger(id, urgent, detail) {
+        const macro = root.findMacro(id);
+        const nowMs = Date.now();
+        if (!root._guardsPass(macro, nowMs))
+            return false;
+        root._recordFire(id, nowMs, detail);
+        root.run(id, urgent);
+        return true;
+    }
+
+    function triggerHotkey(id) {
+        if (root.playing && root.activeId === id) {
+            root.stop();
+            return;
+        }
+        root._fireTrigger(id, true, "Hotkey");
     }
 
     function run(id, urgent) {
@@ -221,6 +278,17 @@ Singleton {
         }
     }
 
+    function _findMatchingClient(query) {
+        if (!query || !String(query).trim())
+            return null;
+        const clients = Compositor.clients.values || [];
+        for (const client of clients) {
+            if (MacroUtils.matchesQuery(client.class, query) || MacroUtils.matchesQuery(client.title, query))
+                return client;
+        }
+        return null;
+    }
+
     function _runStep() {
         if (!root.playing || !root.currentMacro)
             return;
@@ -272,6 +340,27 @@ Singleton {
             break;
         case "launch":
             ApplicationLauncher.launchCommand(["bash", "-c", step.command]);
+            Qt.callLater(() => {
+                if (token === root.runToken)
+                    root._next();
+            });
+            break;
+        case "focus": {
+            const client = root._findMatchingClient(step.match);
+            if (client)
+                Compositor.dispatch("focuswindow address:" + client.address);
+            Qt.callLater(() => {
+                if (token === root.runToken)
+                    root._next();
+            });
+            break;
+        }
+        case "notify":
+            Notifications.notifyInternal({
+                appName: "Pangu Macros",
+                summary: step.title || root.currentMacro.name || "Macro",
+                body: step.body || ""
+            });
             Qt.callLater(() => {
                 if (token === root.runToken)
                     root._next();
@@ -342,15 +431,25 @@ Singleton {
         }
     }
 
-
     property var timerObjects: ({})
-    property var knownClients: ({})
+    property var dailyFiredStamp: ({})
+    property var clientSnapshots: ({})
+    property bool clientsInitialized: false
     property string lastFocusedAddress: ""
     property var sequenceState: ({})
     property bool startupDone: false
+    property int maxClipboardId: -1
+    property bool clipboardInitialized: false
+    property string lastWifiStatus: ""
+    property string lastWifiSsid: ""
+    property var connectedBtMap: ({})
+    property bool btInitialized: false
+    property string lastSinkName: ""
+    property bool gameModeSettled: false
+    property bool lastGameMode: false
 
     function _timerFired(id) {
-        root.run(id, false);
+        root._fireTrigger(id, false, "Timer");
     }
 
     function _syncTimers() {
@@ -358,9 +457,12 @@ Singleton {
         for (const macro of root.list()) {
             if (!macro || !macro.enabled || macro.trigger?.type !== "timer")
                 continue;
+            const trig = MacroUtils.normalizeTrigger(macro.trigger);
+            if (trig.mode !== "interval")
+                continue;
             const id = macro.id;
-            const interval = Math.max(1, macro.trigger.seconds || 60) * 1000;
-            const repeat = macro.trigger.repeat !== false;
+            const interval = Math.max(1, trig.seconds || 60) * 1000;
+            const repeat = trig.repeat !== false;
             wanted[id] = true;
             let timer = root.timerObjects[id];
             if (!timer) {
@@ -383,49 +485,173 @@ Singleton {
         }
     }
 
+    function _checkDailyTimers(nowDate) {
+        const dt = nowDate || new Date();
+        const hhmm = ("0" + dt.getHours()).slice(-2) + ":" + ("0" + dt.getMinutes()).slice(-2);
+        const dayKey = dt.getFullYear() + "-" + (dt.getMonth() + 1) + "-" + dt.getDate() + " " + hhmm;
+        for (const macro of root.list()) {
+            if (!macro || !macro.enabled || macro.trigger?.type !== "timer")
+                continue;
+            const trig = MacroUtils.normalizeTrigger(macro.trigger);
+            if (trig.mode !== "daily" || trig.at !== hhmm)
+                continue;
+            if (root.dailyFiredStamp[macro.id] === dayKey)
+                continue;
+            root.dailyFiredStamp = Object.assign({}, root.dailyFiredStamp, { [macro.id]: dayKey });
+            root._fireTrigger(macro.id, false, "Daily " + hhmm);
+        }
+    }
+
+    function _snapshotClient(client) {
+        return {
+            address: client.address,
+            class: client.class || "",
+            initialClass: client.initialClass || "",
+            title: client.title || "",
+            fullscreen: Boolean(client.fullscreen)
+        };
+    }
+
     function _syncAppClients() {
         const clients = Compositor.clients.values || [];
         const seen = {};
         for (const client of clients)
-            seen[client.address] = true;
-        root.knownClients = seen;
+            seen[client.address] = root._snapshotClient(client);
+        root.clientSnapshots = seen;
+        root.clientsInitialized = true;
     }
 
-    function _appMatches(trigger, className) {
-        if (!trigger.match)
-            return false;
-        return String(className || "").toLowerCase().indexOf(trigger.match.toLowerCase()) !== -1;
-    }
-
-    function _fireAppTriggers(className, focused) {
+    function _fireAppEvent(eventName, client, prevClient) {
         for (const macro of root.list()) {
             if (!macro || !macro.enabled || macro.trigger?.type !== "app")
                 continue;
-            const trigger = macro.trigger;
-            const isFocusedRule = trigger.onFocus === true;
-            if (isFocusedRule !== focused)
+            const trig = MacroUtils.normalizeTrigger(macro.trigger);
+            if (trig.event !== eventName)
                 continue;
-            if (root._appMatches(trigger, className))
-                root.run(macro.id, false);
+            if (!MacroUtils.clientMatches(client, trig.match, trig.titleMatch))
+                continue;
+            if (eventName === "title" && prevClient && MacroUtils.clientMatches(prevClient, trig.match, trig.titleMatch))
+                continue;
+            root._fireTrigger(macro.id, false, "Window " + eventName);
         }
     }
 
-    function _checkLaunches() {
-        const clients = Compositor.clients.values || [];
-        for (const client of clients) {
-            if (root.knownClients[client.address])
-                continue;
-            root._fireAppTriggers(client.class, false);
+    function _checkClientEvents() {
+        if (!Config.initialLoadComplete)
+            return;
+        if (!root.clientsInitialized) {
+            root._syncAppClients();
+            return;
         }
-        root._syncAppClients();
+        const clients = Compositor.clients.values || [];
+        const next = {};
+        for (const client of clients) {
+            const prev = root.clientSnapshots[client.address];
+            const snap = root._snapshotClient(client);
+            next[client.address] = snap;
+            if (!prev) {
+                root._fireAppEvent("launch", snap, null);
+            } else {
+                if (snap.title !== prev.title)
+                    root._fireAppEvent("title", snap, prev);
+                if (snap.fullscreen && !prev.fullscreen)
+                    root._fireAppEvent("fullscreen", snap, prev);
+            }
+        }
+        for (const addr in root.clientSnapshots) {
+            if (!next[addr])
+                root._fireAppEvent("close", root.clientSnapshots[addr], null);
+        }
+        root.clientSnapshots = next;
     }
 
     function _checkFocus() {
         const client = Compositor.focusedClient;
-        if (!client || client.address === root.lastFocusedAddress)
+        if (!client) {
+            root.lastFocusedAddress = "";
+            return;
+        }
+        if (client.address === root.lastFocusedAddress)
             return;
         root.lastFocusedAddress = client.address;
-        root._fireAppTriggers(client.class, true);
+        if (!Config.initialLoadComplete)
+            return;
+        root._fireAppEvent("focus", root._snapshotClient(client), null);
+    }
+
+    function _handleNotification(notif) {
+        if (!Config.initialLoadComplete || !notif)
+            return;
+        // Ignore notifications emitted by macro steps to prevent self-triggering loops.
+        if (String(notif.appName || "") === "Pangu Macros")
+            return;
+        const urgencyNum = typeof notif.urgency === "number" ? notif.urgency : 1;
+        const text = String(notif.summary || "") + "\n" + String(notif.body || "");
+        for (const macro of root.list()) {
+            if (!macro || !macro.enabled || macro.trigger?.type !== "notification")
+                continue;
+            const trig = MacroUtils.normalizeTrigger(macro.trigger);
+            if (!trig.appMatch.trim() && !trig.textMatch.trim() && trig.urgency === "any")
+                continue;
+            if (trig.urgency === "critical" && urgencyNum < 2)
+                continue;
+            if (trig.urgency === "normal" && urgencyNum < 1)
+                continue;
+            if (!MacroUtils.matchesOptionalQuery(notif.appName || "", trig.appMatch))
+                continue;
+            if (!MacroUtils.matchesOptionalQuery(text, trig.textMatch))
+                continue;
+            root._fireTrigger(macro.id, false, "Notification: " + (notif.appName || "alert"));
+        }
+    }
+
+    function _handleClipboardUpdate() {
+        const items = ClipboardService.items || [];
+        let highest = root.maxClipboardId;
+        for (const item of items) {
+            const num = parseInt(item.id, 10);
+            if (!isNaN(num) && num > highest)
+                highest = num;
+        }
+        if (!root.clipboardInitialized) {
+            root.maxClipboardId = highest;
+            root.clipboardInitialized = true;
+            return;
+        }
+        if (highest <= root.maxClipboardId)
+            return;
+        const prevMax = root.maxClipboardId;
+        root.maxClipboardId = highest;
+        if (!Config.initialLoadComplete)
+            return;
+        for (const item of items) {
+            const num = parseInt(item.id, 10);
+            if (isNaN(num) || num <= prevMax || item.isImage)
+                continue;
+            const content = String(item.fullContent || item.preview || "");
+            for (const macro of root.list()) {
+                if (!macro || !macro.enabled || macro.trigger?.type !== "clipboard")
+                    continue;
+                const trig = MacroUtils.normalizeTrigger(macro.trigger);
+                if (MacroUtils.matchesQuery(content, trig.match))
+                    root._fireTrigger(macro.id, false, "Clipboard copy");
+            }
+        }
+    }
+
+    function _fireSystemEvent(eventName, contextValue) {
+        if (!Config.initialLoadComplete)
+            return;
+        for (const macro of root.list()) {
+            if (!macro || !macro.enabled || macro.trigger?.type !== "system")
+                continue;
+            const trig = MacroUtils.normalizeTrigger(macro.trigger);
+            if (trig.event !== eventName)
+                continue;
+            if (!MacroUtils.matchesOptionalQuery(contextValue || "", trig.match))
+                continue;
+            root._fireTrigger(macro.id, false, MacroUtils.describeSystemEvent(eventName, contextValue || ""));
+        }
     }
 
     function _resetSequences() {
@@ -445,7 +671,7 @@ Singleton {
         if (index === expected) {
             if (expected + 1 >= total) {
                 root._resetSequences();
-                root.run(id, true);
+                root._fireTrigger(id, true, "Key sequence");
                 return;
             }
             root.sequenceState = Object.assign({}, root.sequenceState, { [id]: expected + 1 });
@@ -466,7 +692,309 @@ Singleton {
         root.startupDone = true;
         for (const macro of root.list()) {
             if (macro && macro.enabled && macro.trigger?.type === "startup")
-                root.run(macro.id, false);
+                root._fireTrigger(macro.id, false, "Shell startup");
+        }
+    }
+
+    function samplePathFor(macroId) {
+        const safeId = String(macroId || "sample").replace(/[^A-Za-z0-9_-]/g, "_");
+        return Paths.dataPath("macro-sounds/" + safeId + ".wav");
+    }
+
+    function _soundRuleFromMacro(macro, telemetryOnly) {
+        const trig = MacroUtils.normalizeTrigger(macro.trigger);
+        if (trig.type !== "sound")
+            return null;
+        if (trig.mode === "sample" && !trig.samplePath)
+            return null;
+        return {
+            id: macro.id,
+            mode: trig.mode,
+            source: trig.source,
+            samplePath: trig.samplePath,
+            trimStart: trig.trimStart,
+            trimEnd: trig.trimEnd,
+            bandFilter: trig.bandFilter,
+            minHz: trig.minHz,
+            maxHz: trig.maxHz,
+            minDurationMs: trig.minDurationMs,
+            threshold: trig.threshold,
+            cooldownMs: trig.cooldownMs,
+            telemetryOnly: Boolean(telemetryOnly)
+        };
+    }
+
+    function _buildSoundConfig(macrosList, masterEnabled, draftMacro, telemetryActive) {
+        const rules = [];
+        const draftId = telemetryActive && draftMacro && draftMacro.id ? draftMacro.id : "";
+        let draftIncluded = false;
+        for (const raw of MacroUtils.asArray(macrosList)) {
+            if (!raw)
+                continue;
+            if (draftId && raw.id === draftId) {
+                draftIncluded = true;
+                const cleanDraft = MacroUtils.normalizeMacro(draftMacro);
+                const draftRule = root._soundRuleFromMacro(cleanDraft, !(masterEnabled && cleanDraft.enabled));
+                if (draftRule)
+                    rules.push(draftRule);
+                continue;
+            }
+            if (!masterEnabled || raw.enabled === false)
+                continue;
+            const rule = root._soundRuleFromMacro(raw, false);
+            if (rule)
+                rules.push(rule);
+        }
+        if (draftId && !draftIncluded) {
+            const extraDraft = MacroUtils.normalizeMacro(draftMacro);
+            const extraRule = root._soundRuleFromMacro(extraDraft, !(masterEnabled && extraDraft.enabled));
+            if (extraRule)
+                rules.push(extraRule);
+        }
+        return {
+            rules: rules,
+            json: JSON.stringify({ telemetry: Boolean(telemetryActive), rules: rules })
+        };
+    }
+
+    readonly property var _soundState: root._buildSoundConfig(
+        root.macros,
+        root.enabled,
+        root.previewDraft,
+        GlobalStates.macrosWindowVisible
+    )
+    readonly property string _soundConfigJson: root._soundState.json
+    readonly property bool soundShouldRun: Config.initialLoadComplete
+        && root._soundState.rules.length > 0
+        && !SuspendManager.isSuspending
+        && root.recordingMacroId === ""
+
+    function _ensureSoundMonitor() {
+        if (!root.soundShouldRun) {
+            soundRetryTimer.stop();
+            if (soundMonitorProc.running)
+                soundMonitorProc.running = false;
+            return;
+        }
+        if (!soundMonitorProc.running)
+            soundMonitorProc.running = true;
+    }
+
+    on_SoundConfigJsonChanged: soundConfigDebounce.restart()
+
+    onSoundShouldRunChanged: {
+        if (root.soundShouldRun) {
+            root.soundDaemonRetried = false;
+            soundConfigDebounce.restart();
+        } else {
+            soundRetryTimer.stop();
+            soundMonitorProc.running = false;
+            root.soundScores = ({});
+            root.soundLevels = ({});
+            root.soundPeakHz = ({});
+        }
+    }
+
+    function startSoundRecord(macroId, source) {
+        if (!macroId || soundRecordProc.running)
+            return;
+        root.stopSoundPreview();
+        const outPath = root.samplePathFor(macroId);
+        const recSource = source === "mic" ? "mic" : "desktop";
+        root.recordingMacroId = macroId;
+        root.recordingTargetPath = outPath;
+        root.recordingLevel = 0;
+        root.recordingSeconds = 0;
+        soundRecordProc.command = [
+            "python3",
+            Paths.script("sound_trigger.py"),
+            "record",
+            outPath,
+            "--source",
+            recSource,
+            "--max-seconds",
+            "10"
+        ];
+        soundRecordProc.running = true;
+    }
+
+    function stopSoundRecord() {
+        if (soundRecordProc.running && soundRecordProc.processId > 0) {
+            soundStopSignalProc.command = ["kill", "-INT", String(soundRecordProc.processId)];
+            soundStopSignalProc.running = true;
+        } else {
+            soundRecordProc.running = false;
+            root.recordingMacroId = "";
+            root.recordingLevel = 0;
+        }
+    }
+
+    function importSoundSample(macroId, inputPath) {
+        if (!macroId || !inputPath)
+            return;
+        const outPath = root.samplePathFor(macroId);
+        const proc = inspectProcessComponent.createObject(root, {
+            macroId: macroId,
+            samplePath: outPath,
+            isImport: true,
+            command: ["python3", Paths.script("sound_trigger.py"), "import", inputPath, outPath]
+        });
+        proc.running = true;
+    }
+
+    function inspectSoundSample(samplePath, trimStart, trimEnd, autotrim) {
+        if (!samplePath)
+            return;
+        const cmd = ["python3", Paths.script("sound_trigger.py"), "inspect", samplePath];
+        if (autotrim) {
+            cmd.push("--autotrim");
+        } else if (typeof trimStart === "number" && typeof trimEnd === "number" && trimEnd > trimStart) {
+            cmd.push("--trim-start", String(trimStart), "--trim-end", String(trimEnd));
+        }
+        const proc = inspectProcessComponent.createObject(root, {
+            macroId: "",
+            samplePath: samplePath,
+            isImport: false,
+            command: cmd
+        });
+        proc.running = true;
+    }
+
+    function previewSoundSnippet(samplePath, trimStart, trimEnd) {
+        if (!samplePath)
+            return;
+        if (soundPreviewProc.running)
+            soundPreviewProc.running = false;
+        const args = ["mpv", "--no-video", "--no-terminal"];
+        if (typeof trimStart === "number" && trimStart > 0)
+            args.push("--start=" + trimStart.toFixed(3));
+        if (typeof trimEnd === "number" && trimEnd > (trimStart || 0))
+            args.push("--end=" + trimEnd.toFixed(3));
+        args.push("--", samplePath);
+        soundPreviewProc.command = args;
+        root.previewPlaying = true;
+        soundPreviewProc.running = true;
+    }
+
+    function stopSoundPreview() {
+        if (soundPreviewProc.running)
+            soundPreviewProc.running = false;
+        root.previewPlaying = false;
+    }
+
+    GeneratedFile {
+        id: soundConfigFile
+        path: Paths.runtimePath("macro-sound-triggers.json")
+        onWritten: root._ensureSoundMonitor()
+    }
+
+    Timer {
+        id: soundConfigDebounce
+        interval: 120
+        onTriggered: soundConfigFile.write(root._soundConfigJson)
+    }
+
+    Process {
+        id: soundMonitorProc
+        command: ["python3", Paths.script("sound_trigger.py"), "monitor", "--config", soundConfigFile.path]
+
+        stdout: SplitParser {
+            onRead: line => {
+                const text = line.trim();
+                if (text.startsWith("MATCH ")) {
+                    const parts = text.split(/\s+/);
+                    if (parts.length >= 3)
+                        root._fireTrigger(parts[1], false, "Sound match (" + parts[2] + "%)");
+                } else if (text.startsWith("TELEMETRY ")) {
+                    try {
+                        const data = JSON.parse(text.slice(10));
+                        root.soundScores = data.scores || ({});
+                        root.soundLevels = data.levels || ({});
+                        root.soundPeakHz = data.peakHz || ({});
+                    } catch (e) {}
+                }
+            }
+        }
+
+        onExited: {
+            if (!root.soundShouldRun)
+                return;
+            if (!root.soundDaemonRetried) {
+                root.soundDaemonRetried = true;
+                soundRetryTimer.restart();
+            }
+        }
+    }
+
+    Timer {
+        id: soundRetryTimer
+        interval: 1500
+        onTriggered: root._ensureSoundMonitor()
+    }
+
+    Timer {
+        id: soundHealthyTimer
+        interval: 10000
+        running: soundMonitorProc.running
+        onTriggered: root.soundDaemonRetried = false
+    }
+
+    Process {
+        id: soundRecordProc
+        stdout: SplitParser {
+            onRead: line => {
+                const text = line.trim();
+                if (text.startsWith("RMS ")) {
+                    const parts = text.split(/\s+/);
+                    root.recordingLevel = parseFloat(parts[1]) || 0;
+                    root.recordingSeconds = parseFloat(parts[2]) || 0;
+                } else if (text.startsWith("SAVED ")) {
+                    try {
+                        const meta = JSON.parse(text.slice(6));
+                        root.soundSampleReady(root.recordingMacroId, root.recordingTargetPath, meta);
+                    } catch (e) {}
+                }
+            }
+        }
+        onExited: {
+            root.recordingMacroId = "";
+            root.recordingLevel = 0;
+            root.recordingSeconds = 0;
+        }
+    }
+
+    Process {
+        id: soundStopSignalProc
+    }
+
+    Process {
+        id: soundPreviewProc
+        onExited: root.previewPlaying = false
+    }
+
+    Component {
+        id: inspectProcessComponent
+        Process {
+            id: inspectProc
+            property string macroId: ""
+            property string samplePath: ""
+            property bool isImport: false
+            property string outputBuffer: ""
+            stdout: StdioCollector {
+                onStreamFinished: inspectProc.outputBuffer = text.trim()
+            }
+            onExited: code => {
+                if (code === 0 && inspectProc.outputBuffer.length > 0) {
+                    try {
+                        const meta = JSON.parse(inspectProc.outputBuffer);
+                        if (inspectProc.isImport)
+                            root.soundSampleReady(inspectProc.macroId, inspectProc.samplePath, meta);
+                        else
+                            root.soundSampleInspected(inspectProc.samplePath, meta);
+                    } catch (e) {}
+                }
+                inspectProc.destroy();
+            }
         }
     }
 
@@ -504,11 +1032,18 @@ Singleton {
         onTriggered: root._resetSequences()
     }
 
+    Timer {
+        id: dailyScheduleTimer
+        interval: 15000
+        repeat: true
+        running: Config.initialLoadComplete && root.enabled && !SuspendManager.isSuspending
+        onTriggered: root._checkDailyTimers(new Date())
+    }
+
     Connections {
         target: Config.macros
         function onMacrosChanged() {
             root._syncTimers();
-            root._syncAppClients();
             root._resetSequences();
             root._reconcileActive();
         }
@@ -528,7 +1063,122 @@ Singleton {
     Connections {
         target: Compositor.clients
         function onValuesChanged() {
-            root._checkLaunches();
+            root._checkClientEvents();
+        }
+    }
+
+    Connections {
+        target: Notifications
+        function onNotify(notif) {
+            root._handleNotification(notif);
+        }
+    }
+
+    Connections {
+        target: ClipboardService
+        function onListCompleted() {
+            root._handleClipboardUpdate();
+        }
+    }
+
+    Connections {
+        target: GlobalStates
+        function onLockscreenVisibleChanged() {
+            if (GlobalStates.lockscreenVisible)
+                root._fireSystemEvent("lock", "");
+        }
+    }
+
+    Connections {
+        target: LockscreenService
+        function onUnlocked() {
+            root._fireSystemEvent("unlock", "");
+        }
+    }
+
+    Connections {
+        target: SuspendManager
+        function onPreparingForSleep() {
+            root._fireSystemEvent("suspend", "");
+        }
+        function onWakingUp() {
+            root._fireSystemEvent("resume", "");
+        }
+    }
+
+    Connections {
+        target: GameModeService
+        function onToggledChanged() {
+            if (!root.gameModeSettled)
+                return;
+            const next = Boolean(GameModeService.toggled);
+            if (next === root.lastGameMode)
+                return;
+            root.lastGameMode = next;
+            root._fireSystemEvent(next ? "gamemode_on" : "gamemode_off", "");
+        }
+    }
+
+    Connections {
+        target: NetworkService
+        function onWifiStatusChanged() {
+            const st = NetworkService.wifiStatus || "";
+            const ssid = NetworkService.active?.ssid || "";
+            if (!root.lastWifiStatus) {
+                root.lastWifiStatus = st;
+                root.lastWifiSsid = ssid;
+                return;
+            }
+            if (st === "connected" && root.lastWifiStatus !== "connected") {
+                root.lastWifiSsid = ssid;
+                root._fireSystemEvent("wifi_connected", ssid);
+            } else if ((st === "disconnected" || st === "disabled") && root.lastWifiStatus === "connected") {
+                root._fireSystemEvent("wifi_disconnected", root.lastWifiSsid);
+                root.lastWifiSsid = "";
+            }
+            root.lastWifiStatus = st;
+        }
+    }
+
+    Connections {
+        target: BluetoothService
+        function onFriendlyDeviceListChanged() {
+            const devices = BluetoothService.friendlyDeviceList || [];
+            const next = {};
+            for (const dev of devices) {
+                if (dev && dev.connected)
+                    next[dev.address || dev.name] = dev.name || dev.address || "";
+            }
+            if (!root.btInitialized) {
+                root.connectedBtMap = next;
+                root.btInitialized = true;
+                return;
+            }
+            for (const key in next) {
+                if (!(key in root.connectedBtMap))
+                    root._fireSystemEvent("bt_connected", next[key]);
+            }
+            for (const key in root.connectedBtMap) {
+                if (!(key in next))
+                    root._fireSystemEvent("bt_disconnected", root.connectedBtMap[key]);
+            }
+            root.connectedBtMap = next;
+        }
+    }
+
+    Connections {
+        target: Audio
+        function onSinkChanged() {
+            if (soundMonitorProc.running) {
+                root.soundDaemonRetried = false;
+                soundMonitorProc.running = false;
+            }
+            if (!Audio._sinkSettled || !Audio.sink)
+                return;
+            const label = Audio.friendlyDeviceName(Audio.sink);
+            if (root.lastSinkName && label !== root.lastSinkName)
+                root._fireSystemEvent("audio_output", label);
+            root.lastSinkName = label;
         }
     }
 
@@ -538,7 +1188,14 @@ Singleton {
             if (Config.initialLoadComplete) {
                 root._syncTimers();
                 root._syncAppClients();
+                root.lastWifiStatus = NetworkService.wifiStatus || "";
+                root.lastWifiSsid = NetworkService.active?.ssid || "";
+                root.lastGameMode = Boolean(GameModeService.toggled);
+                root.gameModeSettled = true;
+                if (Audio.sink)
+                    root.lastSinkName = Audio.friendlyDeviceName(Audio.sink);
                 root._runStartup();
+                soundConfigDebounce.restart();
             }
         }
     }
@@ -563,7 +1220,14 @@ Singleton {
         if (Config.initialLoadComplete) {
             root._syncTimers();
             root._syncAppClients();
+            root.lastWifiStatus = NetworkService.wifiStatus || "";
+            root.lastWifiSsid = NetworkService.active?.ssid || "";
+            root.lastGameMode = Boolean(GameModeService.toggled);
+            root.gameModeSettled = true;
+            if (Audio.sink)
+                root.lastSinkName = Audio.friendlyDeviceName(Audio.sink);
             root._runStartup();
+            soundConfigDebounce.restart();
         }
         bindDebounce.restart();
     }

@@ -43,6 +43,7 @@
   networkmanager,
   networkmanagerapplet,
   nodejs,
+  pipewire,
   playerctl,
   power-profiles-daemon,
   procps,
@@ -95,6 +96,8 @@ let
     ];
   };
 
+  pythonEnv = python3.withPackages (ps: [ ps.numpy ]);
+
   src = stdenvNoCC.mkDerivation {
     name = "pangu-shell";
     src = lib.cleanSourceWith {
@@ -106,7 +109,7 @@ let
 
     nativeBuildInputs = [
       bash
-      python3
+      pythonEnv
       nodejs
       lua
       quickshell
@@ -201,10 +204,11 @@ let
     mpvpaper
     networkmanager
     networkmanagerapplet # nm-connection-editor for the wifi panel
+    pipewire # pw-cat audio capture for macro sound triggers
     power-profiles-daemon
     playerctl
     procps # pgrep/pkill
-    python3
+    pythonEnv
     slurp
     socat # mpv IPC sockets for animated wallpapers
     swappy

@@ -17,7 +17,7 @@ QtObject {
 
     function run(command) {
         if (command.startsWith("macros-run ")) {
-            MacroService.run(command.slice(11).trim());
+            MacroService.triggerHotkey(command.slice(11).trim());
             return;
         }
         if (command.startsWith("macros-seq ")) {

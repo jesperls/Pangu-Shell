@@ -164,7 +164,9 @@ Values are saved per wallpaper directory in
 Pangu's saved values. The source wallpaper and the other GUI's files are left
 intact. These properties are shared across screens using the same wallpaper.
 
-`RuntimeDirectory=pangu` contains transient idle and audio configs. The separate
+`RuntimeDirectory=pangu` contains transient idle, audio-visualizer and macro
+sound-detector configs. Recorded or imported macro audio trigger samples live
+under `$XDG_DATA_HOME/pangu/macro-sounds`. The separate
 `pangu-session-started` marker survives service restarts to distinguish them
 from the first login. The wrapper captures the user's clean session `PATH` and
 Qt/QML search paths before adding internal runtime dependencies so launched

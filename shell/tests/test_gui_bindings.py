@@ -1711,4 +1711,196 @@ Item {
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_sound_trigger_editor_and_macro_step_row_bindings(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-sound-ui-") as directory:
+            root = Path(directory)
+            for name in ("config", "modules/theme", "modules/components", "modules/globals", "modules/services", "macros"):
+                (root / name).mkdir(parents=True)
+            (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
+            (root / "config/Config.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property var theme: ({font: "Sans", monoFont: "Monospace", fontSize: 12, lightMode: false})\n'
+                '}\n'
+            )
+            (root / "modules/theme/qmldir").write_text(
+                "singleton Styling 1.0 Styling.qml\n"
+                "singleton Colors 1.0 Colors.qml\n"
+                "singleton Icons 1.0 Icons.qml\n"
+            )
+            (root / "modules/theme/Styling.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property int animDuration: 0\n'
+                '    function radius(n) { return 8; }\n'
+                '    function fontSize(n) { return 12 + n; }\n'
+                '    function srItem(n) { return "#ffffff"; }\n'
+                '}\n'
+            )
+            (root / "modules/theme/Colors.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property color background: "#111111"\n'
+                '    property color overBackground: "#eeeeee"\n'
+                '    property color overSurfaceVariant: "#aaaaaa"\n'
+                '    property color surfaceBright: "#222222"\n'
+                '    property color outline: "#666666"\n'
+                '    property color primary: "#4da3ff"\n'
+                '    property color error: "#ff5555"\n'
+                '}\n'
+            )
+            shutil.copy(SHELL / "modules/theme/Icons.qml", root / "modules/theme/Icons.qml")
+            components = root / "modules/components"
+            (components / "qmldir").write_text(
+                "StyledRect 1.0 StyledRect.qml\n"
+                "StyledToolTip 1.0 StyledToolTip.qml\n"
+                "SearchInput 1.0 SearchInput.qml\n"
+                "SettingsNumberInputRow 1.0 SettingsNumberInputRow.qml\n"
+                "SettingsToggleRow 1.0 SettingsToggleRow.qml\n"
+            )
+            (components / "StyledRect.qml").write_text(
+                'import QtQuick\nRectangle {\n'
+                '    property string variant: "common"\n'
+                '    property bool enableShadow: false\n'
+                '    property real backgroundOpacity: -1\n'
+                '    property bool enableBorder: false\n'
+                '    property color item: "#ffffff"\n'
+                '}\n'
+            )
+            (components / "SearchInput.qml").write_text(
+                'import QtQuick\nItem {\n'
+                '    property string text: ""\n'
+                '    property string variant: "common"\n'
+                '    property string placeholderText: ""\n'
+                '    property bool clearOnEscape: false\n'
+                '    signal searchTextChanged(string text)\n'
+                '    signal escapePressed()\n'
+                '    signal accepted()\n'
+                '    signal downPressed()\n'
+                '    signal upPressed()\n'
+                '    function focusInput() {}\n'
+                '}\n'
+            )
+            shutil.copy(SHELL / "modules/components/StyledToolTip.qml", components / "StyledToolTip.qml")
+            shutil.copy(SHELL / "modules/components/SettingsNumberInputRow.qml", components / "SettingsNumberInputRow.qml")
+            shutil.copy(SHELL / "modules/components/SettingsToggleRow.qml", components / "SettingsToggleRow.qml")
+            (root / "modules/globals/qmldir").write_text("singleton GlobalStates 1.0 GlobalStates.qml\n")
+            (root / "modules/globals/GlobalStates.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property int mousePickSeq: 0\n'
+                '    property bool mousePickValid: false\n'
+                '    property int mousePickX: 0\n'
+                '    property int mousePickY: 0\n'
+                '    function beginMousePick() {}\n'
+                '}\n'
+            )
+            (root / "modules/services/qmldir").write_text(
+                "singleton MacroService 1.0 MacroService.qml\n"
+                "singleton Compositor 1.0 Compositor.qml\n"
+                "singleton AppSearch 1.0 AppSearch.qml\n"
+            )
+            (root / "modules/services/MacroService.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property var soundScores: ({})\n'
+                '    property var soundLevels: ({})\n'
+                '    property var soundPeakHz: ({})\n'
+                '    property string recordingMacroId: ""\n'
+                '    property real recordingLevel: 0\n'
+                '    property real recordingSeconds: 0\n'
+                '    property bool previewPlaying: false\n'
+                '    signal soundSampleReady(string macroId, string samplePath, var meta)\n'
+                '    signal soundSampleInspected(string samplePath, var meta)\n'
+                '    function inspectSoundSample(path, t0, t1, auto) {}\n'
+                '    function startSoundRecord(id, src) {}\n'
+                '    function stopSoundRecord() {}\n'
+                '    function importSoundSample(id, path) {}\n'
+                '    function previewSoundSnippet(path, t0, t1) {}\n'
+                '    function stopSoundPreview() {}\n'
+                '}\n'
+            )
+            (root / "modules/services/Compositor.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject { property var clients: ({values: []}) }\n'
+            )
+            (root / "modules/services/AppSearch.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property var list: []\n'
+                '    function getCachedIcon(name) { return ""; }\n'
+                '}\n'
+            )
+            for fname in (
+                "MacroKeys.qml",
+                "MacroButton.qml",
+                "MacroIconButton.qml",
+                "MacroTextField.qml",
+                "MacroSoundField.qml",
+                "MacroAppPicker.qml",
+                "KeyCaptureField.qml",
+                "SoundTriggerEditor.qml",
+                "MacroStepRow.qml",
+                "qmldir",
+            ):
+                shutil.copy(SHELL / "modules/widgets/macros" / fname, root / "macros" / fname)
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import qs.modules.services
+import "macros"
+ShellRoot {
+    Item {
+        width: 720
+        height: 480
+        SoundTriggerEditor {
+            id: sndEditor
+            width: 680
+            macroId: "m_bell"
+            trigger: ({
+                type: "sound", mode: "sample", source: "desktop", samplePath: "",
+                trimStart: 0, trimEnd: 0, bandFilter: false, minHz: 1200, maxHz: 3800,
+                minDurationMs: 60, threshold: 70, cooldownMs: 1500
+            })
+            onTriggerEdited: next => sndEditor.trigger = next
+        }
+        MacroStepRow {
+            id: focusRow
+            width: 680
+            step: ({ type: "focus", match: "vesktop" })
+            onStepEdited: s => focusRow.step = s
+        }
+        MacroStepRow {
+            id: notifyRow
+            width: 680
+            step: ({ type: "notify", title: "Bell", body: "Ready" })
+            onStepEdited: s => notifyRow.step = s
+        }
+    }
+    Timer {
+        interval: 120; running: true
+        onTriggered: {
+            const peaks = [];
+            for (let i = 0; i < 96; i++) peaks.push(0.5);
+            MacroService.soundSampleReady("m_bell", "/tmp/bell.wav", {
+                duration: 2.0, trimStart: 0.4, trimEnd: 0.9,
+                peaks: peaks, dominantHz: 1480, bandMinHz: 1180, bandMaxHz: 3600
+            });
+            MacroService.soundScores = { m_bell: 84 };
+            MacroService.soundPeakHz = { desktop: 1482 };
+            const ok = sndEditor.trigger.samplePath === "/tmp/bell.wav"
+                && Math.abs(sndEditor.trigger.trimStart - 0.4) < 0.01
+                && Math.abs(sndEditor.trigger.trimEnd - 0.9) < 0.01
+                && sndEditor.peaks.length === 96
+                && sndEditor.liveScore === 84
+                && sndEditor.livePeakHz === 1482
+                && focusRow.step.type === "focus"
+                && notifyRow.step.type === "notify";
+            console.log(ok ? "CHECK_PASSED" : "CHECK_FAILED " + JSON.stringify({
+                samplePath: sndEditor.trigger.samplePath,
+                trimStart: sndEditor.trigger.trimStart,
+                trimEnd: sndEditor.trigger.trimEnd,
+                peaks: sndEditor.peaks.length,
+                liveScore: sndEditor.liveScore,
+                livePeakHz: sndEditor.livePeakHz
+            }));
+            Qt.quit();
+        }
+    }
+}
+''')
+
+
 

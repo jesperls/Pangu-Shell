@@ -1,9 +1,28 @@
 .pragma library
 
-var STEP_TYPES = ["key", "text", "command", "launch", "sound", "delay", "click"];
-var TRIGGER_TYPES = ["none", "hotkey", "timer", "app", "sequence", "startup"];
+var STEP_TYPES = ["key", "text", "command", "launch", "sound", "delay", "click", "focus", "notify"];
+var TRIGGER_TYPES = ["none", "hotkey", "sequence", "sound", "app", "notification", "clipboard", "system", "timer", "startup"];
 var LOOP_MODES = ["none", "count", "infinite"];
 var CLICK_BUTTONS = ["left", "right", "middle"];
+var SOUND_MODES = ["sample", "frequency"];
+var SOUND_SOURCES = ["desktop", "mic", "both"];
+var APP_EVENTS = ["launch", "focus", "close", "title", "fullscreen"];
+var NOTIF_URGENCIES = ["any", "normal", "critical"];
+var SYSTEM_EVENTS = [
+    "unlock",
+    "lock",
+    "resume",
+    "suspend",
+    "gamemode_on",
+    "gamemode_off",
+    "wifi_connected",
+    "wifi_disconnected",
+    "bt_connected",
+    "bt_disconnected",
+    "audio_output"
+];
+var TIMER_MODES = ["interval", "daily"];
+var CONDITION_MODES = ["any", "focused", "running", "not_focused"];
 
 function newId() {
     return "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -27,8 +46,67 @@ function clampInt(value, min, max, fallback) {
     return Math.max(min, Math.min(max, n));
 }
 
+function clampFloat(value, min, max, fallback) {
+    var n = parseFloat(value);
+    if (isNaN(n) || !isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+}
+
 function pick(list, value, fallback) {
     return list.indexOf(value) !== -1 ? value : fallback;
+}
+
+function normalizeTimeOfDay(value, fallback) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(value || "").trim());
+    if (!m)
+        return fallback || "09:00";
+    var hh = parseInt(m[1], 10);
+    var mm = parseInt(m[2], 10);
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59)
+        return fallback || "09:00";
+    return ("0" + hh).slice(-2) + ":" + ("0" + mm).slice(-2);
+}
+
+function matchesQuery(text, query) {
+    var q = String(query === undefined || query === null ? "" : query).trim();
+    if (!q)
+        return false;
+    var hay = String(text === undefined || text === null ? "" : text);
+    if (q.length >= 2 && q.charAt(0) === "/") {
+        var lastSlash = q.lastIndexOf("/");
+        if (lastSlash > 0) {
+            var flags = q.slice(lastSlash + 1);
+            if (/^[gimsuy]*$/.test(flags)) {
+                try {
+                    return new RegExp(q.slice(1, lastSlash), flags).test(hay);
+                } catch (e) {
+                    return false;
+                }
+            }
+        }
+    }
+    return hay.toLowerCase().indexOf(q.toLowerCase()) !== -1;
+}
+
+function matchesOptionalQuery(text, query) {
+    var q = String(query === undefined || query === null ? "" : query).trim();
+    if (!q)
+        return true;
+    return matchesQuery(text, q);
+}
+
+function clientMatches(client, appMatch, titleMatch) {
+    if (!client)
+        return false;
+    var hasApp = String(appMatch || "").trim().length > 0;
+    var hasTitle = String(titleMatch || "").trim().length > 0;
+    if (!hasApp && !hasTitle)
+        return false;
+    if (hasApp && !matchesQuery(client.class, appMatch) && !matchesQuery(client.initialClass, appMatch))
+        return false;
+    if (hasTitle && !matchesQuery(client.title, titleMatch))
+        return false;
+    return true;
 }
 
 function sanitizeCombo(value) {
@@ -78,6 +156,10 @@ function blankStep(type) {
         return { type: "delay", ms: 500 };
     case "click":
         return { type: "click", button: "left" };
+    case "focus":
+        return { type: "focus", match: "" };
+    case "notify":
+        return { type: "notify", title: "", body: "" };
     case "key":
     default:
         return { type: "key", keys: "" };
@@ -109,6 +191,13 @@ function normalizeStep(step) {
             out.y = Math.round(step.y);
         }
         break;
+    case "focus":
+        out.match = String(step.match !== undefined && step.match !== null ? step.match : "");
+        break;
+    case "notify":
+        out.title = String(step.title !== undefined && step.title !== null ? step.title : "");
+        out.body = String(step.body !== undefined && step.body !== null ? step.body : "");
+        break;
     case "key":
         out.keys = sanitizeCombo(step.keys);
         break;
@@ -125,23 +214,70 @@ function normalizeTrigger(trigger) {
     switch (type) {
     case "hotkey":
         return { type: "hotkey", keys: sanitizeCombo(trigger.keys) };
-    case "timer":
-        return {
-            type: "timer",
-            seconds: clampInt(trigger.seconds, 1, 86400, 60),
-            repeat: trigger.repeat !== false
-        };
-    case "app":
-        return {
-            type: "app",
-            match: String(trigger.match || ""),
-            onFocus: trigger.onFocus === true
-        };
     case "sequence":
         return {
             type: "sequence",
             keys: asArray(trigger.keys).map(sanitizeCombo),
             timeoutMs: clampInt(trigger.timeoutMs, 200, 10000, 1500)
+        };
+    case "sound": {
+        var t0 = Math.round(clampFloat(trigger.trimStart, 0, 60, 0) * 1000) / 1000;
+        var t1 = Math.round(clampFloat(trigger.trimEnd, 0, 60, 0) * 1000) / 1000;
+        if (t1 > 0 && t1 <= t0)
+            t1 = 0;
+        var minHz = clampInt(trigger.minHz, 60, 7600, 1200);
+        var maxHz = clampInt(trigger.maxHz, minHz + 40, 7800, Math.max(minHz + 40, 3800));
+        return {
+            type: "sound",
+            mode: pick(SOUND_MODES, trigger.mode, "sample"),
+            source: pick(SOUND_SOURCES, trigger.source, "desktop"),
+            samplePath: String(trigger.samplePath || ""),
+            trimStart: t0,
+            trimEnd: t1,
+            bandFilter: trigger.bandFilter === true,
+            minHz: minHz,
+            maxHz: maxHz,
+            minDurationMs: clampInt(trigger.minDurationMs, 20, 5000, 60),
+            threshold: clampInt(trigger.threshold, 30, 98, 70),
+            cooldownMs: clampInt(trigger.cooldownMs, 100, 300000, 1500)
+        };
+    }
+    case "app": {
+        var rawEvent = trigger.event ? trigger.event : (trigger.onFocus === true ? "focus" : "launch");
+        var appEvent = pick(APP_EVENTS, rawEvent, "launch");
+        return {
+            type: "app",
+            event: appEvent,
+            match: String(trigger.match || ""),
+            titleMatch: String(trigger.titleMatch || ""),
+            onFocus: appEvent === "focus"
+        };
+    }
+    case "notification":
+        return {
+            type: "notification",
+            appMatch: String(trigger.appMatch || ""),
+            textMatch: String(trigger.textMatch || ""),
+            urgency: pick(NOTIF_URGENCIES, trigger.urgency, "any")
+        };
+    case "clipboard":
+        return {
+            type: "clipboard",
+            match: String(trigger.match || "")
+        };
+    case "system":
+        return {
+            type: "system",
+            event: pick(SYSTEM_EVENTS, trigger.event, "unlock"),
+            match: String(trigger.match || "")
+        };
+    case "timer":
+        return {
+            type: "timer",
+            mode: pick(TIMER_MODES, trigger.mode, "interval"),
+            seconds: clampInt(trigger.seconds, 1, 86400, 60),
+            repeat: trigger.repeat !== false,
+            at: normalizeTimeOfDay(trigger.at, "09:00")
         };
     case "startup":
         return { type: "startup" };
@@ -152,6 +288,40 @@ function normalizeTrigger(trigger) {
 
 function blankTriggerFor(type) {
     return normalizeTrigger({ type: type });
+}
+
+function blankCondition() {
+    return { appMode: "any", appMatch: "" };
+}
+
+function normalizeCondition(condition) {
+    return {
+        appMode: pick(CONDITION_MODES, condition && condition.appMode, "any"),
+        appMatch: String(condition && condition.appMatch ? condition.appMatch : "")
+    };
+}
+
+function conditionMet(condition, clients, focusedClient) {
+    var cond = normalizeCondition(condition);
+    var q = cond.appMatch.trim();
+    if (cond.appMode === "any" || !q)
+        return true;
+    var matchesClient = function (c) {
+        return Boolean(c && (matchesQuery(c.class, q) || matchesQuery(c.initialClass, q) || matchesQuery(c.title, q)));
+    };
+    if (cond.appMode === "focused")
+        return matchesClient(focusedClient);
+    if (cond.appMode === "not_focused")
+        return !matchesClient(focusedClient);
+    if (cond.appMode === "running") {
+        var list = asArray(clients);
+        for (var i = 0; i < list.length; i++) {
+            if (matchesClient(list[i]))
+                return true;
+        }
+        return false;
+    }
+    return true;
 }
 
 function blankLoop() {
@@ -172,6 +342,8 @@ function blankMacro(name) {
         name: name || "New macro",
         enabled: true,
         trigger: blankTrigger(),
+        condition: blankCondition(),
+        cooldownMs: 0,
         loop: blankLoop(),
         steps: []
     };
@@ -183,6 +355,8 @@ function normalizeMacro(macro) {
         name: String(macro?.name || "Untitled macro"),
         enabled: macro?.enabled !== false,
         trigger: normalizeTrigger(macro?.trigger),
+        condition: normalizeCondition(macro?.condition),
+        cooldownMs: clampInt(macro?.cooldownMs, 0, 300000, 0),
         loop: normalizeLoop(macro?.loop),
         steps: []
     };
@@ -212,21 +386,66 @@ function stepTitle(step) {
         return step.ms + " ms wait";
     case "click":
         return step.button + " click" + (typeof step.x === "number" ? " @ " + step.x + "," + step.y : "");
+    case "focus":
+        return step.match ? "Focus " + step.match : "Focus window";
+    case "notify":
+        return step.title || step.body || "Notification";
     default:
         return step.type;
     }
+}
+
+function describeSystemEvent(event, match) {
+    var labels = {
+        unlock: "On unlock",
+        lock: "On lock",
+        resume: "On wake",
+        suspend: "On sleep",
+        gamemode_on: "Game mode on",
+        gamemode_off: "Game mode off",
+        wifi_connected: "Wi-Fi connect",
+        wifi_disconnected: "Wi-Fi disconnect",
+        bt_connected: "BT connect",
+        bt_disconnected: "BT disconnect",
+        audio_output: "Audio output"
+    };
+    var base = labels[event] || "System event";
+    return match ? base + " (" + match + ")" : base;
 }
 
 function describeTrigger(trigger) {
     switch (trigger.type) {
     case "hotkey":
         return trigger.keys || "Hotkey";
-    case "timer":
-        return "Every " + trigger.seconds + "s" + (trigger.repeat ? "" : " once");
-    case "app":
-        return (trigger.onFocus ? "Focus " : "Launch ") + (trigger.match || "app");
     case "sequence":
         return "Sequence of " + trigger.keys.length;
+    case "sound":
+        if (trigger.mode === "frequency")
+            return trigger.minHz + "–" + trigger.maxHz + " Hz";
+        return trigger.samplePath ? "Sound: " + trigger.samplePath.split("/").pop() : "Sound match";
+    case "app": {
+        var ev = trigger.event || (trigger.onFocus ? "focus" : "launch");
+        var target = trigger.match || trigger.titleMatch || "window";
+        if (ev === "focus")
+            return "Focus " + (trigger.match || "app");
+        if (ev === "close")
+            return "Close " + target;
+        if (ev === "title")
+            return "Title " + (trigger.titleMatch || target);
+        if (ev === "fullscreen")
+            return "Fullscreen " + target;
+        return "Launch " + (trigger.match || "app");
+    }
+    case "notification":
+        return "Notify: " + (trigger.textMatch || trigger.appMatch || "any");
+    case "clipboard":
+        return "Copy: " + (trigger.match || "pattern");
+    case "system":
+        return describeSystemEvent(trigger.event, trigger.match);
+    case "timer":
+        if (trigger.mode === "daily")
+            return "Daily at " + (trigger.at || "09:00");
+        return "Every " + trigger.seconds + "s" + (trigger.repeat ? "" : " once");
     case "startup":
         return "On shell start";
     default:

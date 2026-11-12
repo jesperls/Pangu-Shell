@@ -37,6 +37,10 @@ those values in `WallpaperSettings.qml`; a successful save signals
 `WallpaperService` to restart matching renderer instances. The same helper
 merges legacy GUI properties with Pangu overrides for the renderer's arguments.
 
+`scripts/sound_trigger.py` records or imports macro audio snippets, computes
+waveform peaks and auto-trim bounds, and monitors PipeWire desktop or microphone
+streams for spectral-whitened template or tonal-band matches.
+
 ## Verification
 
 ```sh
