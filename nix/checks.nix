@@ -204,8 +204,10 @@ in
     assert builtins.elem pkgs.brightnessctl nixos.services.udev.packages;
     assert builtins.elem "i2c" nixos.users.users.pangu-test.extraGroups;
     assert builtins.elem nixos.programs.ydotool.group nixos.users.users.pangu-test.extraGroups;
+    assert nixos.environment.sessionVariables.YDOTOOL_SOCKET == "/run/ydotoold/socket";
     assert !nixosDisabled.programs.gpu-screen-recorder.enable;
     assert !nixosDisabled.programs.ydotool.enable;
+    assert !(nixosDisabled.environment.sessionVariables ? YDOTOOL_SOCKET);
     assert !nixosDisabled.services.upower.enable;
     pkgs.runCommand "pangu-nixos-check" { } ''touch "$out"'';
 

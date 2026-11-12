@@ -1544,3 +1544,171 @@ ShellRoot {
                         f"{qml.relative_to(SHELL)} {mask_match.group(1)} has child visible bindings inside a visible:false layer",
                     )
 
+    def test_all_icon_properties_exist_in_icons_singleton(self):
+        defined = set(
+            re.findall(
+                r"property\s+string\s+(\w+)\s*:",
+                (SHELL / "modules/theme/Icons.qml").read_text(),
+            )
+        )
+        for qml in sorted((SHELL / "modules").rglob("*.qml")):
+            content = qml.read_text()
+            for match in re.finditer(r"\bIcons\.([A-Za-z0-9_]+)\b", content):
+                self.assertIn(
+                    match.group(1),
+                    defined,
+                    f"{qml.relative_to(SHELL)} references undefined Icons.{match.group(1)}",
+                )
+
+    @unittest.skipUnless(shutil.which("qmltestrunner"), "qmltestrunner is required")
+    def test_scheme_selector_and_font_combobox_mouse_clicks_select_and_close(self):
+        with tempfile.TemporaryDirectory(prefix="pangu-popup-clicks-") as directory:
+            root = Path(directory)
+            qs = root / "qs"
+            for name in ("config", "modules/theme", "modules/components", "modules/globals", "widgets"):
+                (qs / name).mkdir(parents=True)
+            (qs / "config/qmldir").write_text("module qs.config\nsingleton Config 1.0 Config.qml\n")
+            (qs / "config/Config.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property QtObject theme: QtObject {\n'
+                '        property bool lightMode: false\n'
+                '        property string font: "Sans"\n'
+                '        property int fontSize: 13\n'
+                '    }\n'
+                '}\n'
+            )
+            (qs / "modules/theme/qmldir").write_text(
+                "module qs.modules.theme\n"
+                "singleton Colors 1.0 Colors.qml\n"
+                "singleton Icons 1.0 Icons.qml\n"
+                "singleton Styling 1.0 Styling.qml\n"
+            )
+            (qs / "modules/theme/Colors.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property color background: "#111111"\n'
+                '    property color overBackground: "#eeeeee"\n'
+                '    property color overSurface: "#eeeeee"\n'
+                '    property color overSurfaceVariant: "#aaaaaa"\n'
+                '    property color outline: "#666666"\n'
+                '}\n'
+            )
+            shutil.copy(SHELL / "modules/theme/Icons.qml", qs / "modules/theme/Icons.qml")
+            (qs / "modules/theme/Styling.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property int animDuration: 0\n'
+                '    function radius(n) { return 8; }\n'
+                '    function fontSize(n) { return 13 + n; }\n'
+                '    function srItem(n) { return "#ffffff"; }\n'
+                '}\n'
+            )
+            (qs / "modules/components/qmldir").write_text(
+                "module qs.modules.components\n"
+                "StyledRect 1.0 StyledRect.qml\n"
+                "FontComboBox 1.0 FontComboBox.qml\n"
+            )
+            (qs / "modules/components/StyledRect.qml").write_text(
+                'import QtQuick\nRectangle {\n'
+                '    property string variant: "common"\n'
+                '    property color item: "#ffffff"\n'
+                '}\n'
+            )
+            shutil.copy(SHELL / "modules/components/FontComboBox.qml", qs / "modules/components/FontComboBox.qml")
+            (qs / "modules/globals/qmldir").write_text("module qs.modules.globals\nsingleton GlobalStates 1.0 GlobalStates.qml\n")
+            (qs / "modules/globals/GlobalStates.qml").write_text(
+                'pragma Singleton\nimport QtQuick\nQtObject {\n'
+                '    property QtObject wallpaperManager: QtObject {\n'
+                '        property var colorPresets: ["Deep Space", "Nord"]\n'
+                '        property string activeColorPreset: "Deep Space"\n'
+                '        property string currentMatugenScheme: "scheme-tonal-spot"\n'
+                '        function setColorPreset(name) { activeColorPreset = name; }\n'
+                '        function setMatugenScheme(name) {\n'
+                '            currentMatugenScheme = name;\n'
+                '            if (activeColorPreset) activeColorPreset = "";\n'
+                '        }\n'
+                '    }\n'
+                '}\n'
+            )
+            shutil.copy(
+                SHELL / "modules/widgets/dashboard/wallpapers/SchemeSelector.qml",
+                qs / "widgets/SchemeSelector.qml",
+            )
+            test_file = root / "tst_popups.qml"
+            test_file.write_text('''import QtQuick
+import QtQuick.Controls
+import QtTest
+import qs.modules.globals
+import qs.modules.components
+import "qs/widgets"
+
+Item {
+    id: scene
+    width: 500
+    height: 500
+
+    SchemeSelector {
+        id: selector
+        x: 20
+        y: 20
+        width: 220
+        height: 48
+    }
+
+    FontComboBox {
+        id: fontBox
+        x: 260
+        y: 20
+        width: 200
+        fontModel: ["Inter", "Noto Sans"]
+        selectedFont: "Inter"
+        property string picked: ""
+        onFontSelected: family => picked = family
+    }
+
+    TestCase {
+        name: "PopupMouseClicks"
+        when: windowShown
+
+        function test_scheme_and_font_clicks() {
+            compare(selector.getCurrentDisplayName(), "Deep Space")
+
+            mouseClick(selector, 60, 24)
+            verify(selector.schemeListExpanded)
+            wait(80)
+            mouseClick(scene, selector.x + 60, selector.y + selector.height + 24)
+            verify(!selector.schemeListExpanded)
+            compare(GlobalStates.wallpaperManager.activeColorPreset, "")
+            verify(selector.getCurrentDisplayName() !== "Deep Space")
+
+            mouseClick(selector, 60, 24)
+            verify(selector.schemeListExpanded)
+            mouseClick(scene, 10, 450)
+            verify(!selector.schemeListExpanded)
+
+            mouseClick(fontBox, 60, 16)
+            verify(fontBox.listExpanded)
+            wait(80)
+            mouseClick(scene, fontBox.x + 60, fontBox.y + fontBox.height + 90)
+            verify(!fontBox.listExpanded)
+            compare(fontBox.picked, "Noto Sans")
+        }
+    }
+}
+''')
+            env = dict(
+                os.environ,
+                QT_QPA_PLATFORM="offscreen",
+                QML_DISABLE_DISK_CACHE="1",
+                QML2_IMPORT_PATH=f"{root}:{os.environ.get('QML2_IMPORT_PATH', '')}",
+                QML_IMPORT_PATH=f"{root}:{os.environ.get('QML_IMPORT_PATH', '')}",
+            )
+            env.pop("WAYLAND_DISPLAY", None)
+            result = subprocess.run(
+                ["qmltestrunner", "-input", str(test_file), "-import", str(root)],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+

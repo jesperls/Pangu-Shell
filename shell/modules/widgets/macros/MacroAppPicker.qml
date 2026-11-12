@@ -15,6 +15,11 @@ Item {
 
     implicitHeight: 36
 
+    onVisibleChanged: {
+        if (!visible && popup.visible)
+            popup.close();
+    }
+
     readonly property var runningClasses: {
         const seen = {};
         const out = [];
@@ -143,6 +148,7 @@ Item {
     Popup {
         id: popup
         parent: root
+        popupType: Popup.Item
         x: 0
         y: root.height + 4
         width: Math.max(root.width, 400)
@@ -225,7 +231,7 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 visible: appIcon.status !== Image.Ready
-                                text: Icons.appWindow
+                                text: Icons.apps
                                 font.family: Icons.font
                                 font.pixelSize: 15
                                 color: row.isCurrent ? row.item : Colors.outline

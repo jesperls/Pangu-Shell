@@ -59,7 +59,7 @@ Singleton {
         if (upowerType === UPowerDevice.Headset || upowerType === UPowerDevice.Headphones || lower.includes("headset") || lower.includes("a50") || lower.includes("arctis") || lower.includes("buds") || lower.includes("airpods"))
             return Icons.headset;
         if (upowerType === UPowerDevice.GamingInput || lower.includes("controller") || lower.includes("dualsense") || lower.includes("xbox"))
-            return Icons.gameController;
+            return Icons.gamepad;
         return Icons.bluetoothConnected;
     }
 

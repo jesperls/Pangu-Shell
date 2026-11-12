@@ -46,7 +46,12 @@ in
         programs.gpu-screen-recorder.enable = lib.mkDefault true;
         programs.gpu-screen-recorder.package = lib.mkDefault cfg.package.recorderPackage;
       })
-      (lib.mkIf cfg.inputAutomation.enable { programs.ydotool.enable = lib.mkDefault true; })
+      (lib.mkIf cfg.inputAutomation.enable {
+        programs.ydotool.enable = lib.mkDefault true;
+        environment.sessionVariables.YDOTOOL_SOCKET = lib.mkIf config.programs.ydotool.enable (
+          lib.mkDefault "/run/ydotoold/socket" # programs.ydotool only sets login-shell variables
+        );
+      })
       (lib.mkIf cfg.powerProfiles.enable { services.power-profiles-daemon.enable = lib.mkDefault true; })
       (lib.mkIf cfg.upower.enable { services.upower.enable = lib.mkDefault true; })
       (lib.mkIf cfg.brightness.enable {

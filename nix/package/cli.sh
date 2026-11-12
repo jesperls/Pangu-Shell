@@ -100,6 +100,9 @@ case "${1:-}" in
 			export QS_ICON_THEME
 		fi
 	fi
+	if [ -z "${YDOTOOL_SOCKET:-}" ] && [ -S /run/ydotoold/socket ]; then
+		export YDOTOOL_SOCKET=/run/ydotoold/socket # programs.ydotool omits systemd --user
+	fi
 	export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt6ct}"
 	unset HL_INITIAL_WORKSPACE_TOKEN
 	prepareStateDirs

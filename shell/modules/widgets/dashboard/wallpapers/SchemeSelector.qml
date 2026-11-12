@@ -107,6 +107,11 @@ Item {
         updateSelectedIndex();
     }
 
+    onVisibleChanged: {
+        if (!visible && schemeListExpanded)
+            schemeListExpanded = false;
+    }
+
     function getSchemeDisplayName(scheme) {
         const map = {
             "scheme-content": "Content",
@@ -162,12 +167,8 @@ Item {
                     focus: true
 
                     onActiveFocusChanged: {
-                        if (!activeFocus) {
+                        if (!activeFocus)
                             keyboardNavigationActive = false;
-                            if (schemeListExpanded) {
-                                schemeListExpanded = false;
-                            }
-                        }
                     }
 
                     onClicked: {
@@ -331,6 +332,7 @@ Item {
     Popup {
         id: schemeListPopup
         parent: root
+        popupType: Popup.Item
         x: 0
         y: root.height + 4
         width: root.width
@@ -394,6 +396,7 @@ Item {
                             width: schemeListView.width
                             height: 40
                             text: modelData.label
+                            focusPolicy: Qt.NoFocus // Qt 6.12 transfers focus on press before onClicked
                             hoverEnabled: !schemeListView.isScrolling
 
                             onHoveredChanged: {

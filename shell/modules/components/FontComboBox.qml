@@ -11,7 +11,7 @@ Item {
     property string selectedFont: ""
     signal fontSelected(string fontFamily)
 
-    readonly property var fontModel: Qt.fontFamilies()
+    property var fontModel: Qt.fontFamilies()
     property string filterText: ""
     readonly property var filteredFonts: {
         const q = filterText.trim().toLowerCase();
@@ -34,6 +34,11 @@ Item {
     }
 
     Component.onCompleted: highlightedIndex = findFontIndex(selectedFont)
+
+    onVisibleChanged: {
+        if (!visible && listExpanded)
+            listExpanded = false;
+    }
 
     onSelectedFontChanged: {
         const idx = findFontIndex(selectedFont);
@@ -103,6 +108,7 @@ Item {
     Popup {
         id: popup
         parent: root
+        popupType: Popup.Item
         x: 0
         y: root.height + 4
         width: Math.max(root.width, 220)
@@ -201,6 +207,7 @@ Item {
                     width: fontListView.width
                     height: 36
                     text: modelData
+                    focusPolicy: Qt.NoFocus
 
                     onClicked: {
                         root.highlightedIndex = index;
