@@ -703,6 +703,31 @@ ShellRoot {
             self.assertEqual(persisted["srBg"]["futureSetting"], 11)
             saved = json.loads((root / "settings/pangu/layouts.json").read_text())["presets"][0]
             self.assertEqual(saved["theme"]["srBg"]["border"], ["primary", 3])
+            self.run_scene(root, '''import QtQuick
+import Quickshell
+import "config"
+import "modules/globals"
+import "modules/services"
+ShellRoot {
+    Timer {
+        interval: 200; running: true; repeat: true
+        onTriggered: {
+            if (!Config.initialLoadComplete) return;
+            const reloaded = LayoutPresets.getPreset("complete-theme");
+            if (!reloaded) return;
+            if (reloaded.theme.srBg.border[0] === "primary" && reloaded.theme.srBg.border[1] === 3) {
+                console.log("CHECK_PASSED");
+            } else {
+                console.log("CHECK_FAILED", "reloaded preset mismatch");
+            }
+            Qt.quit();
+        }
+    }
+}
+''', {
+                "HOME": str(root), "XDG_CONFIG_HOME": str(root / "settings"),
+                "XDG_DATA_HOME": str(root / "data"), "PANGU_NIX_OVERRIDES": "",
+            })
             self.assertNotIn("adapterUpdated", saved["theme"])
 
     def test_pending_reload_preserves_applied_theme(self):

@@ -63,6 +63,7 @@ existing username:
     programs.pangu = {
       enable = true;
       fonts.enable = false; # The NixOS module installs the fonts.
+      hyprland.preset.enable = true; # Omit to keep your own Hyprland bindings and rules.
     };
 
     wayland.windowManager.hyprland = {
@@ -76,10 +77,10 @@ existing username:
 Rebuild your configuration and log into Hyprland. Pangu starts with the session
 through `pangu.service`. Log out and back in for new group memberships to apply.
 
-The NixOS module configures lockscreen PAM, fonts, recording helpers, input
-automation, power profiles and brightness permissions. The Home Manager module
-installs and starts the shell, loads its Hyprland integration and connects
-GTK/Qt palettes. No overlay or extra module arguments are needed.
+The NixOS module configures lockscreen PAM, Polkit, fonts, recording helpers,
+input automation, power profiles, UPower and brightness permissions. The Home
+Manager module installs and starts the shell, loads its Hyprland integration and
+connects GTK/Qt palettes. No overlay or extra module arguments are needed.
 
 To update an installed copy, run `nix flake update pangu-shell` in your NixOS
 configuration and rebuild.
@@ -92,6 +93,7 @@ Open Settings with **Super + I** to adjust the shell. Wallpapers default to
 ```nix
 programs.pangu = {
   wallpapers = "/srv/wallpapers";
+  wallpaperEngine.enable = false; # Skip building the C++ Wallpaper Engine renderer.
   theme.kitty.enable = true;
   settings.bar.position = "top";
 };
@@ -100,13 +102,9 @@ programs.pangu = {
 Nix settings are merged when the service starts. Changes made in the UI to a
 Nix-managed value last until the next service start.
 
-By default, your existing monitor setup, application bindings and window layout
-stay with your Hyprland configuration. For Pangu's desktop bindings, window
-rules, animations and layout behavior, enable its optional preset:
-
-```nix
-programs.pangu.hyprland.preset.enable = true;
-```
+When `programs.pangu.hyprland.preset.enable` is omitted (`false`), your existing
+monitor setup, application bindings and window layout stay with your Hyprland
+configuration while Pangu loads only its shell hooks and shortcuts.
 
 See the [configuration guide](docs/configuration.md) for preset customization,
 feature switches, persistent settings and recording overrides.

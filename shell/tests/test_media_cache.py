@@ -8,6 +8,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import media_cache
 import lockwall
+import matugen_palette
 import thumbgen
 import wallpaper_files
 
@@ -87,6 +88,39 @@ class MediaCacheTest(unittest.TestCase):
             self.assertTrue(thumbgen.generate(self.root / 'image.PNG', self.root / 'output.jpg'))
         self.assertIn('320x200', render.call_args.args[0])
         self.assertIn('crop=320:200', ' '.join(media_cache.frame_command('video.mp4', thumbnail=True)))
+
+    def test_missing_user_wallpaper_dir_uses_packaged_fallbacks(self):
+        packaged = Path(__file__).resolve().parents[1] / 'assets/wallpapers'
+        result = wallpaper_files.scan(str(self.root / 'missing-wallpapers'), str(packaged))
+        self.assertTrue(result['fallback'])
+        self.assertGreaterEqual(len(result['files']), 2)
+        for item in result['files']:
+            self.assertTrue(Path(item).is_file())
+
+    def test_matugen_palette_writes_atomically_into_custom_cache_dir(self):
+        assets = Path(__file__).resolve().parents[1] / 'assets/matugen'
+        custom_cache = self.root / 'cache with "quotes" and spaces' / 'pangu' / 'colors.json'
+
+        def fake_matugen(command, check):
+            cfg_path = Path(command[command.index('-c') + 1])
+            cfg_text = cfg_path.read_text()
+            for line in cfg_text.splitlines():
+                if line.startswith('output_path ='):
+                    out_file = Path(line.split('=', 1)[1].strip().strip('"').replace('\\"', '"'))
+                    out_file.write_text('{"background":"#0c0d11"}\n')
+
+        with patch('matugen_palette.subprocess.run', side_effect=fake_matugen) as run_mock:
+            matugen_palette.generate(
+                '/wall.jpg',
+                str(assets / 'colors.json'),
+                str(assets / 'config.toml'),
+                'scheme-tonal-spot',
+                'dark',
+                str(custom_cache),
+            )
+        self.assertEqual(run_mock.call_count, 1)
+        self.assertEqual(custom_cache.read_text(), '{"background":"#0c0d11"}\n')
+        self.assertEqual(list(custom_cache.parent.iterdir()), [custom_cache])
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ Hyprland Lua hooks and GTK/Qt palette imports. Each integration can be disabled:
 programs.pangu = {
   enable = true;
   wallpapers = "/srv/wallpapers";
+  wallpaperEngine.enable = true;
   fonts.enable = false;
   theme = {
     gtk.enable = true;
@@ -21,6 +22,9 @@ programs.pangu = {
   hyprland.bindings.enable = false;
 };
 ```
+
+Set `wallpaperEngine.enable = false` to omit the `linux-wallpaperengine`
+renderer when Steam Workshop wallpapers are not needed.
 
 Set `systemd.enable = false` for manual startup and `hyprland.enable = false`
 for manually managed compositor hooks. In that case, load the equivalent
@@ -94,8 +98,8 @@ accept optional `mods` (default `SUPER`), `class`, `width`, `height` and
 `description`, plus `key`, `name` and `command` to spawn on first use and toggle
 their named special workspace thereafter. Additional `apps.shortcuts` entries
 accept `mods` (default `SUPER`), `key`, `command` and `description`. Set
-`binds.mouse_side_buttons = false` when mouse buttons `275`/`276`/`277` should
-remain browser navigation buttons instead of window drag, resize and close.
+`binds.mouse_side_buttons = true` when mouse buttons `275`/`276`/`277` should
+drag, resize and close windows instead of navigating back and forward.
 
 ## Persistent settings
 
@@ -169,16 +173,17 @@ applications inherit the user environment without wrapper leakage.
 ## NixOS prerequisites
 
 Enabling `programs.pangu.enable` registers `security.pam.services.pangu = { };`
-so the lockscreen honors system PAM policies such as `fprintd`, `u2f` and
-`faillock` (falling back to the PAM configuration packaged with QML on
-non-NixOS setups). The brightness integration installs backlight udev rules,
-enables I2C access and grants listed `users` the `video` and `i2c` groups when
-`brightness.enable` is true.
+and `security.polkit.enable` by default so the lockscreen honors system PAM
+policies such as `fprintd`, `u2f` and `faillock` (when `/etc/pam.d/pangu` is
+absent, the lockscreen probes `/etc/pam.d/hyprlock` and `/etc/pam.d/login`
+before falling back to the PAM configuration packaged with QML). The brightness
+integration installs backlight udev rules, enables I2C access and grants listed
+`users` the `video` and `i2c` groups when `brightness.enable` is true.
 
 The NixOS module has independent `fonts.enable`, `recording.enable`,
-`inputAutomation.enable`, `powerProfiles.enable` and `brightness.enable`
-switches. They default to true when `programs.pangu.enable` is enabled. Set a
-switch to false when you provide that integration differently.
+`inputAutomation.enable`, `powerProfiles.enable`, `upower.enable` and
+`brightness.enable` switches. They default to true when `programs.pangu.enable`
+is enabled. Set a switch to false when you provide that integration differently.
 
 `programs.pangu.package` selects the package used for dependency alignment;
 the Home Manager module has its own package option. Use the same package in

@@ -208,6 +208,13 @@ package.preload["pangu.popout"] = function()
   return {}
 end
 dofile(source .. "/binds.lua")
+assert(bind_flags["Mouse: drag window"] ~= nil and bind_flags["Mouse: resize window"] ~= nil, "Missing primary mouse binds")
+assert(bind_flags["Mouse: drag window (side button)"] == nil, "Side mouse buttons must stay unbound by default")
+assert(bind_flags["Mouse: resize window (side button)"] == nil, "Side mouse buttons must stay unbound by default")
+assert(release_binds == 1, "Default mouse release cleanup bind count mismatch")
+binds, bind_flags, release_binds = {}, {}, 0
+state.binds = { mouse_side_buttons = true }
+dofile(source .. "/binds.lua")
 for _, desc in ipairs({
   "Mouse: drag window",
   "Mouse: resize window",

@@ -531,6 +531,60 @@ try {
 }
 console.log('Preset copying preserves quoted paths and falls back to user presets');
 
+const pamContext = {root: {}};
+serviceFunctions('LockscreenService.qml', ['resolvePamTarget'], pamContext);
+assert.deepEqual({...pamContext.resolvePamTarget(true, true, true, '/shell')}, {directory: '/etc/pam.d', config: 'pangu'});
+assert.deepEqual({...pamContext.resolvePamTarget(false, true, true, '/shell')}, {directory: '/etc/pam.d', config: 'hyprlock'});
+assert.deepEqual({...pamContext.resolvePamTarget(false, false, true, '/shell')}, {directory: '/etc/pam.d', config: 'login'});
+assert.deepEqual({...pamContext.resolvePamTarget(false, false, false, '/shell')}, {directory: '/shell/config/pam', config: 'password.conf'});
+console.log('Lockscreen PAM probe falls back through pangu, hyprlock, login and bundled config');
+
+let scannedCommand = null, matugenCommand = null;
+const wallSvcContext = {
+    root: {},
+    defaultWallpaperDir: '/home/alice/Pictures/Wallpapers',
+    fallbackDir: '/nix/store/pangu/assets/wallpapers',
+    wallpaperDir: '/home/alice/Pictures/Wallpapers',
+    scanPending: false,
+    scanDirectory: '',
+    activeColorPreset: '',
+    currentWallpaper: '/nix/store/pangu/assets/wallpapers/01-deep-horizon.jpg',
+    initialLoadCompleted: true,
+    Paths: {
+        home: '/home/alice',
+        script(name) { return '/nix/store/pangu/scripts/' + name; },
+        asset(name) { return '/nix/store/pangu/assets/' + name; },
+        cachePath(name) { return '/custom/cache/pangu/' + name; }
+    },
+    Config: {theme: {dynamicColors: true, lightMode: false}},
+    wallpaperAdapter: {wallPath: ''},
+    wallpaperConfig: {adapter: {matugenScheme: 'scheme-tonal-spot'}},
+    scanWallpapers: {running: false, command: []},
+    getColorSource(filePath) { return filePath; },
+    requestPalette(command) { matugenCommand = command; }
+};
+wallSvcContext.wallpaper = wallSvcContext;
+serviceFunctions('../widgets/dashboard/wallpapers/WallpaperService.qml',
+    ['expandDirectory', 'setWallpaperDirectory', 'startScan', 'runMatugenForCurrentWallpaper'], wallSvcContext);
+wallSvcContext.setWallpaperDirectory('');
+assert.equal(wallSvcContext.wallpaperAdapter.wallPath, '/home/alice/Pictures/Wallpapers',
+    'Resetting wallpaper directory must preserve user default folder rather than packaged store fallback');
+wallSvcContext.startScan();
+scannedCommand = [...wallSvcContext.scanWallpapers.command];
+assert.deepEqual(scannedCommand, [
+    'python3', '/nix/store/pangu/scripts/wallpaper_files.py',
+    '/home/alice/Pictures/Wallpapers', '--fallback', '/nix/store/pangu/assets/wallpapers'
+]);
+wallSvcContext.runMatugenForCurrentWallpaper(false);
+assert.deepEqual([...matugenCommand], [
+    'python3', '/nix/store/pangu/scripts/matugen_palette.py',
+    '/nix/store/pangu/assets/wallpapers/01-deep-horizon.jpg',
+    '/nix/store/pangu/assets/matugen/colors.json',
+    '/nix/store/pangu/assets/matugen/config.toml',
+    'scheme-tonal-spot', 'dark', '/custom/cache/pangu/colors.json'
+]);
+console.log('Wallpaper fallback keeps user wallPath while matugen targets XDG cache');
+
 const shaderWrites = [], shaderUpdates = [];
 const shaderContext = {
     root: {}, Qt: {callLater(callback) { callback(); }}, shaderWriting: false, pendingShader: 'first', shaderSlot: 0,

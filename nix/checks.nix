@@ -46,6 +46,10 @@ let
     (home {
       programs.pangu.wallpapers = "/home/pangu-test/My Wallpapers";
     }).config;
+  noWallpaperEngine =
+    (home {
+      programs.pangu.wallpaperEngine.enable = false;
+    }).config;
   disabled = (home { programs.pangu.enable = lib.mkForce false; }).config;
   manual =
     (home {
@@ -134,7 +138,15 @@ in
       && valid disabled
       && valid manual
       && valid spacedWallpapers
+      && valid noWallpaperEngine
       && valid themedApps;
+    assert noWallpaperEngine.programs.pangu.package.wallpaperEnginePackage == null;
+    assert
+      !(builtins.elem pangu.wallpaperEnginePackage noWallpaperEngine.programs.pangu.package.runtimeInputs);
+    assert builtins.any (rule: lib.hasInfix "pangu/gtk.css" rule) plain.systemd.user.tmpfiles.rules;
+    assert builtins.any (
+      rule: lib.hasInfix "qt6ct/colors/pangu.colors" rule
+    ) plain.systemd.user.tmpfiles.rules;
     assert
       themedApps.programs.firefox.profiles.default.settings."toolkit.legacyUserProfileCustomizations.stylesheets";
     assert lib.hasInfix "pangu/firefox.css" themedApps.programs.firefox.profiles.default.userChrome;
@@ -182,14 +194,19 @@ in
   nixos =
     assert nixos.programs.gpu-screen-recorder.enable;
     assert nixos.security.pam.services ? pangu;
+    assert nixos.security.polkit.enable;
     assert nixos.programs.gpu-screen-recorder.package == nixos.programs.pangu.package.recorderPackage;
-    assert nixos.programs.ydotool.enable && nixos.services.power-profiles-daemon.enable;
+    assert
+      nixos.programs.ydotool.enable
+      && nixos.services.power-profiles-daemon.enable
+      && nixos.services.upower.enable;
     assert nixos.hardware.i2c.enable;
     assert builtins.elem pkgs.brightnessctl nixos.services.udev.packages;
     assert builtins.elem "i2c" nixos.users.users.pangu-test.extraGroups;
     assert builtins.elem nixos.programs.ydotool.group nixos.users.users.pangu-test.extraGroups;
     assert !nixosDisabled.programs.gpu-screen-recorder.enable;
     assert !nixosDisabled.programs.ydotool.enable;
+    assert !nixosDisabled.services.upower.enable;
     pkgs.runCommand "pangu-nixos-check" { } ''touch "$out"'';
 
   hyprland = pkgs.runCommand "pangu-hyprland-check" { nativeBuildInputs = [ pkgs.lua ]; } ''

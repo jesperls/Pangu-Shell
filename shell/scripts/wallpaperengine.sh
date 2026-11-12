@@ -7,6 +7,7 @@ GUI_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/Linux Wallpaper Engine"
 PREVIEW_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/pangu/we_previews"
 
 cmd_scan() {
+    command -v linux-wallpaperengine >/dev/null 2>&1 || exit 0
     local dir="${1:-}"
     [ -n "$dir" ] || dir="$DEFAULT_WORKSHOP_DIR"
     [ -d "$dir" ] || exit 0

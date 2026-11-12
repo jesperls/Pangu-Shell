@@ -8,12 +8,13 @@ import qs.config
 Singleton {
     id: wallpaper
 
-    readonly property string wallpaperDir: expandDirectory(wallpaperConfig.adapter.wallPath || fallbackDir)
+    readonly property string defaultWallpaperDir: Paths.wallpapersDir
+    readonly property string wallpaperDir: expandDirectory(wallpaperConfig.adapter.wallPath || defaultWallpaperDir)
     property string scanRoot: wallpaperDir
     property string scanDirectory: ""
     property bool scanPending: false
     property bool thumbnailsPending: false
-    property string fallbackDir: Paths.wallpapersDir
+    property string fallbackDir: Paths.asset("wallpapers")
     property var wallpaperPaths: []
     property var subfolderFilters: []
     property var allSubdirs: []
@@ -228,7 +229,7 @@ Singleton {
     }
 
     function setWallpaperDirectory(path) {
-        wallpaperAdapter.wallPath = expandDirectory(path) || fallbackDir;
+        wallpaperAdapter.wallPath = expandDirectory(path) || defaultWallpaperDir;
     }
 
     function scanSubfolders() {
@@ -360,8 +361,16 @@ Singleton {
 
         if (currentWallpaper && initialLoadCompleted) {
             var matugenSource = getColorSource(currentWallpaper);
-            var command = ["matugen", "image", matugenSource, "--source-color-index", "0", "-c", Paths.asset("matugen/config.toml"), "-t", wallpaperConfig.adapter.matugenScheme];
-            command.push("-m", Config.theme.lightMode ? "light" : "dark");
+            var command = [
+                "python3",
+                Paths.script("matugen_palette.py"),
+                matugenSource,
+                Paths.asset("matugen/colors.json"),
+                Paths.asset("matugen/config.toml"),
+                wallpaperConfig.adapter.matugenScheme,
+                Config.theme.lightMode ? "light" : "dark",
+                Paths.cachePath("colors.json")
+            ];
             requestPalette(command);
         }
     }
@@ -437,7 +446,17 @@ Singleton {
         target: wallpaperConfig
         function onReadyChanged() {
             if (wallpaperConfig.ready && !wallpaperAdapter.wallPath)
-                wallpaperAdapter.wallPath = wallpaper.fallbackDir;
+                wallpaperAdapter.wallPath = wallpaper.defaultWallpaperDir;
+        }
+    }
+
+    Connections {
+        target: Config
+        function onInitialLoadCompleteChanged() {
+            if (Config.initialLoadComplete && !wallpaperConfig.ready) {
+                wallpaperConfig.reload();
+                scanColorPresets();
+            }
         }
     }
 

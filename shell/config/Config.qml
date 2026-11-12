@@ -92,7 +92,7 @@ Singleton {
     }
 
     Process {
-        command: ["mkdir", "-p", root.configDir, Paths.dataDir, Paths.cacheDir]
+        command: ["mkdir", "-p", root.configDir, Paths.configPath("colors"), Paths.dataDir, Paths.cacheDir]
         running: true
         onExited: {
             for (const name in root.files)

@@ -99,7 +99,8 @@ Use `xvfb-run -a` for manual renderer tests too. Avoid `Xvfb -displayfd` in an
 active desktop: probing low display numbers can remove a live Xwayland socket.
 `pangu.wallpaperEnginePackage` exposes the renderer
 for isolated testing. To select another renderer, use
-`pangu.override { linux-wallpaperengine = yourRenderer; }`.
+`pangu.override { linux-wallpaperengine = yourRenderer; }`, or omit it with
+`pangu.override { withWallpaperEngine = false; }` (`programs.pangu.wallpaperEngine.enable = false`).
 
 For individual tests and shader tooling:
 

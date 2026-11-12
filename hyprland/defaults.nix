@@ -12,7 +12,7 @@
     numlock = true;
   };
   binds = {
-    mouse_side_buttons = true;
+    mouse_side_buttons = false;
   };
   scratchpad = {
     width = 900;
@@ -21,9 +21,9 @@
   render.direct_scanout = 2;
   apps = {
     terminal = "xdg-terminal-exec";
-    browser = "xdg-open https://example.org";
+    browser = "sh -c 'b=$(xdg-settings get default-web-browser 2>/dev/null); [ -n \"$b\" ] && exec gtk-launch \"\${b%.desktop}\" || exec xdg-open about:blank'";
     file_manager = "xdg-open .";
-    editor = "xdg-terminal-exec vi";
+    editor = "xdg-terminal-exec sh -c 'for e in \"\${VISUAL:-}\" \"\${EDITOR:-}\" nvim vim nano vi; do [ -n \"$e\" ] && command -v \"\${e%% *}\" >/dev/null 2>&1 && eval \"exec \$e\"; done'";
     shortcuts = [ ];
     scratchpads = [ ];
   };

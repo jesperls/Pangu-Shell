@@ -32,20 +32,25 @@ in
     recording.enable = feature "Enable the privileged GPU recording helper.";
     inputAutomation.enable = feature "Enable ydotool input automation.";
     powerProfiles.enable = feature "Enable the power profile service.";
+    upower.enable = feature "Enable UPower device battery reporting.";
     brightness.enable = feature "Enable I2C access for external-monitor brightness.";
   };
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
-      { security.pam.services.pangu = { }; }
+      {
+        security.pam.services.pangu = { };
+        security.polkit.enable = lib.mkDefault true;
+      }
       (lib.mkIf cfg.fonts.enable { fonts.packages = import ../fonts.nix { inherit pkgs; }; })
       (lib.mkIf cfg.recording.enable {
-        programs.gpu-screen-recorder.enable = true;
+        programs.gpu-screen-recorder.enable = lib.mkDefault true;
         programs.gpu-screen-recorder.package = lib.mkDefault cfg.package.recorderPackage;
       })
-      (lib.mkIf cfg.inputAutomation.enable { programs.ydotool.enable = true; })
-      (lib.mkIf cfg.powerProfiles.enable { services.power-profiles-daemon.enable = true; })
+      (lib.mkIf cfg.inputAutomation.enable { programs.ydotool.enable = lib.mkDefault true; })
+      (lib.mkIf cfg.powerProfiles.enable { services.power-profiles-daemon.enable = lib.mkDefault true; })
+      (lib.mkIf cfg.upower.enable { services.upower.enable = lib.mkDefault true; })
       (lib.mkIf cfg.brightness.enable {
-        hardware.i2c.enable = true;
+        hardware.i2c.enable = lib.mkDefault true;
         services.udev.packages = [ pkgs.brightnessctl ];
       })
       {

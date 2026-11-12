@@ -35,7 +35,7 @@
   kitty,
   libnotify,
   libqalculate,
-  linux-wallpaperengine,
+  linux-wallpaperengine ? null,
   lua,
   matugen,
   mpv,
@@ -67,6 +67,7 @@
   yt-dlp,
 
   version ? "1.1.5",
+  withWallpaperEngine ? linux-wallpaperengine != null,
   ocrLanguages ? [
     "eng"
     "spa"
@@ -195,7 +196,6 @@ let
     kitty # the dashboard's tmux tab opens sessions in it
     libnotify
     libqalculate
-    linux-wallpaperengine
     matugen
     mpv
     mpvpaper
@@ -222,6 +222,9 @@ let
     zenity
     ydotool
     yt-dlp
+  ]
+  ++ lib.optionals (withWallpaperEngine && linux-wallpaperengine != null) [
+    linux-wallpaperengine
   ];
 in
 writeShellApplication {
@@ -258,7 +261,7 @@ writeShellApplication {
     shellSource = src;
     hyprlandSource = ../../hyprland/pangu;
     recorderPackage = gpu-screen-recorder;
-    wallpaperEnginePackage = linux-wallpaperengine;
+    wallpaperEnginePackage = if withWallpaperEngine then linux-wallpaperengine else null;
     configFiles = builtins.concatLists (
       builtins.filter builtins.isList (
         builtins.split "ConfigFile[^}]*name: \"([a-z]+)\"" (builtins.readFile ../../shell/config/Config.qml)

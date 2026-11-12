@@ -227,7 +227,7 @@ PanelWindow {
     Rectangle {
         id: background
         anchors.fill: parent
-        color: getFileType(wallpaper.effectiveWallpaper) === 'wallpaperengine' ? "transparent" : "black"
+        color: getFileType(wallpaper.effectiveWallpaper) === 'wallpaperengine' ? "transparent" : Colors.background
         focus: true
 
         Keys.onLeftPressed: {

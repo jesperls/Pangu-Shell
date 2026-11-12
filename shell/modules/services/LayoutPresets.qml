@@ -82,6 +82,19 @@ Singleton {
         }
     }
 
+    Connections {
+        target: Config
+        function onInitialLoadCompleteChanged() {
+            if (Config.initialLoadComplete && !presetsFile.ready)
+                presetsFile.reloadConfig();
+        }
+    }
+
+    Component.onCompleted: {
+        if (Config.initialLoadComplete)
+            presetsFile.reloadConfig();
+    }
+
     readonly property var userPresets: (presetsFile.adapter && presetsFile.adapter.presets) ? presetsFile.adapter.presets : []
     readonly property var presets: builtinPresets.concat(userPresets)
 

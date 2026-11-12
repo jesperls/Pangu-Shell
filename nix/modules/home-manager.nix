@@ -55,8 +55,24 @@ in
     enable = lib.mkEnableOption "the Pangu desktop shell";
     package = lib.mkOption {
       type = lib.types.package;
-      default = packageFor pkgs;
+      default =
+        let
+          base = packageFor pkgs;
+        in
+        if cfg.wallpaperEngine.enable then
+          base
+        else
+          base.override {
+            withWallpaperEngine = false;
+            linux-wallpaperengine = null;
+          };
+      defaultText = lib.literalExpression "packageFor pkgs";
       description = "Pangu package to run.";
+    };
+    wallpaperEngine.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Include the Linux Wallpaper Engine renderer.";
     };
     wallpapers = lib.mkOption {
       type = lib.types.str;
@@ -153,6 +169,12 @@ in
           cfg.package
         ]
         ++ lib.optionals cfg.hyprland.preset.enable cfg.package.runtimeInputs;
+        systemd.user.tmpfiles.rules = [
+          "d ${config.xdg.configHome}/pangu/config 0755 - - -"
+          "d ${config.xdg.configHome}/pangu/colors 0755 - - -"
+          "d ${config.xdg.dataHome}/pangu 0755 - - -"
+          "d ${config.xdg.cacheHome}/pangu 0755 - - -"
+        ];
         assertions = [
           {
             assertion = builtins.all (name: builtins.elem name cfg.package.configFiles) (
@@ -231,12 +253,19 @@ in
         gtk.enable = lib.mkDefault true;
         gtk.gtk3.extraCss = paletteImport;
         gtk.gtk4.extraCss = paletteImport;
+        systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/gtk.css 0644 - - -" ];
       })
       (lib.mkIf cfg.theme.qt.enable {
         qt.enable = lib.mkDefault true;
         qt.platformTheme.name = lib.mkDefault "qtct";
         qt.qt5ctSettings = qtPalette "qt5ct";
         qt.qt6ctSettings = qtPalette "qt6ct";
+        systemd.user.tmpfiles.rules = [
+          "d ${config.xdg.configHome}/qt5ct/colors 0755 - - -"
+          "f ${config.xdg.configHome}/qt5ct/colors/pangu.colors 0644 - - -"
+          "d ${config.xdg.configHome}/qt6ct/colors 0755 - - -"
+          "f ${config.xdg.configHome}/qt6ct/colors/pangu.colors 0644 - - -"
+        ];
       })
       (lib.mkIf cfg.theme.kitty.enable {
         programs.kitty.extraConfig = lib.mkAfter "include ${config.xdg.cacheHome}/pangu/kitty.conf";

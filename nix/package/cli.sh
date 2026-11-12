@@ -79,6 +79,19 @@ usage() {
 	EOF
 }
 
+prepareStateDirs() {
+	local configDir="${XDG_CONFIG_HOME:-$HOME/.config}/pangu"
+	local dataDir="${XDG_DATA_HOME:-$HOME/.local/share}/pangu"
+	local cacheDir="${XDG_CACHE_HOME:-$HOME/.cache}/pangu"
+	mkdir -p "$runtimeDir" "$configDir/config" "$configDir/colors" "$dataDir" "$cacheDir"
+	if [ ! -s "$cacheDir/colors.json" ] && [ -f "$shellRoot/assets/matugen/default-dark.json" ]; then
+		local tmpColors
+		tmpColors=$(mktemp "$cacheDir/colors.json.XXXXXX")
+		cp -- "$shellRoot/assets/matugen/default-dark.json" "$tmpColors"
+		mv -- "$tmpColors" "$cacheDir/colors.json"
+	fi
+}
+
 case "${1:-}" in
 "")
 	if command -v gsettings >/dev/null 2>&1; then
@@ -89,7 +102,7 @@ case "${1:-}" in
 	fi
 	export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt6ct}"
 	unset HL_INITIAL_WORKSPACE_TOKEN
-	mkdir -p "$runtimeDir"
+	prepareStateDirs
 	exec qs -p "$shellRoot/shell.qml"
 	;;
 run)

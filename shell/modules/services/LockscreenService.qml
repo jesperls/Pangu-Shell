@@ -12,7 +12,9 @@ Singleton {
     id: root
 
     property bool _firstStartOfSession: false
-    property bool _hasSystemPam: false
+    property bool _hasPanguPam: false
+    property bool _hasHyprlockPam: false
+    property bool _hasLoginPam: false
     property bool authenticating: false
     property bool showError: false
     property string errorMessage: ""
@@ -22,12 +24,45 @@ Singleton {
     signal unlocked()
     signal authFailed()
 
+    function resolvePamTarget(hasPangu, hasHyprlock, hasLogin, shellDir) {
+        if (hasPangu)
+            return { directory: "/etc/pam.d", config: "pangu" };
+        if (hasHyprlock)
+            return { directory: "/etc/pam.d", config: "hyprlock" };
+        if (hasLogin)
+            return { directory: "/etc/pam.d", config: "login" };
+        return { directory: (shellDir || ".") + "/config/pam", config: "password.conf" };
+    }
+
+    readonly property var _pamTarget: resolvePamTarget(
+        root._hasPanguPam,
+        root._hasHyprlockPam,
+        root._hasLoginPam,
+        typeof Paths !== "undefined" ? Paths.shellDir : "."
+    )
+
     FileView {
-        id: systemPamProbe
         path: "/etc/pam.d/pangu"
         preload: true
-        onLoaded: root._hasSystemPam = true
-        onLoadFailed: root._hasSystemPam = false
+        printErrors: false
+        onLoaded: root._hasPanguPam = true
+        onLoadFailed: root._hasPanguPam = false
+    }
+
+    FileView {
+        path: "/etc/pam.d/hyprlock"
+        preload: true
+        printErrors: false
+        onLoaded: root._hasHyprlockPam = true
+        onLoadFailed: root._hasHyprlockPam = false
+    }
+
+    FileView {
+        path: "/etc/pam.d/login"
+        preload: true
+        printErrors: false
+        onLoaded: root._hasLoginPam = true
+        onLoadFailed: root._hasLoginPam = false
     }
 
     Process {
@@ -62,8 +97,8 @@ Singleton {
 
     PamContext {
         id: pamAuth
-        configDirectory: root._hasSystemPam ? "/etc/pam.d" : ((typeof Paths !== "undefined" ? Paths.shellDir : ".") + "/config/pam")
-        config: root._hasSystemPam ? "pangu" : "password.conf"
+        configDirectory: root._pamTarget.directory
+        config: root._pamTarget.config
 
         onPamMessage: {
             if (this.responseRequired) {
