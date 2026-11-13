@@ -110,10 +110,16 @@ ActionGrid {
             icon: Icons.keyboard,
             tooltip: "Macros & Hotkeys",
             command: ""
+        },
+        {
+            name: "vpets",
+            icon: Icons.pawPrint,
+            tooltip: "Pokémon Sanctuary",
+            command: ""
         }
     ]
 
-    actions: allActions.filter(action => action !== saveReplayAction || ReplayService.active)
+    actions: allActions.filter(action => (action !== saveReplayAction || ReplayService.active) && (action.name !== "vpets" || Boolean(Config.petsEnabled)))
 
     function openFolder(kind, subdirectory) {
         ApplicationLauncher.launchCommand(["bash", "-c", 'directory=$(xdg-user-dir "$1")/$2; mkdir -p -- "$directory" && exec xdg-open "$directory"', "pangu-open-directory", kind, subdirectory]);
@@ -168,6 +174,9 @@ ActionGrid {
             break;
         case "macros":
             GlobalShortcuts.toggleMacros();
+            break;
+        case "vpets":
+            ApplicationLauncher.launchCommand(["qs-vpets", "pen"]);
             break;
         default:
             return;

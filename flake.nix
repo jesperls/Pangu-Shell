@@ -7,6 +7,11 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    qs-vpets = {
+      url = "github:jesperls/qs-vpets";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
   };
 
   outputs =
@@ -14,6 +19,7 @@
       self,
       nixpkgs,
       home-manager,
+      qs-vpets,
     }:
     let
       inherit (nixpkgs) lib;
@@ -31,6 +37,7 @@
     {
       overlays.default = final: prev: {
         pangu = packageFor final;
+        qs-vpets = (qs-vpets.overlays.default final prev).qs-vpets;
         ttf-phosphor-icons = final.callPackage ./nix/phosphor-icons { };
       };
 
@@ -42,11 +49,14 @@
         {
           pangu = packageFor pkgs;
           default = self.packages.${system}.pangu;
+          qs-vpets = qs-vpets.packages.${system}.qs-vpets;
           ttf-phosphor-icons = pkgs.callPackage ./nix/phosphor-icons { };
         }
       );
 
-      homeManagerModules.default = import ./nix/modules/home-manager.nix { inherit packageFor; };
+      homeManagerModules.default = import ./nix/modules/home-manager.nix {
+        inherit packageFor qs-vpets;
+      };
       nixosModules.default = import ./nix/modules/nixos.nix { inherit packageFor; };
 
       checks = forAllSystems (

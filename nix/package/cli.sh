@@ -103,6 +103,9 @@ case "${1:-}" in
 	if [ -z "${YDOTOOL_SOCKET:-}" ] && [ -S /run/ydotoold/socket ]; then
 		export YDOTOOL_SOCKET=/run/ydotoold/socket # programs.ydotool omits systemd --user
 	fi
+	if [ -z "${PANGU_PETS_ENABLE:-}" ] && PATH="${PANGU_USER_PATH:-}" command -v qs-vpets >/dev/null 2>&1; then
+		export PANGU_PETS_ENABLE=1
+	fi
 	export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt6ct}"
 	unset HL_INITIAL_WORKSPACE_TOKEN
 	prepareStateDirs

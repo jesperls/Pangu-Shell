@@ -36,10 +36,34 @@
         "type": "github"
       }
     },
+    "qs-vpets": {
+      "inputs": {
+        "home-manager": [
+          "home-manager"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794578574,
+        "narHash": "sha256-dOnjuBIEJLbvyCwBfQ2CEVTp01/NTbgVIWb+JaE8FXY=",
+        "owner": "jesperls",
+        "repo": "qs-vpets",
+        "rev": "750511eef54852ca3b0ab0a654c16fa69fbe32e6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jesperls",
+        "repo": "qs-vpets",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "qs-vpets": "qs-vpets"
       }
     }
   },

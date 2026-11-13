@@ -52,6 +52,11 @@ QtObject {
             case "cheatsheet": GlobalStates.cheatsheetVisible = !GlobalStates.cheatsheetVisible; break;
             case "macros": toggleMacros(); break;
             case "macros-stop": MacroService.stop(); break;
+            case "vpets":
+            case "sanctuary":
+                Visibilities.setActiveModule("");
+                ApplicationLauncher.launchCommand(["qs-vpets", "pen"]);
+                break;
             case "lockscreen": LockscreenService.lock(); break;
             case "gamemode": GameModeService.toggle(); break;
             case "dnd": Notifications.silent = !Notifications.silent; break;

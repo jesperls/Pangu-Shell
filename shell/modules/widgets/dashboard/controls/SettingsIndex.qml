@@ -1,5 +1,6 @@
 
 import QtQuick
+import qs.config
 import qs.modules.theme
 
 QtObject {
@@ -171,6 +172,7 @@ QtObject {
         { label: "Hover to Reveal", keywords: "mouse show hide edge", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Hover Region Height", keywords: "pixels trigger area", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Show Pin Button", keywords: "toggle pin unpin", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
+        { label: "Show Pets Button", keywords: "pets pokemon sanctuary vpets companion toolbar button bar", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.pawPrint, isIcon: true },
         { label: "Available on Fullscreen", keywords: "overlay game video", section: "shell", subSection: "bar", subLabel: "Shell > Bar", icon: Icons.layout, isIcon: true },
         { label: "Show Running Indicators", keywords: "dots active apps dock", section: "shell", subSection: "dock", subLabel: "Shell > Dock", icon: Icons.layout, isIcon: true },
         { label: "Show Overview Button", keywords: "workspace switcher dock", section: "shell", subSection: "dock", subLabel: "Shell > Dock", icon: Icons.layout, isIcon: true },
@@ -362,5 +364,5 @@ QtObject {
         { label: "Korean", keywords: "Korean ocr language text recognition system", section: "shell", subSection: "system", subLabel: "Shell > System", icon: Icons.faders, isIcon: true }
     ]
 
-    readonly property var items: staticItems
+    readonly property var items: Boolean(Config.petsEnabled) ? staticItems : staticItems.filter(item => item.label !== "Show Pets Button")
 }
