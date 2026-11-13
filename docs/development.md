@@ -41,6 +41,10 @@ merges legacy GUI properties with Pangu overrides for the renderer's arguments.
 waveform peaks and auto-trim bounds, and monitors PipeWire desktop or microphone
 streams for spectral-whitened template or tonal-band matches.
 
+`scripts/pixel_trigger.py` captures Wayland screen pixels or regions via `grim`,
+samples distinct colors or reference baselines, and monitors color-match or
+visual-change macro rules with perceptual distance and hold/edge gating.
+
 ## Verification
 
 ```sh

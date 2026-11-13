@@ -38,6 +38,7 @@ Singleton {
     property var soundScores: ({})
     property var soundLevels: ({})
     property var soundPeakHz: ({})
+    property var pixelTelemetry: ({})
     property var previewDraft: null
     property string recordingMacroId: ""
     property string recordingTargetPath: ""
@@ -45,9 +46,14 @@ Singleton {
     property real recordingSeconds: 0
     property bool previewPlaying: false
     property bool soundDaemonRetried: false
+    property bool pixelDaemonRetried: false
+    property int _activeScreenTasks: 0
+    readonly property bool screenCaptureHide: root._activeScreenTasks > 0
 
     signal soundSampleReady(string macroId, string samplePath, var meta)
     signal soundSampleInspected(string samplePath, var meta)
+    signal pixelSampled(string macroId, var result)
+    signal pixelBaselineReady(string macroId, string baselinePath, var meta)
 
     function list() {
         return MacroUtils.asArray(root.macros);
@@ -94,7 +100,8 @@ Singleton {
     function _guardsPass(macro, nowMs) {
         if (!macro || macro.enabled === false || !root.enabled)
             return false;
-        const cd = Math.max(0, macro.cooldownMs || 0);
+        const trigType = macro.trigger?.type || "none";
+        const cd = (trigType === "sound" || trigType === "pixel") ? 0 : Math.max(0, macro.cooldownMs || 0);
         if (cd > 0 && root.lastFiredAt[macro.id] && (nowMs - root.lastFiredAt[macro.id]) < cd)
             return false;
         const clients = Compositor.clients.values || [];
@@ -998,6 +1005,266 @@ Singleton {
         }
     }
 
+    function pixelBaselinePathFor(macroId) {
+        const safeId = String(macroId || "pixel").replace(/[^A-Za-z0-9_-]/g, "_");
+        return Paths.dataPath("macro-pixels/" + safeId + "_baseline.png");
+    }
+
+    function pixelPreviewPathFor(macroId) {
+        const safeId = String(macroId || "pixel").replace(/[^A-Za-z0-9_-]/g, "_");
+        return Paths.runtimePath("macro-pixel-preview-" + safeId + ".png");
+    }
+
+    function _pixelRuleFromMacro(macro, telemetryOnly, allowEmptyColors) {
+        const trig = MacroUtils.normalizeTrigger(macro.trigger);
+        if (trig.type !== "pixel")
+            return null;
+        if (!allowEmptyColors && trig.watchMode === "color" && trig.colors.length === 0)
+            return null;
+        return {
+            id: macro.id,
+            targetMode: trig.targetMode,
+            watchMode: trig.watchMode,
+            x: trig.x,
+            y: trig.y,
+            width: trig.width,
+            height: trig.height,
+            colors: trig.colors,
+            colorLogic: trig.colorLogic,
+            colorTolerance: trig.colorTolerance,
+            changeRef: trig.changeRef,
+            baselinePath: trig.baselinePath,
+            changeThreshold: trig.changeThreshold,
+            areaThreshold: trig.areaThreshold,
+            fireOnEdge: trig.fireOnEdge,
+            minHoldMs: trig.minHoldMs,
+            intervalMs: trig.intervalMs,
+            cooldownMs: trig.cooldownMs,
+            telemetryOnly: Boolean(telemetryOnly)
+        };
+    }
+
+    function _buildPixelConfig(macrosList, masterEnabled, draftMacro, telemetryActive) {
+        const rules = [];
+        const draftId = telemetryActive && draftMacro && draftMacro.id ? draftMacro.id : "";
+        let draftIncluded = false;
+        for (const raw of MacroUtils.asArray(macrosList)) {
+            if (!raw)
+                continue;
+            if (draftId && raw.id === draftId) {
+                draftIncluded = true;
+                const cleanDraft = MacroUtils.normalizeMacro(draftMacro);
+                const draftRule = root._pixelRuleFromMacro(cleanDraft, !(masterEnabled && cleanDraft.enabled), true);
+                if (draftRule)
+                    rules.push(draftRule);
+                continue;
+            }
+            if (!masterEnabled || raw.enabled === false)
+                continue;
+            const rule = root._pixelRuleFromMacro(raw, false, false);
+            if (rule)
+                rules.push(rule);
+        }
+        if (draftId && !draftIncluded) {
+            const extraDraft = MacroUtils.normalizeMacro(draftMacro);
+            const extraRule = root._pixelRuleFromMacro(extraDraft, !(masterEnabled && extraDraft.enabled), true);
+            if (extraRule)
+                rules.push(extraRule);
+        }
+        return {
+            rules: rules,
+            json: JSON.stringify({ telemetry: Boolean(telemetryActive), rules: rules })
+        };
+    }
+
+    readonly property var _pixelState: root._buildPixelConfig(
+        root.macros,
+        root.enabled,
+        root.previewDraft,
+        GlobalStates.macrosWindowVisible
+    )
+    readonly property string _pixelConfigJson: root._pixelState.json
+    readonly property bool pixelShouldRun: Config.initialLoadComplete
+        && root._pixelState.rules.length > 0
+        && !SuspendManager.isSuspending
+        && !GlobalStates.lockscreenVisible
+
+    function _ensurePixelMonitor() {
+        if (!root.pixelShouldRun) {
+            pixelRetryTimer.stop();
+            if (pixelMonitorProc.running)
+                pixelMonitorProc.running = false;
+            return;
+        }
+        if (!pixelMonitorProc.running)
+            pixelMonitorProc.running = true;
+    }
+
+    on_PixelConfigJsonChanged: pixelConfigDebounce.restart()
+
+    onPixelShouldRunChanged: {
+        if (root.pixelShouldRun) {
+            root.pixelDaemonRetried = false;
+            pixelConfigDebounce.restart();
+        } else {
+            pixelRetryTimer.stop();
+            pixelMonitorProc.running = false;
+            root.pixelTelemetry = ({});
+        }
+    }
+
+    function _runScreenTask(settleMs, macroId, kind, outPath, command) {
+        const job = pixelOneShotComponent.createObject(root, {
+            macroId: macroId,
+            kind: kind,
+            outPath: outPath,
+            taskCommand: command,
+            settleInterval: Math.max(20, settleMs)
+        });
+        root._activeScreenTasks++;
+        job.start();
+    }
+
+    function samplePixelRegion(macroId, x, y, width, height, maxColors, minSep, alreadyHidden) {
+        if (!macroId)
+            return;
+        const previewOut = root.pixelPreviewPathFor(macroId);
+        const cmd = [
+            "python3",
+            Paths.script("pixel_trigger.py"),
+            "sample",
+            "--x", String(Math.round(x)),
+            "--y", String(Math.round(y)),
+            "--width", String(Math.max(1, Math.round(width))),
+            "--height", String(Math.max(1, Math.round(height))),
+            "--max-colors", String(Math.max(1, Math.round(maxColors || 4))),
+            "--min-sep", String(Math.max(2, Math.round(minSep || 10))),
+            "--preview-out", previewOut
+        ];
+        root._runScreenTask(alreadyHidden ? 60 : 180, macroId, "sample", previewOut, cmd);
+    }
+
+    function capturePixelBaseline(macroId, x, y, width, height) {
+        if (!macroId)
+            return;
+        const outPath = root.pixelBaselinePathFor(macroId);
+        const cmd = [
+            "python3",
+            Paths.script("pixel_trigger.py"),
+            "snapshot",
+            "--x", String(Math.round(x)),
+            "--y", String(Math.round(y)),
+            "--width", String(Math.max(1, Math.round(width))),
+            "--height", String(Math.max(1, Math.round(height))),
+            "--output", outPath
+        ];
+        root._runScreenTask(180, macroId, "snapshot", outPath, cmd);
+    }
+
+    GeneratedFile {
+        id: pixelConfigFile
+        path: Paths.runtimePath("macro-pixel-triggers.json")
+        onWritten: root._ensurePixelMonitor()
+    }
+
+    Timer {
+        id: pixelConfigDebounce
+        interval: 120
+        onTriggered: pixelConfigFile.write(root._pixelConfigJson)
+    }
+
+    Process {
+        id: pixelMonitorProc
+        command: ["python3", Paths.script("pixel_trigger.py"), "monitor", "--config", pixelConfigFile.path]
+
+        stdout: SplitParser {
+            onRead: line => {
+                const text = line.trim();
+                if (text.startsWith("MATCH ")) {
+                    const rest = text.slice(6).trim();
+                    const sp = rest.indexOf(" ");
+                    const matchedId = sp === -1 ? rest : rest.slice(0, sp);
+                    const detail = sp === -1 ? "Pixel match" : rest.slice(sp + 1).trim();
+                    if (matchedId)
+                        root._fireTrigger(matchedId, false, detail);
+                } else if (text.startsWith("TELEMETRY ")) {
+                    try {
+                        const data = JSON.parse(text.slice(10));
+                        root.pixelTelemetry = data.rules || ({});
+                    } catch (e) {}
+                }
+            }
+        }
+
+        onExited: {
+            if (!root.pixelShouldRun)
+                return;
+            if (!root.pixelDaemonRetried) {
+                root.pixelDaemonRetried = true;
+                pixelRetryTimer.restart();
+            }
+        }
+    }
+
+    Timer {
+        id: pixelRetryTimer
+        interval: 1500
+        onTriggered: root._ensurePixelMonitor()
+    }
+
+    Timer {
+        id: pixelHealthyTimer
+        interval: 10000
+        running: pixelMonitorProc.running
+        onTriggered: root.pixelDaemonRetried = false
+    }
+
+    Component {
+        id: pixelOneShotComponent
+        Item {
+            id: shotJob
+            property string macroId: ""
+            property string kind: "sample"
+            property string outPath: ""
+            property var taskCommand: []
+            property int settleInterval: 120
+            property string outputBuffer: ""
+
+            function start() {
+                settleTimer.restart();
+            }
+
+            Timer {
+                id: settleTimer
+                interval: shotJob.settleInterval
+                onTriggered: {
+                    shotProc.command = shotJob.taskCommand;
+                    shotProc.running = true;
+                }
+            }
+
+            Process {
+                id: shotProc
+                stdout: StdioCollector {
+                    onStreamFinished: shotJob.outputBuffer = text.trim()
+                }
+                onExited: code => {
+                    root._activeScreenTasks = Math.max(0, root._activeScreenTasks - 1);
+                    if (code === 0 && shotJob.outputBuffer.length > 0) {
+                        try {
+                            const parsed = JSON.parse(shotJob.outputBuffer);
+                            if (shotJob.kind === "snapshot")
+                                root.pixelBaselineReady(shotJob.macroId, shotJob.outPath, parsed);
+                            else
+                                root.pixelSampled(shotJob.macroId, parsed);
+                        } catch (e) {}
+                    }
+                    shotJob.destroy();
+                }
+            }
+        }
+    }
+
     Component {
         id: timerComponent
         Timer {
@@ -1196,6 +1463,7 @@ Singleton {
                     root.lastSinkName = Audio.friendlyDeviceName(Audio.sink);
                 root._runStartup();
                 soundConfigDebounce.restart();
+                pixelConfigDebounce.restart();
             }
         }
     }
@@ -1228,6 +1496,7 @@ Singleton {
                 root.lastSinkName = Audio.friendlyDeviceName(Audio.sink);
             root._runStartup();
             soundConfigDebounce.restart();
+            pixelConfigDebounce.restart();
         }
         bindDebounce.restart();
     }

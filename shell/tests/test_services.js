@@ -1047,7 +1047,7 @@ const macroSource = fs.readFileSync(path.join(__dirname, '../modules/services/ma
     .replace(/^\.pragma library\n/, '');
 const macroContext = vm.createContext({module: {exports: {}}, console});
 vm.runInContext(macroSource
-    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle, matchesQuery, matchesOptionalQuery, clientMatches, conditionMet, describeSystemEvent, normalizeTimeOfDay, asArray, delayBounds, sampleDelayMs};',
+    + '\nmodule.exports = {normalizeMacro, normalizeStep, normalizeTrigger, blankMacro, blankStep, blankTriggerFor, bindsLua, luaQuote, runCommand, sequenceCommand, sanitizeCombo, isValidCombo, describeTrigger, stepTitle, matchesQuery, matchesOptionalQuery, clientMatches, conditionMet, describeSystemEvent, normalizeTimeOfDay, normalizeHexColor, normalizeHexColors, asArray, delayBounds, sampleDelayMs};',
     macroContext, {filename: 'macro_utils.js'});
 const macroUtils = macroContext.module.exports;
 const macro = macroUtils.normalizeMacro({
@@ -1274,7 +1274,7 @@ serviceFunctions('MacroService.qml', [
     '_guardsPass', '_recordFire', '_fireTrigger', 'triggerHotkey',
     '_snapshotClient', '_syncAppClients', '_fireAppEvent', '_checkClientEvents',
     '_handleNotification', '_handleClipboardUpdate', '_checkDailyTimers',
-    '_soundRuleFromMacro', '_buildSoundConfig'
+    '_soundRuleFromMacro', '_buildSoundConfig', '_pixelRuleFromMacro', '_buildPixelConfig'
 ], eventCtx);
 
 eventCtx._handleNotification({appName: 'Pangu Macros', summary: 'Bell raid', body: '', urgency: 2});
@@ -1328,7 +1328,38 @@ const sndCfg = eventCtx._buildSoundConfig(eventMacros, true, disabledDraft, true
 assert.equal(sndCfg.rules.length, 1);
 assert.equal(sndCfg.rules[0].threshold, 64, 'Open editor draft overrides live sound telemetry parameters');
 assert.equal(sndCfg.rules[0].telemetryOnly, true, 'Disabled draft streams telemetry without firing');
-console.log('Event scripting triggers, guards, cooldowns, loop prevention and live sound config tests passed');
+
+assert.equal(macroUtils.normalizeHexColor('#f3a'), '#FF33AA');
+assert.equal(macroUtils.normalizeHexColor('12abef'), '#12ABEF');
+assert.equal(macroUtils.normalizeHexColor('nothex'), '');
+const pxTrig = macroUtils.normalizeTrigger({
+    type: 'pixel', targetMode: 'area', watchMode: 'color',
+    x: 1400, y: -1200, width: 80, height: 40,
+    colors: ['#f3a', '#FF33AA', '34c759', 'invalid'],
+    colorLogic: 'all', colorTolerance: 99, areaThreshold: 25,
+    fireOnEdge: false, minHoldMs: 120, intervalMs: 20, cooldownMs: 50
+});
+assert.equal(pxTrig.y, -1200, 'Negative multi-monitor coordinates are preserved');
+assert.deepEqual(Array.from(pxTrig.colors), ['#FF33AA', '#34C759']);
+assert.equal(pxTrig.colorTolerance, 50);
+assert.equal(pxTrig.intervalMs, 50);
+assert.equal(pxTrig.cooldownMs, 100);
+assert.equal(pxTrig.fireOnEdge, false);
+assert.equal(macroUtils.describeTrigger(pxTrig), 'Area 80×40 (all 2 colors)');
+assert.equal(macroUtils.describeTrigger(macroUtils.normalizeTrigger({
+    type: 'pixel', targetMode: 'pixel', watchMode: 'change', x: 50, y: 60, changeThreshold: 18
+})), 'Pixel 50,60 Δ≥18%');
+
+const unconfiguredPixelMacro = macroUtils.normalizeMacro({
+    id: 'm_px_empty', name: 'Empty Px', enabled: true,
+    trigger: {type: 'pixel', targetMode: 'pixel', watchMode: 'color', x: 10, y: 20, colors: []}
+});
+assert.equal(eventCtx._buildPixelConfig([unconfiguredPixelMacro], true, null, false).rules.length, 0,
+    'Color pixel triggers without target colors stay idle when editor is closed');
+const livePxCfg = eventCtx._buildPixelConfig([unconfiguredPixelMacro], true, unconfiguredPixelMacro, true);
+assert.equal(livePxCfg.rules.length, 1, 'Open editor streams live swatch telemetry even before colors are picked');
+assert.equal(livePxCfg.rules[0].telemetryOnly, false);
+console.log('Event scripting triggers, guards, cooldowns, loop prevention and live sound/pixel config tests passed');
 
 assert.equal(macroUtils.sampleDelayMs({type: 'delay', ms: 350}), 350, 'Legacy fixed delay returns exact ms');
 assert.equal(macroUtils.stepTitle(macroUtils.normalizeStep({type: 'delay', ms: 350})), '350 ms wait');

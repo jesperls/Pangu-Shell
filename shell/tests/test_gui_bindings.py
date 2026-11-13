@@ -1714,7 +1714,7 @@ Item {
     def test_sound_trigger_editor_and_macro_step_row_bindings(self):
         with tempfile.TemporaryDirectory(prefix="pangu-sound-ui-") as directory:
             root = Path(directory)
-            for name in ("config", "modules/theme", "modules/components", "modules/globals", "modules/services", "macros"):
+            for name in ("config", "modules/theme", "modules/components", "modules/globals", "modules/services", "modules/widgets/macros"):
                 (root / name).mkdir(parents=True)
             (root / "config/qmldir").write_text("singleton Config 1.0 Config.qml\n")
             (root / "config/Config.qml").write_text(
@@ -1786,9 +1786,14 @@ Item {
                 'pragma Singleton\nimport QtQuick\nQtObject {\n'
                 '    property int mousePickSeq: 0\n'
                 '    property bool mousePickValid: false\n'
+                '    property string mousePickMode: "point"\n'
+                '    property string mousePickHint: ""\n'
                 '    property int mousePickX: 0\n'
                 '    property int mousePickY: 0\n'
+                '    property int mousePickW: 1\n'
+                '    property int mousePickH: 1\n'
                 '    function beginMousePick() {}\n'
+                '    function beginScreenPick(mode, hint) { mousePickMode = mode; mousePickHint = hint; }\n'
                 '}\n'
             )
             (root / "modules/services/qmldir").write_text(
@@ -1796,23 +1801,30 @@ Item {
                 "singleton Compositor 1.0 Compositor.qml\n"
                 "singleton AppSearch 1.0 AppSearch.qml\n"
             )
+            shutil.copy(SHELL / "modules/services/macro_utils.js", root / "modules/services/macro_utils.js")
             (root / "modules/services/MacroService.qml").write_text(
                 'pragma Singleton\nimport QtQuick\nQtObject {\n'
                 '    property var soundScores: ({})\n'
                 '    property var soundLevels: ({})\n'
                 '    property var soundPeakHz: ({})\n'
+                '    property var pixelTelemetry: ({})\n'
+                '    property bool screenCaptureHide: false\n'
                 '    property string recordingMacroId: ""\n'
                 '    property real recordingLevel: 0\n'
                 '    property real recordingSeconds: 0\n'
                 '    property bool previewPlaying: false\n'
                 '    signal soundSampleReady(string macroId, string samplePath, var meta)\n'
                 '    signal soundSampleInspected(string samplePath, var meta)\n'
+                '    signal pixelSampled(string macroId, var result)\n'
+                '    signal pixelBaselineReady(string macroId, string baselinePath, var meta)\n'
                 '    function inspectSoundSample(path, t0, t1, auto) {}\n'
                 '    function startSoundRecord(id, src) {}\n'
                 '    function stopSoundRecord() {}\n'
                 '    function importSoundSample(id, path) {}\n'
                 '    function previewSoundSnippet(path, t0, t1) {}\n'
                 '    function stopSoundPreview() {}\n'
+                '    function samplePixelRegion(id, x, y, w, h, k, sep, hidden) {}\n'
+                '    function capturePixelBaseline(id, x, y, w, h) {}\n'
                 '}\n'
             )
             (root / "modules/services/Compositor.qml").write_text(
@@ -1833,18 +1845,20 @@ Item {
                 "MacroAppPicker.qml",
                 "KeyCaptureField.qml",
                 "SoundTriggerEditor.qml",
+                "PixelTriggerEditor.qml",
                 "MacroStepRow.qml",
                 "qmldir",
             ):
-                shutil.copy(SHELL / "modules/widgets/macros" / fname, root / "macros" / fname)
+                shutil.copy(SHELL / "modules/widgets/macros" / fname, root / "modules/widgets/macros" / fname)
             self.run_scene(root, '''import QtQuick
 import Quickshell
+import qs.modules.globals
 import qs.modules.services
-import "macros"
+import qs.modules.widgets.macros
 ShellRoot {
     Item {
         width: 720
-        height: 480
+        height: 640
         SoundTriggerEditor {
             id: sndEditor
             width: 680
@@ -1855,6 +1869,20 @@ ShellRoot {
                 minDurationMs: 60, threshold: 70, cooldownMs: 1500
             })
             onTriggerEdited: next => sndEditor.trigger = next
+        }
+        PixelTriggerEditor {
+            id: pxEditor
+            width: 680
+            macroId: "m_pixel"
+            trigger: ({
+                type: "pixel", targetMode: "area", watchMode: "color",
+                x: 100, y: 200, width: 64, height: 48,
+                colors: ["#FF3B30"], colorLogic: "any", colorTolerance: 12,
+                changeRef: "previous", baselinePath: "", changeThreshold: 12,
+                areaThreshold: 20, fireOnEdge: true, minHoldMs: 50,
+                intervalMs: 150, cooldownMs: 1000
+            })
+            onTriggerEdited: next => pxEditor.trigger = next
         }
         MacroStepRow {
             id: focusRow
@@ -1886,24 +1914,58 @@ ShellRoot {
             });
             MacroService.soundScores = { m_bell: 84 };
             MacroService.soundPeakHz = { desktop: 1482 };
+
+            pxEditor.addHexColor("#34c759");
+            MacroService.pixelSampled("m_pixel", {
+                hex: "#00A8FF",
+                colors: [{ hex: "#00A8FF", coverage: 32.0 }]
+            });
+            MacroService.pixelBaselineReady("m_pixel", "/tmp/base.png", { width: 64, height: 48 });
+            MacroService.pixelTelemetry = {
+                m_pixel: {
+                    score: 36.5,
+                    threshold: 20.0,
+                    matched: true,
+                    hex: "#FF3B30",
+                    coverage: 36.5,
+                    perColor: { "#FF3B30": 24.5, "#34C759": 12.0 }
+                }
+            };
+            pxEditor.pendingPickAction = "target_area";
+            GlobalStates.mousePickX = 320;
+            GlobalStates.mousePickY = -480;
+            GlobalStates.mousePickW = 120;
+            GlobalStates.mousePickH = 60;
+            GlobalStates.mousePickValid = true;
+            GlobalStates.mousePickSeq++;
+
             const ok = sndEditor.trigger.samplePath === "/tmp/bell.wav"
                 && Math.abs(sndEditor.trigger.trimStart - 0.4) < 0.01
                 && Math.abs(sndEditor.trigger.trimEnd - 0.9) < 0.01
                 && sndEditor.peaks.length === 96
                 && sndEditor.liveScore === 84
                 && sndEditor.livePeakHz === 1482
+                && pxEditor.colors.length === 3
+                && pxEditor.colors[1] === "#34C759"
+                && pxEditor.colors[2] === "#00A8FF"
+                && pxEditor.baselinePath === "/tmp/base.png"
+                && pxEditor.liveMatched === true
+                && Math.abs(pxEditor.liveScore - 36.5) < 0.01
+                && pxEditor.posX === 320
+                && pxEditor.posY === -480
+                && pxEditor.areaW === 120
+                && pxEditor.areaH === 60
                 && focusRow.step.type === "focus"
                 && notifyRow.step.type === "notify"
                 && delayRow.delayMode === "gaussian"
                 && delayRow.delayMsVal === 500
                 && delayRow.delayStdVal === 80;
             console.log(ok ? "CHECK_PASSED" : "CHECK_FAILED " + JSON.stringify({
-                samplePath: sndEditor.trigger.samplePath,
-                trimStart: sndEditor.trigger.trimStart,
-                trimEnd: sndEditor.trigger.trimEnd,
-                peaks: sndEditor.peaks.length,
-                liveScore: sndEditor.liveScore,
-                livePeakHz: sndEditor.livePeakHz
+                pxColors: pxEditor.colors,
+                pxBaseline: pxEditor.baselinePath,
+                pxMatched: pxEditor.liveMatched,
+                pxScore: pxEditor.liveScore,
+                pxGeom: [pxEditor.posX, pxEditor.posY, pxEditor.areaW, pxEditor.areaH]
             }));
             Qt.quit();
         }

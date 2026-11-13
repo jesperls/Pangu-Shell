@@ -1,12 +1,16 @@
 .pragma library
 
 var STEP_TYPES = ["key", "text", "command", "launch", "sound", "delay", "click", "focus", "notify"];
-var TRIGGER_TYPES = ["none", "hotkey", "sequence", "sound", "app", "notification", "clipboard", "system", "timer", "startup"];
+var TRIGGER_TYPES = ["none", "hotkey", "sequence", "sound", "pixel", "app", "notification", "clipboard", "system", "timer", "startup"];
 var LOOP_MODES = ["none", "count", "infinite"];
 var CLICK_BUTTONS = ["left", "right", "middle"];
 var DELAY_MODES = ["fixed", "range", "gaussian"];
 var SOUND_MODES = ["sample", "frequency"];
 var SOUND_SOURCES = ["desktop", "mic", "both"];
+var PIXEL_TARGET_MODES = ["pixel", "area"];
+var PIXEL_WATCH_MODES = ["color", "change"];
+var PIXEL_COLOR_LOGICS = ["any", "all", "none"];
+var PIXEL_CHANGE_REFS = ["previous", "baseline"];
 var APP_EVENTS = ["launch", "focus", "close", "title", "fullscreen"];
 var NOTIF_URGENCIES = ["any", "normal", "critical"];
 var SYSTEM_EVENTS = [
@@ -66,6 +70,28 @@ function normalizeTimeOfDay(value, fallback) {
     if (hh < 0 || hh > 23 || mm < 0 || mm > 59)
         return fallback || "09:00";
     return ("0" + hh).slice(-2) + ":" + ("0" + mm).slice(-2);
+}
+
+function normalizeHexColor(value) {
+    var s = String(value === undefined || value === null ? "" : value).trim();
+    if (s.charAt(0) === "#")
+        s = s.slice(1);
+    if (/^[0-9a-fA-F]{3}$/.test(s))
+        s = s.charAt(0) + s.charAt(0) + s.charAt(1) + s.charAt(1) + s.charAt(2) + s.charAt(2);
+    if (!/^[0-9a-fA-F]{6}$/.test(s))
+        return "";
+    return "#" + s.toUpperCase();
+}
+
+function normalizeHexColors(list) {
+    var raw = asArray(list);
+    var out = [];
+    for (var i = 0; i < raw.length && out.length < 12; i++) {
+        var hx = normalizeHexColor(raw[i]);
+        if (hx && out.indexOf(hx) === -1)
+            out.push(hx);
+    }
+    return out;
 }
 
 function matchesQuery(text, query) {
@@ -244,6 +270,29 @@ function normalizeTrigger(trigger) {
             minDurationMs: clampInt(trigger.minDurationMs, 20, 5000, 60),
             threshold: clampInt(trigger.threshold, 30, 98, 70),
             cooldownMs: clampInt(trigger.cooldownMs, 100, 300000, 1500)
+        };
+    }
+    case "pixel": {
+        var targetMode = pick(PIXEL_TARGET_MODES, trigger.targetMode, "pixel");
+        return {
+            type: "pixel",
+            targetMode: targetMode,
+            watchMode: pick(PIXEL_WATCH_MODES, trigger.watchMode, "color"),
+            x: clampInt(trigger.x, -32768, 32767, 0),
+            y: clampInt(trigger.y, -32768, 32767, 0),
+            width: clampInt(trigger.width, 1, 8192, 64),
+            height: clampInt(trigger.height, 1, 8192, 64),
+            colors: normalizeHexColors(trigger.colors),
+            colorLogic: pick(PIXEL_COLOR_LOGICS, trigger.colorLogic, "any"),
+            colorTolerance: clampInt(trigger.colorTolerance, 1, 50, 12),
+            changeRef: pick(PIXEL_CHANGE_REFS, trigger.changeRef, "previous"),
+            baselinePath: String(trigger.baselinePath || ""),
+            changeThreshold: clampInt(trigger.changeThreshold, 1, 100, 12),
+            areaThreshold: clampInt(trigger.areaThreshold, 1, 100, 15),
+            fireOnEdge: trigger.fireOnEdge !== false,
+            minHoldMs: clampInt(trigger.minHoldMs, 0, 10000, 0),
+            intervalMs: clampInt(trigger.intervalMs, 50, 10000, 150),
+            cooldownMs: clampInt(trigger.cooldownMs, 100, 300000, 1000)
         };
     }
     case "app": {
@@ -474,6 +523,22 @@ function describeTrigger(trigger) {
         if (trigger.mode === "frequency")
             return trigger.minHz + "–" + trigger.maxHz + " Hz";
         return trigger.samplePath ? "Sound: " + trigger.samplePath.split("/").pop() : "Sound match";
+    case "pixel": {
+        var geom = trigger.targetMode === "area"
+            ? "Area " + trigger.width + "×" + trigger.height
+            : "Pixel " + trigger.x + "," + trigger.y;
+        if (trigger.watchMode === "change") {
+            var thr = trigger.targetMode === "area" ? trigger.areaThreshold : trigger.changeThreshold;
+            return geom + " Δ≥" + thr + "%";
+        }
+        var palette = asArray(trigger.colors);
+        if (palette.length === 0)
+            return geom + " (pick color)";
+        var prefix = trigger.colorLogic === "none" ? "≠" : (trigger.colorLogic === "all" && palette.length > 1 ? "all " : "");
+        if (palette.length === 1)
+            return geom + " (" + prefix + palette[0] + ")";
+        return geom + " (" + prefix + palette.length + " colors)";
+    }
     case "app": {
         var ev = trigger.event || (trigger.onFocus ? "focus" : "launch");
         var target = trigger.match || trigger.titleMatch || "window";

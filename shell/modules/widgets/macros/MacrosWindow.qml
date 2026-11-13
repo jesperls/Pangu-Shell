@@ -19,8 +19,10 @@ FloatingWindow {
 
     property bool initialized: false
     property var clientsBeforeMapping: []
+    property bool _resumingFromCapture: false
 
-    visible: initialized && GlobalStates.macrosWindowVisible
+    readonly property bool temporarilyHiddenForCapture: GlobalStates.mousePickActive || MacroService.screenCaptureHide
+    visible: initialized && GlobalStates.macrosWindowVisible && !temporarilyHiddenForCapture
 
     property string selectedId: ""
     property var draft: MacroUtils.blankMacro("")
@@ -36,6 +38,7 @@ FloatingWindow {
         { type: "hotkey", label: "Hotkey", icon: Icons.keyboard },
         { type: "sequence", label: "Sequence", icon: Icons.list },
         { type: "sound", label: "Sound", icon: Icons.waveform },
+        { type: "pixel", label: "Pixel / Area", icon: Icons.aperture },
         { type: "app", label: "Window", icon: Icons.apps },
         { type: "notification", label: "Notification", icon: Icons.bellRinging },
         { type: "clipboard", label: "Clipboard", icon: Icons.clipboard },
@@ -58,7 +61,7 @@ FloatingWindow {
     ]
 
     function syncPreviewDraft() {
-        MacroService.previewDraft = (root.visible && root.hasSelection) ? root.draft : null;
+        MacroService.previewDraft = ((root.visible || root.temporarilyHiddenForCapture) && root.hasSelection) ? root.draft : null;
     }
 
     function refreshFilter() {
@@ -148,7 +151,9 @@ FloatingWindow {
                 if (currentSpec !== targetWorkspace)
                     Compositor.dispatch(`movetoworkspacesilent ${targetWorkspace}, address:${client.address}`);
                 Compositor.dispatch(`focuswindow address:${client.address}`);
-                searchInput.focusInput();
+                if (!root._resumingFromCapture)
+                    searchInput.focusInput();
+                root._resumingFromCapture = false;
                 return true;
             }
         }
@@ -191,9 +196,12 @@ FloatingWindow {
             if (initialized)
                 preparePlacement();
             refreshFilter();
-            if (root.selectedId && MacroService.findMacro(root.selectedId))
+            if (!root._resumingFromCapture && root.selectedId && MacroService.findMacro(root.selectedId))
                 root.selectMacro(root.selectedId);
+        } else if (GlobalStates.macrosWindowVisible && root.temporarilyHiddenForCapture) {
+            root._resumingFromCapture = true;
         } else {
+            root._resumingFromCapture = false;
             if (MacroService.recordingMacroId !== "")
                 MacroService.stopSoundRecord();
             MacroService.stopSoundPreview();
@@ -619,6 +627,14 @@ FloatingWindow {
                                 onTriggerEdited: value => root.mutate(next => next.trigger = MacroUtils.normalizeTrigger(value))
                             }
 
+                            PixelTriggerEditor {
+                                Layout.fillWidth: true
+                                visible: root.draft.trigger.type === "pixel"
+                                macroId: root.draft.id
+                                trigger: root.draft.trigger
+                                onTriggerEdited: value => root.mutate(next => next.trigger = MacroUtils.normalizeTrigger(value))
+                            }
+
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 visible: root.draft.trigger.type === "app"
@@ -933,7 +949,7 @@ FloatingWindow {
                                     SettingsNumberInputRow {
                                         Layout.fillWidth: (root.draft.condition?.appMode || "any") === "any"
                                         Layout.preferredWidth: 200
-                                        visible: root.draft.trigger.type !== "sound"
+                                        visible: root.draft.trigger.type !== "sound" && root.draft.trigger.type !== "pixel"
                                         label: "Cooldown"
                                         suffix: "ms"
                                         value: root.draft.cooldownMs || 0
