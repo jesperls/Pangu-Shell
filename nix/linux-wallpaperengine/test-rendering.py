@@ -53,7 +53,7 @@ setTimeout(function () {
         logfile = root / (name + ".log")
         with logfile.open("w") as output:
             command = [sys.argv[1], "--window", "0x0x160x120", "--silent", "--noautomute",
-                       "--use-gl=angle", "--use-angle=gl", "--ozone-platform=x11",
+                       "--use-gl=angle", "--use-angle=gl", "--ozone-platform=x11", "--no-sandbox", # Ubuntu CI AppArmor blocks CLONE_NEWUSER and /nix/store cannot setuid chrome-sandbox
                        "--no-audio-processing", "--no-fullscreen-pause", "--fps", "30",
                        "--assets-dir", str(root / "assets"), *args, str(root)]
             process = subprocess.Popen(command, env=env, stdout=output, stderr=output, start_new_session=True)
