@@ -58,7 +58,7 @@ existing username:
   };
 
   home-manager.users.alice = {
-    imports = [ inputs.pangu-shell.homeManagerModules.default ];
+    imports = [ inputs.pangu-shell.homeModules.default ];
 
     programs.pangu = {
       enable = true;

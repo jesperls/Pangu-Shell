@@ -366,6 +366,32 @@ weatherContext.root.wasCancelled = true;
 weatherContext.finishRequest(143, '');
 assert.equal(weatherErrors, 1);
 assert.equal(weatherContext.root.isLoading, false);
+
+const snapshotPayloads = [];
+const weatherSnapshotContext = {
+    root: {
+        dataAvailable: false,
+        debugMode: false,
+        effectiveWeatherCode: 0,
+        _rawCurrentTempC: 14.5,
+        effectiveIsDay: true,
+        sunrise: '06:15',
+        sunset: '19:45',
+        weatherSnapshotFile: { write(text) { snapshotPayloads.push(JSON.parse(text)); } }
+    },
+    Date: { now: () => 1700000000000 }
+};
+serviceFunctions('WeatherService.qml', ['writeWeatherSnapshot'], weatherSnapshotContext);
+weatherSnapshotContext.writeWeatherSnapshot();
+assert.equal(snapshotPayloads.length, 0);
+weatherSnapshotContext.root.debugMode = true;
+weatherSnapshotContext.root.effectiveWeatherCode = 95;
+weatherSnapshotContext.root.effectiveIsDay = false;
+weatherSnapshotContext.writeWeatherSnapshot();
+assert.equal(snapshotPayloads.length, 1);
+assert.equal(snapshotPayloads[0].weatherCode, 95);
+assert.equal(snapshotPayloads[0].isDay, false);
+assert.equal(snapshotPayloads[0].tempC, 14.5);
 console.log('Weather timeout, superseded request and cancellation tests passed');
 
 const idleCommands = [];

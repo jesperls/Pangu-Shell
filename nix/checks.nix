@@ -11,7 +11,7 @@ let
     home-manager.lib.homeManagerConfiguration {
       inherit pkgs;
       modules = [
-        self.homeManagerModules.default
+        self.homeModules.default
         {
           home.username = "pangu-test";
           home.homeDirectory = "/home/pangu-test";
