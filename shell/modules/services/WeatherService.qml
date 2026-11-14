@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.config
+import qs.modules.components
 import qs.modules.globals
 import qs.modules.services
 import qs.modules.theme
@@ -40,6 +41,9 @@ Singleton {
     property var _rawForecastC: []
 
     readonly property string scriptPath: Paths.script("weather.sh")
+    property GeneratedFile weatherSnapshotFile: GeneratedFile {
+        path: Paths.cachePath("weather.json")
+    }
 
     property int retryCount: 0
     readonly property int maxRetries: 3
@@ -485,6 +489,14 @@ Singleton {
                     root.isLoading = false;
                     root.hasFailed = false;
                     root.retryCount = 0;
+                    root.weatherSnapshotFile.write(JSON.stringify({
+                        weatherCode: root.weatherCode,
+                        tempC: root._rawCurrentTempC,
+                        isDay: root.isDay,
+                        sunrise: root.sunrise,
+                        sunset: root.sunset,
+                        updatedAt: Date.now()
+                    }));
                 } else {
                     console.warn("WeatherService: Invalid response structure");
                     root.dataAvailable = false;
