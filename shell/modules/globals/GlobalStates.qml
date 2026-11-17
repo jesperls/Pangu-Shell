@@ -154,18 +154,42 @@ Singleton {
 
     property bool mousePickActive: false
     property bool mousePickValid: false
+    property string mousePickMode: "point"
+    property string mousePickHint: ""
     property int mousePickX: 0
     property int mousePickY: 0
+    property int mousePickW: 1
+    property int mousePickH: 1
     property int mousePickSeq: 0
 
     function beginMousePick() {
+        beginScreenPick("point", "");
+    }
+
+    function beginScreenPick(mode, hint) {
+        mousePickMode = mode || "point";
+        mousePickHint = hint || "";
         mousePickValid = false;
+        mousePickW = 1;
+        mousePickH = 1;
         mousePickActive = true;
     }
 
     function finishMousePick(x, y) {
         mousePickX = x;
         mousePickY = y;
+        mousePickW = 1;
+        mousePickH = 1;
+        mousePickValid = true;
+        mousePickSeq++;
+        mousePickActive = false;
+    }
+
+    function finishRegionPick(x, y, w, h) {
+        mousePickX = x;
+        mousePickY = y;
+        mousePickW = Math.max(1, w);
+        mousePickH = Math.max(1, h);
         mousePickValid = true;
         mousePickSeq++;
         mousePickActive = false;

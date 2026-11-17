@@ -4,6 +4,7 @@ MacroTextField 1.0 MacroTextField.qml
 MacroAppPicker 1.0 MacroAppPicker.qml
 MacroSoundField 1.0 MacroSoundField.qml
 SoundTriggerEditor 1.0 SoundTriggerEditor.qml
+PixelTriggerEditor 1.0 PixelTriggerEditor.qml
 KeyCaptureField 1.0 KeyCaptureField.qml
 MacroButton 1.0 MacroButton.qml
 MacroIconButton 1.0 MacroIconButton.qml
