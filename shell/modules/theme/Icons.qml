@@ -235,6 +235,7 @@ QtObject {
     readonly property string downloadSimple: "\ue20c"
     readonly property string musicNotes: "\ue340"
     readonly property string pictureInPicture: "\ue64c"
+    readonly property string pawPrint: "\ue648"
     readonly property string headset: "\ue584"
     readonly property string filmStrip: "\ue792"
     readonly property string fileVideo: "\uea22"

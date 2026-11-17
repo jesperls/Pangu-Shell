@@ -1,4 +1,4 @@
-{ packageFor }:
+{ packageFor, qs-vpets }:
 {
   config,
   lib,
@@ -51,6 +51,8 @@ let
   };
 in
 {
+  imports = [ qs-vpets.homeManagerModules.default ];
+
   options.programs.pangu = {
     enable = lib.mkEnableOption "the Pangu desktop shell";
     package = lib.mkOption {
@@ -74,6 +76,7 @@ in
       default = true;
       description = "Include the Linux Wallpaper Engine renderer.";
     };
+    pets.enable = lib.mkEnableOption "desktop virtual pets (qs-vpets) and the toolbar Sanctuary button";
     wallpapers = lib.mkOption {
       type = lib.types.str;
       default = "${config.home.homeDirectory}/Pictures/Wallpapers";
@@ -218,10 +221,20 @@ in
             Slice = "session.slice";
             Environment = [
               "PANGU_WALLPAPERS=${cfg.wallpapers}"
+              "PANGU_PETS_ENABLE=${if cfg.pets.enable then "1" else "0"}"
             ]
             ++ lib.optional hasSettings "PANGU_NIX_OVERRIDES=${overrideMetadata}";
           };
           Install.WantedBy = [ cfg.systemd.target ];
+        };
+      })
+      (lib.mkIf cfg.pets.enable {
+        programs.qs-vpets = {
+          enable = lib.mkDefault true;
+          systemd = {
+            enable = lib.mkDefault cfg.systemd.enable;
+            target = lib.mkDefault cfg.systemd.target;
+          };
         };
       })
       (lib.mkIf cfg.hyprland.enable {

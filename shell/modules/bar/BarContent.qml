@@ -32,6 +32,7 @@ Item {
     readonly property string clockPosition: (Config.bar && Config.bar.clockPosition === "center" ? "center" : "right")
     readonly property bool showWorkspaces: (Config.bar && Config.bar.showWorkspaces !== undefined ? Config.bar.showWorkspaces : true)
     readonly property bool showLauncherButton: (Config.bar && Config.bar.showLauncherButton !== undefined ? Config.bar.showLauncherButton : true)
+    readonly property bool showPetsButton: Boolean(Config.petsEnabled) && (Config.bar && Config.bar.showPetsButton !== undefined ? Config.bar.showPetsButton : true)
     readonly property string launcherPosition: (Config.bar && Config.bar.launcherPosition === "end" ? "end" : "start")
     readonly property bool islandsMode: (Config.bar && Config.bar.style === "islands")
 
@@ -383,7 +384,7 @@ Item {
                             return count > 0 ? total + Math.max(0, count - 1) * horizontalRow.spacing : 0;
                         }
                         readonly property real rightContentWidth: {
-                            const items = [toolsButton, sysTrayItem, recordingIndicatorItem, controlsButton, batteryIndicator, clockComponent, powerButton, launcherButtonEnd];
+                            const items = [petsButton, toolsButton, sysTrayItem, recordingIndicatorItem, controlsButton, batteryIndicator, clockComponent, powerButton, launcherButtonEnd];
                             let total = 0;
                             let count = 0;
                             if (root.dockAtEnd && integratedDockItem.visible && integratedDockItem.implicitWidth > 0) {
@@ -535,10 +536,19 @@ Item {
                             visible: !(root.orientation === "horizontal" && integratedDockEnabled)
                         }
 
+                        PetsButton {
+                            id: petsButton
+                            visible: root.showPetsButton
+                            startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
+                            endRadius: root.innerRadius
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
                         ToolsButton {
                             id: toolsButton
                             screenName: root.screenName
-                            startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
+                            startRadius: (petsButton.visible || root.dockAtEnd) ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
@@ -549,7 +559,7 @@ Item {
                             bar: root
                             enableShadow: root.shadowsEnabled
                             flatStyle: root.flatButtons
-                            startRadius: (!toolsButton.visible && !root.dockAtEnd) ? root.outerRadius : root.innerRadius
+                            startRadius: (!petsButton.visible && !toolsButton.visible && !root.dockAtEnd) ? root.outerRadius : root.innerRadius
                             endRadius: root.innerRadius
                         }
 
@@ -648,6 +658,16 @@ Item {
                         ToolsButton {
                             id: toolsButtonVert
                             screenName: root.screenName
+                            startRadius: root.innerRadius
+                            endRadius: petsButtonVert.visible ? root.innerRadius : root.outerRadius
+                            vertical: true
+                            enableShadow: root.shadowsEnabled
+                            flatStyle: root.flatButtons
+                        }
+
+                        PetsButton {
+                            id: petsButtonVert
+                            visible: root.showPetsButton
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             vertical: true

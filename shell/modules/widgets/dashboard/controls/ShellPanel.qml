@@ -1094,6 +1094,18 @@ Item {
                         }
 
                         ToggleRow {
+                            visible: Boolean(Config.petsEnabled)
+                            label: "Show Pets Button"
+                            checked: Config.bar.showPetsButton ?? true
+                            onToggled: value => {
+                                if (value !== Config.bar.showPetsButton) {
+                                    GlobalStates.markShellChanged();
+                                    Config.bar.showPetsButton = value;
+                                }
+                            }
+                        }
+
+                        ToggleRow {
                             label: "Use 12h Format"
                             checked: Config.bar.use12hFormat ?? false
                             onToggled: value => {

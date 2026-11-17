@@ -10,6 +10,7 @@ programs.pangu = {
   enable = true;
   wallpapers = "/srv/wallpapers";
   wallpaperEngine.enable = true;
+  pets.enable = false;
   fonts.enable = false;
   theme = {
     gtk.enable = true;
@@ -24,7 +25,9 @@ programs.pangu = {
 ```
 
 Set `wallpaperEngine.enable = false` to omit the `linux-wallpaperengine`
-renderer when Steam Workshop wallpapers are not needed.
+renderer when Steam Workshop wallpapers are not needed. Set `pets.enable = true`
+to install and start `qs-vpets` with the session target and expose the Pokémon
+Sanctuary button in the bar and tools menu.
 
 Set `systemd.enable = false` for manual startup and `hyprland.enable = false`
 for manually managed compositor hooks. In that case, load the equivalent

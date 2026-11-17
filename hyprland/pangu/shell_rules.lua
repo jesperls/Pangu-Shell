@@ -12,4 +12,11 @@ hl.window_rule({
   size = { 1180, 720 },
 })
 
+hl.window_rule({
+  match = { class = "^(org\\.quickshell)$", title = "^(Pokémon Sanctuary)$" },
+  float = true,
+  center = true,
+  size = { 1080, 700 },
+})
+
 return true

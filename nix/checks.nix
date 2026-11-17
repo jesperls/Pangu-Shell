@@ -50,6 +50,10 @@ let
     (home {
       programs.pangu.wallpaperEngine.enable = false;
     }).config;
+  withPets =
+    (home {
+      programs.pangu.pets.enable = true;
+    }).config;
   disabled = (home { programs.pangu.enable = lib.mkForce false; }).config;
   manual =
     (home {
@@ -139,10 +143,16 @@ in
       && valid manual
       && valid spacedWallpapers
       && valid noWallpaperEngine
+      && valid withPets
       && valid themedApps;
     assert noWallpaperEngine.programs.pangu.package.wallpaperEnginePackage == null;
     assert
       !(builtins.elem pangu.wallpaperEnginePackage noWallpaperEngine.programs.pangu.package.runtimeInputs);
+    assert !plain.programs.qs-vpets.enable && !(plain.systemd.user.services ? qs-vpets);
+    assert builtins.elem "PANGU_PETS_ENABLE=0" plain.systemd.user.services.pangu.Service.Environment;
+    assert withPets.programs.qs-vpets.enable && (withPets.systemd.user.services ? qs-vpets);
+    assert withPets.systemd.user.services.qs-vpets.Unit.BindsTo == [ "hyprland-session.target" ];
+    assert builtins.elem "PANGU_PETS_ENABLE=1" withPets.systemd.user.services.pangu.Service.Environment;
     assert builtins.any (rule: lib.hasInfix "pangu/gtk.css" rule) plain.systemd.user.tmpfiles.rules;
     assert builtins.any (
       rule: lib.hasInfix "qt6ct/colors/pangu.colors" rule

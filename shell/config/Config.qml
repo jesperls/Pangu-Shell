@@ -11,6 +11,7 @@ Singleton {
     id: root
 
     readonly property string version: Quickshell.env("PANGU_VERSION") || "dev"
+    readonly property bool petsEnabled: Quickshell.env("PANGU_PETS_ENABLE") === "1"
 
     readonly property string configDir: Paths.configPath("config")
 
@@ -511,6 +512,7 @@ Singleton {
             property int hoverRegionHeight: 8
             property int hideDelay: 1000
             property bool showPinButton: true
+            property bool showPetsButton: true
             property bool availableOnFullscreen: false
             property bool use12hFormat: false
             property bool showSeconds: false

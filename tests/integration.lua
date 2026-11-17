@@ -41,7 +41,7 @@ hl = {
 require("pangu.integration")
 assert(loaded.theme and loaded.macros, "Standalone integration must load generated theme and macro hooks")
 assert(reloaded, "Standalone integration must reload game-mode state on config reload")
-assert(#rules == 2, "Standalone integration must position the shell windows")
+assert(#rules == 3, "Standalone integration must position the shell windows")
 assert(not package.loaded["pangu.settings"], "Standalone integration changed desktop preferences")
 assert(not package.loaded["pangu.binds"], "Standalone integration loaded desktop keybindings")
 require("pangu.bindings")
