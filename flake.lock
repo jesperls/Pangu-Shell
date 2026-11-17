@@ -46,11 +46,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794690085,
-        "narHash": "sha256-t8P1sofz1xh8QERK79rjEnvmYcHyWI8elMmZ8PfNtBM=",
+        "lastModified": 1794852681,
+        "narHash": "sha256-mo2QgfgkAWS8nVilD2AEwP/ssrpNu40UjB9aqKDljIo=",
         "owner": "jesperls",
         "repo": "qs-vpets",
-        "rev": "88b1c384098f378518c5988dc536740ad16fb23b",
+        "rev": "1605cfa2afd74b3be4e1adbccec458eb1e04c22b",
         "type": "github"
       },
       "original": {

@@ -163,6 +163,25 @@ Singleton {
         onLoaded: loadNotifications()
     }
 
+    FileView {
+        id: toastSnapshotFile
+        path: Paths.cachePath("toast.json")
+        atomicWrites: true
+        printErrors: false
+    }
+
+    function writeToastSnapshot(notif) {
+        if (!notif)
+            return;
+        toastSnapshotFile.setText(JSON.stringify({
+            "id": notif.id,
+            "appName": notif.appName || "Desktop",
+            "urgency": notif.urgency,
+            "silent": root.silent,
+            "updatedAt": Date.now()
+        }));
+    }
+
     Timer {
         id: saveDebounceTimer
         interval: 500
@@ -349,6 +368,7 @@ Singleton {
                 newNotifObject.timer = timerObj;
             }
 
+            root.writeToastSnapshot(newNotifObject);
             root.notify(newNotifObject);
         }
     }
@@ -397,6 +417,8 @@ Singleton {
         if (!root.viewingHistory && options.silentUnread !== true)
             root.unreadCount++;
         saveNotifications();
+        if (options.silentUnread !== true)
+            root.writeToastSnapshot(newNotifObject);
         root.notify(newNotifObject);
         return newNotifObject;
     }

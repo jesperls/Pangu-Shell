@@ -135,6 +135,23 @@ iconContext.root.appIcon = 'firefox';
 assert.equal(iconContext.iconSource(), 'image://icon/firefox');
 console.log('Notification history drops expired provider handles and preserves usable icon sources');
 
+const toastWrites = [];
+const toastContext = {
+    root: {silent: true},
+    toastSnapshotFile: {setText(text) { toastWrites.push(JSON.parse(text)); }}
+};
+serviceFunctions('Notifications.qml', ['writeToastSnapshot'], toastContext);
+toastContext.writeToastSnapshot(null);
+assert.equal(toastWrites.length, 0);
+toastContext.writeToastSnapshot({id: 77, appName: 'Vesktop', urgency: 2});
+assert.equal(toastWrites.length, 1);
+assert.equal(toastWrites[0].id, 77);
+assert.equal(toastWrites[0].appName, 'Vesktop');
+assert.equal(toastWrites[0].urgency, 2);
+assert.equal(toastWrites[0].silent, true);
+assert.equal(typeof toastWrites[0].updatedAt, 'number');
+console.log('Notification toast snapshot exports appName, urgency, and DND state');
+
 const clipboardContext = {root: {}};
 serviceFunctions('ClipboardService.qml', ['enqueue', 'startNext'], clipboardContext);
 const process = {pending: [], running: false};
