@@ -35,6 +35,10 @@ Singleton {
     property real debugHour: 12.0
     property int debugWeatherCode: 0
 
+    onDebugModeChanged: if (_initialized) root.writeWeatherSnapshot()
+    onDebugHourChanged: if (_initialized && debugMode) root.writeWeatherSnapshot()
+    onDebugWeatherCodeChanged: if (_initialized && debugMode) root.writeWeatherSnapshot()
+
     property real _rawCurrentTempC: 0
     property real _rawMaxTempC: 0
     property real _rawMinTempC: 0
@@ -317,6 +321,7 @@ Singleton {
         var sunriseH = sunrise.length > 0 ? parseTime(sunrise) : 6.0;
         var sunsetH = sunset.length > 0 ? parseTime(sunset) : 18.0;
 
+        var wasDay = root.isDay;
         root.isDay = (hour >= sunriseH && hour <= sunsetH);
         root.sunProgress = calculateSunProgress(hour, sunriseH, sunsetH);
 
@@ -327,6 +332,9 @@ Singleton {
             root.timeOfDay = "Evening";
         } else {
             root.timeOfDay = "Night";
+        }
+        if (_initialized && wasDay !== root.isDay && root.dataAvailable) {
+            root.writeWeatherSnapshot();
         }
     }
 
@@ -410,6 +418,19 @@ Singleton {
         }));
     }
 
+    function writeWeatherSnapshot() {
+        if (!root.dataAvailable && !root.debugMode)
+            return;
+        root.weatherSnapshotFile.write(JSON.stringify({
+            weatherCode: root.effectiveWeatherCode,
+            tempC: root._rawCurrentTempC,
+            isDay: root.effectiveIsDay,
+            sunrise: root.sunrise,
+            sunset: root.sunset,
+            updatedAt: Date.now()
+        }));
+    }
+
     function handleError() {
         if (retryCount < maxRetries) {
             retryCount++;
@@ -489,14 +510,7 @@ Singleton {
                     root.isLoading = false;
                     root.hasFailed = false;
                     root.retryCount = 0;
-                    root.weatherSnapshotFile.write(JSON.stringify({
-                        weatherCode: root.weatherCode,
-                        tempC: root._rawCurrentTempC,
-                        isDay: root.isDay,
-                        sunrise: root.sunrise,
-                        sunset: root.sunset,
-                        updatedAt: Date.now()
-                    }));
+                    root.writeWeatherSnapshot();
                 } else {
                     console.warn("WeatherService: Invalid response structure");
                     root.dataAvailable = false;

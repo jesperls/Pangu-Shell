@@ -51,7 +51,7 @@ let
   };
 in
 {
-  imports = [ qs-vpets.homeManagerModules.default ];
+  imports = [ qs-vpets.homeModules.default ];
 
   options.programs.pangu = {
     enable = lib.mkEnableOption "the Pangu desktop shell";

@@ -54,7 +54,7 @@
         }
       );
 
-      homeManagerModules.default = import ./nix/modules/home-manager.nix {
+      homeModules.default = import ./nix/modules/home-manager.nix {
         inherit packageFor qs-vpets;
       };
       nixosModules.default = import ./nix/modules/nixos.nix { inherit packageFor; };
