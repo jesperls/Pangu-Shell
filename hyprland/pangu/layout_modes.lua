@@ -99,6 +99,11 @@ function M.set(target)
   modes[workspace.id] = target
   session.save()
 
+  if hl.dispatch and hl.dsp and hl.dsp.event then
+    local mon_name = workspace.monitor and workspace.monitor.name or ""
+    hl.dispatch(hl.dsp.event("layoutmode," .. mon_name .. "," .. target))
+  end
+
   layouts_module.schedule_scan()
 end
 

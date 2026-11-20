@@ -87,19 +87,23 @@ local function sign_step(value, step)
 end
 
 for key, spec in pairs({
-  up = { delta = -30, resize = { 0, -30 } },
-  down = { delta = 30, resize = { 0, 30 } },
-  k = { delta = -30, resize = { 0, -30 } },
-  j = { delta = 30, resize = { 0, 30 } },
-  left = { resize = { -30, 0 } },
-  right = { resize = { 30, 0 } },
-  h = { resize = { -30, 0 } },
-  l = { resize = { 30, 0 } },
+  up = { vdelta = -30, resize = { 0, -30 } },
+  down = { vdelta = 30, resize = { 0, 30 } },
+  k = { vdelta = -30, resize = { 0, -30 } },
+  j = { vdelta = 30, resize = { 0, 30 } },
+  left = { hdelta = -0.05, resize = { -30, 0 } },
+  right = { hdelta = 0.05, resize = { 30, 0 } },
+  h = { hdelta = -0.05, resize = { -30, 0 } },
+  l = { hdelta = 0.05, resize = { 30, 0 } },
 }) do
   bind(mainMod .. " CTRL", key, function()
     local window = hl.get_active_window()
-    if spec.delta and in_centered() and window and not window.floating then
-      hl.dispatch(hl.dsp.layout("vresize " .. sign_step(spec.delta, state.layouts.centered.height_resize_step)))
+    if in_centered() and window and not window.floating then
+      if spec.vdelta then
+        hl.dispatch(hl.dsp.layout("vresize " .. sign_step(spec.vdelta, state.layouts.centered.height_resize_step)))
+      elseif spec.hdelta then
+        hl.dispatch(hl.dsp.layout("hresize " .. sign_step(spec.hdelta, 0.05)))
+      end
     else
       hl.dispatch(hl.dsp.window.resize({ x = spec.resize[1], y = spec.resize[2] }))
     end
@@ -171,6 +175,8 @@ bind(mainMod, "period", hl.dsp.focus({ workspace = "r+1" }), "Workspace: next")
 bind(mainMod, "comma", hl.dsp.focus({ workspace = "r-1" }), "Workspace: previous")
 bind(mainMod .. " SHIFT", "mouse_up", hl.dsp.window.move({ workspace = "r-1" }), "Workspace: move window back (scroll)")
 bind(mainMod .. " SHIFT", "mouse_down", hl.dsp.window.move({ workspace = "r+1" }), "Workspace: move window forward (scroll)")
+bind(mainMod .. " ALT", "comma", hl.dsp.window.move({ workspace = "r-1" }), "Workspace: move window to previous")
+bind(mainMod .. " ALT", "period", hl.dsp.window.move({ workspace = "r+1" }), "Workspace: move window to next")
 
 local popout = require("pangu.popout")
 
@@ -202,7 +208,7 @@ bind(mainMod .. " SHIFT", "comma", hl.dsp.window.move({ monitor = "-1" }), "Moni
 bind(mainMod .. " SHIFT", "period", hl.dsp.window.move({ monitor = "+1" }), "Monitor: move window to next")
 
 bind_exec(mainMod, "V", "pangu run clipboard", "Shell: clipboard history")
-bind_exec(mainMod .. " SHIFT", "C", "hyprpicker -a", "Tools: color picker")
+bind_exec(mainMod .. " SHIFT", "C", "pangu run colorpicker", "Tools: color picker")
 
 bind_exec("", "Print", "pangu run screenshot", "Tools: screenshot")
 bind_exec(
@@ -212,7 +218,7 @@ bind_exec(
   "Tools: full-screen screenshot to clipboard"
 )
 
-bind_exec("", "XF86AudioRaiseVolume", "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+", "Media: volume up", { repeating = true, locked = true })
+bind_exec("", "XF86AudioRaiseVolume", "pangu run volume-up || wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+", "Media: volume up", { repeating = true, locked = true })
 bind_exec("", "XF86AudioLowerVolume", "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-", "Media: volume down", { repeating = true, locked = true })
 bind_exec("", "XF86AudioMute", "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", "Media: mute", { locked = true })
 bind_exec("", "XF86AudioMicMute", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", "Media: mic mute", { locked = true })

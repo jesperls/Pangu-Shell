@@ -8,6 +8,7 @@ local aspect = state.layouts.centered.aspect[1] / state.layouts.centered.aspect[
 
 local slots = session.table("slots")
 local weights = session.table("weights")
+local master_widths = session.table("master_widths")
 local fresh = {}
 
 local function stack(entries, box)
@@ -218,9 +219,9 @@ local function monitor_box(mon)
   return { x = mon.x, y = mon.y, w = w / scale, h = h / scale }
 end
 
-local function full_master_box(mon, has_sides)
+local function full_master_box(mon, has_sides, width_ratio)
   local box = monitor_box(mon)
-  local w = box.h * aspect
+  local w = width_ratio and (box.w * width_ratio) or (box.h * aspect)
   if w >= box.w then
     return nil
   end
@@ -236,21 +237,17 @@ end
 local emitted = {}
 
 local function update_gap(mon)
-  local master = full_master_box(mon)
   local ws = mon.active_workspace
-  local on = master ~= nil
-  if on then
-    on = ws ~= nil and not ws.special and ws.tiled_layout == "lua:centered"
-    if on then
-      on = false
-      for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
-        if not window.floating then
-          on = true
-          break
-        end
+  local tiled_count = 0
+  if ws ~= nil and not ws.special and ws.tiled_layout == "lua:centered" then
+    for _, window in ipairs(hl.get_workspace_windows(ws.id)) do
+      if not window.floating then
+        tiled_count = tiled_count + 1
       end
     end
   end
+  local master = tiled_count > 0 and full_master_box(mon, tiled_count > 1, master_widths[ws.id]) or nil
+  local on = master ~= nil
 
   local payload
   if on then
@@ -296,6 +293,11 @@ local function prune_session()
   for id in pairs(slots) do
     if not live_ws[id] then
       slots[id] = nil
+    end
+  end
+  for id in pairs(master_widths) do
+    if not live_ws[id] then
+      master_widths[id] = nil
     end
   end
   for id in pairs(weights) do
@@ -521,11 +523,13 @@ hl.layout.register("centered", {
     end
 
     local area = ctx.area
-    local master_w = area.w * mwfact
+    local ws = workspace_id(ctx)
+    local width_ratio = master_widths[ws]
+    local master_w = area.w * (width_ratio or mwfact)
     local master_box
     if full_height then
       local mon = ctx_monitor(ctx)
-      master_box = mon and full_master_box(mon, n > 1)
+      master_box = mon and full_master_box(mon, n > 1, width_ratio)
       if master_box then
         master_w = master_box.w
       end
@@ -617,9 +621,13 @@ hl.layout.register("centered", {
 
       if id == s.master then
         local list = dir == "l" and s.left or s.right
+        local other = dir == "l" and s.right or s.left
         if list[1] then
           s.master = list[1]
           list[1] = id
+        elseif other[1] then
+          table.insert(list, 1, id)
+          s.master = table.remove(other, 1)
         end
         return true
       end
@@ -650,13 +658,33 @@ hl.layout.register("centered", {
       return true
     end
 
+    local hdelta = msg:match("^hresize%s+([+-]?%d*%.?%d+)$")
+    if hdelta then
+      local ws = workspace_id(ctx)
+      local base = master_widths[ws]
+      if not base then
+        local mon = full_height and ctx_monitor(ctx) or nil
+        if mon then
+          local box = monitor_box(mon)
+          base = box.w > 0 and ((box.h * aspect) / box.w) or mwfact
+        else
+          base = mwfact
+        end
+      end
+      master_widths[ws] = math.min(0.85, math.max(0.25, base + tonumber(hdelta)))
+      schedule_scan()
+      return true
+    end
+
     if msg == "equalize" then
+      master_widths[workspace_id(ctx)] = nil
       if s.master then weights[s.master] = nil end
       for _, list in ipairs({ s.left, s.right }) do
         for _, id in ipairs(list) do
           weights[id] = nil
         end
       end
+      schedule_scan()
       return true
     end
   end,

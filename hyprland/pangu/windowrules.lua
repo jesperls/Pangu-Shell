@@ -18,6 +18,8 @@ for _, class in ipairs({
   "^overskride$",
   "^scrcpy$",
   "^xdg-desktop-portal-gtk$",
+  "^xdg-desktop-portal-hyprland$",
+  "^zenity$",
   "^hyprpolkitagent$",
 }) do
   hl.window_rule({ match = { class = class }, float = true })
