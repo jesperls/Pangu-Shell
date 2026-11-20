@@ -379,6 +379,8 @@ assert.equal(weatherResponses, 0);
 assert.equal(weatherRefreshes, 1);
 weatherContext.finishRequest(0, 'current location');
 assert.equal(weatherResponses, 1);
+weatherContext.finishRequest(1, '{"error":"Location not found"}');
+assert.equal(weatherResponses, 2);
 weatherContext.root.wasCancelled = true;
 weatherContext.finishRequest(143, '');
 assert.equal(weatherErrors, 1);
@@ -1063,8 +1065,12 @@ for (const [section, file] of Object.entries(panels)) {
     const source = fs.readFileSync(path.join(controlsDir, file), 'utf8');
     subsections[section] = new Set([...source.matchAll(/currentSection === "(\w+)"/g)].map(match => match[1]));
 }
+const seenIndexKeys = new Set();
 for (const entry of indexEntries) {
     assert.ok(entry.label.length > 0, `Settings index entry has no label (${entry.section}/${entry.subSection})`);
+    const key = `${entry.section}/${entry.subSection}/${entry.label.toLowerCase()}`;
+    assert.ok(!seenIndexKeys.has(key), `Duplicate settings index entry: ${key}`);
+    seenIndexKeys.add(key);
     assert.ok(panels[entry.section], `Settings index targets an unknown section: ${entry.section}`);
     if (entry.subSection) {
         assert.ok(subsections[entry.section].has(entry.subSection),

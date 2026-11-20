@@ -185,6 +185,15 @@ class SoundTriggerDspTest(unittest.TestCase):
             self.assertEqual([r.id for r in by_source["mic"][0]], ["m1"])
             self.assertEqual([r.id for r in by_source["mic"][1]], ["m2"])
 
+    def test_inspect_clip_handles_very_short_sample(self):
+        short = np.array([0.0, 0.25, -0.5, 0.75, 0.1], dtype=np.float32)
+        with tempfile.TemporaryDirectory(prefix="pangu-snd-") as tmp:
+            wav_path = Path(tmp) / "tiny.wav"
+            st.write_wav_atomic(wav_path, np.clip(short * 32767.0, -32768, 32767))
+            meta = st.inspect_clip(wav_path, do_autotrim=False)
+        self.assertEqual(len(meta["peaks"]), 96)
+        self.assertTrue(all(0.0 <= p <= 1.0 for p in meta["peaks"]))
+
 
 if __name__ == "__main__":
     unittest.main()

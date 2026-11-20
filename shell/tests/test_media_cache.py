@@ -101,7 +101,8 @@ class MediaCacheTest(unittest.TestCase):
         assets = Path(__file__).resolve().parents[1] / 'assets/matugen'
         custom_cache = self.root / 'cache with "quotes" and spaces' / 'pangu' / 'colors.json'
 
-        def fake_matugen(command, check):
+        def fake_matugen(command, check, timeout=None):
+            self.assertEqual(timeout, 30)
             cfg_path = Path(command[command.index('-c') + 1])
             cfg_text = cfg_path.read_text()
             for line in cfg_text.splitlines():

@@ -27,6 +27,8 @@ if name == "slurp":
     print("0,0 20x20")
 elif name in ("tesseract", "zbarimg"):
     sys.stdout.write(os.environ.get("TEXT", "recognized"))
+elif name == "grim" and "ppm" in sys.argv:
+    sys.stdout.buffer.write(b"P6\\n1 1\\n255\\n\\x20\\x40\\x80")
 elif name == "magick" and "info:-" in sys.argv:
     print("32 64 128")
 elif name == "wl-copy":
@@ -37,7 +39,8 @@ sys.exit(int(os.environ.get(name.upper().replace("-", "_") + "_STATUS", "0")))
             for command in ("slurp", "grim", "tesseract", "zbarimg", "wl-copy", "notify-send", "magick"):
                 (binary / command).symlink_to(stub)
             env = dict(os.environ, PATH=str(binary) + ":" + os.environ["PATH"],
-                       TEST_ROOT=str(root), TMPDIR=str(temporary))
+                       TEST_ROOT=str(root), TMPDIR=str(temporary),
+                       XDG_RUNTIME_DIR=str(root / "runtime"))
             env.update({key: str(value) for key, value in settings.items()})
             command = [sys.executable, str(SCRIPTS / "colorpicker.py")] if name == "colorpicker" else ["bash", str(SCRIPTS / (name + ".sh"))]
             if supplied_image:
@@ -121,3 +124,43 @@ sys.exit(int(os.environ.get(name.upper().replace("-", "_") + "_STATUS", "0")))
         self.assertEqual(code, 1)
         self.assertIsNone(clipboard)
         self.assertIn("Could not", calls[-1][2])
+
+    def test_process_clip_invalid_trim_fallback_and_uri_encoding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "bin"
+            binary.mkdir()
+            runtime = root / "runtime"
+            runtime.mkdir()
+            stub = binary / "stub"
+            stub.write_text("#!" + sys.executable + "\n" + """import json, os, pathlib, sys
+name = pathlib.Path(sys.argv[0]).name
+root = pathlib.Path(os.environ["TEST_ROOT"])
+with (root / "calls").open("a") as stream:
+    stream.write(json.dumps([name] + sys.argv[1:]) + "\\n")
+if name == "ffprobe":
+    print("12.5")
+elif name == "ffmpeg":
+    pathlib.Path(sys.argv[-1]).write_bytes(b"mp4")
+elif name == "wl-copy":
+    (root / "clipboard").write_bytes(sys.stdin.buffer.read())
+""")
+            stub.chmod(0o755)
+            for command in ("ffprobe", "ffmpeg", "wl-copy"):
+                (binary / command).symlink_to(stub)
+            clip = root / "My Clip #1.mp4"
+            clip.write_bytes(b"input")
+            env = dict(os.environ, PATH=str(binary) + ":" + os.environ["PATH"],
+                       TEST_ROOT=str(root), XDG_RUNTIME_DIR=str(runtime))
+            res = subprocess.run(
+                ["bash", str(SCRIPTS / "process_clip.sh"), "compress", str(clip), "8.0", "2.0"],
+                env=env, capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            calls = [json.loads(line) for line in (root / "calls").read_text().splitlines()]
+            ffmpeg_call = next(c for c in calls if c[0] == "ffmpeg")
+            self.assertNotIn("-ss", ffmpeg_call)
+            self.assertNotIn("-to", ffmpeg_call)
+            uri = (root / "clipboard").read_text().strip()
+            self.assertTrue(uri.startswith("file://"))
+            self.assertIn("My%20Clip%20%231_discord_", uri)

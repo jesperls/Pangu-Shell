@@ -98,6 +98,19 @@ class NotesTest(unittest.TestCase):
         self.assertEqual(set(ids), {note['id'] for note in result})
         self.assertEqual(next(note['title'] for note in result if note['id'] == ids[0]), 'Renamed')
 
+    def test_delete_succeeds_when_backing_file_was_removed(self):
+        key = self.create('Orphan')
+        (self.root / 'notes' / f'{key}.html').unlink()
+        self.call('delete', id=key)
+        self.assertEqual(self.call('list')['notes'], [])
+
+    def test_create_handles_non_string_title(self):
+        key = self.call('create', title=None, isMarkdown=True)['id']
+        listed = self.call('list')['notes']
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0]['id'], key)
+        self.assertEqual(listed[0]['title'], 'Untitled Note')
+
 
 @unittest.skipUnless(shutil.which('qs'), 'Quickshell is required')
 class NotesServiceTest(unittest.TestCase):
