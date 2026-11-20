@@ -1436,3 +1436,100 @@ assert.ok(Math.abs(bellMean - 500) < 4, `Expected bell mean near 500, got ${bell
 assert.ok(Math.abs(Math.sqrt(bellVar) - 80) < 4, `Expected bell stdDev near 80, got ${Math.sqrt(bellVar)}`);
 assert.ok(bellSamples.every(v => v >= 260 && v <= 740), 'All bell samples stay inside ±3σ bounds');
 console.log('Fixed, uniform range and Gaussian bell-curve delay sampling tests passed');
+
+const appEntries = [
+    {name: 'Visual Studio Code', genericName: 'Code Editor', comment: 'Editing evolved', keywords: ['ide', 'editor'], command: ['code'], id: 'code'},
+    {name: 'Firefox', genericName: 'Web Browser', comment: 'Browse the web', keywords: ['internet'], command: ['firefox'], id: 'firefox'},
+    {name: 'Codecs Settings', genericName: 'Audio', comment: '', keywords: [], command: ['codecs'], id: 'codecs'}
+];
+const appSearchCtx = {
+    root: {},
+    list: appEntries,
+    searchIndex: [],
+    iconCache: {},
+    Config: {launcher: {sortByUsage: false}},
+    UsageTracker: {getUsageScore() { return 0; }},
+    validateIcon(i) { return i; },
+    launchApp() {}
+};
+serviceFunctions('AppSearch.qml', ['buildIndex', 'fuzzyScore', 'scoreEntry', 'fuzzyQuery'], appSearchCtx);
+assert.equal(appSearchCtx.fuzzyQuery('vsc')[0].id, 'code', 'Acronym query matches Visual Studio Code');
+assert.equal(appSearchCtx.fuzzyQuery('vs code')[0].id, 'code', 'Multi-token query matches Visual Studio Code');
+assert.equal(appSearchCtx.fuzzyQuery('ffx')[0].id, 'firefox', 'Subsequence query matches Firefox');
+assert.equal(appSearchCtx.fuzzyQuery('zzzzzz').length, 0, 'Unmatched query returns empty list');
+console.log('AppSearch fuzzy, acronym, subsequence and multi-token scoring tests passed');
+
+const skinToneCtx = {root: {}};
+serviceFunctions('../widgets/dashboard/emoji/EmojiTab.qml', ['applySkinTone'], skinToneCtx);
+assert.equal(skinToneCtx.applySkinTone('👍', '🏽'), '👍🏽');
+assert.equal(skinToneCtx.applySkinTone('✌️', '🏽'), '✌🏽', 'Variation selector FE0F is stripped before skin tone');
+assert.equal(skinToneCtx.applySkinTone('🏃‍♀️', '🏽'), '🏃🏽‍♀️', 'ZWJ sequence receives skin tone before ZWJ');
+assert.equal(skinToneCtx.applySkinTone('👍', ''), '👍');
+
+let dismissedDirect = 0;
+let invokedDirect = 0;
+const notifDirectCtx = {
+    root: {
+        list: [
+            {id: 10, isCached: false, closeTimer: {stop() {}}, timer: null, notification: {dismiss() { dismissedDirect++; }, actions: [{identifier: 'open', invoke() { invokedDirect++; }}]}},
+            {id: 11, isCached: true, closeTimer: {stop() {}}, timer: null, notification: null}
+        ],
+        unreadCount: 1,
+        idOffset: 0,
+        internalIdCounter: 0,
+        timeoutWithAnimation() {},
+        scheduleDestroy() {},
+        discard(id) {},
+        notifToJSON(n) { return {id: n.id}; }
+    },
+    triggerListChange() {},
+    saveNotifications() {},
+    jsonToNotif(j) { return {id: j.id, isCached: true, closeTimer: {stop() {}}, timer: null, notification: null}; },
+    notifServer: {trackedNotifications: {values: []}},
+    notifFileView: {text() { return JSON.stringify([{id: 10}, {id: 12}]); }},
+    console
+};
+serviceFunctions('Notifications.qml', ['loadNotifications', 'discardNotification', 'attemptInvokeAction'], notifDirectCtx);
+notifDirectCtx.loadNotifications();
+assert.deepEqual(Array.from(notifDirectCtx.root.list, n => n.id), [12, 10], 'loadNotifications deduplicates by id and drops stale cached entries');
+notifDirectCtx.attemptInvokeAction(10, 'open');
+assert.equal(invokedDirect, 1, 'attemptInvokeAction invokes entry.notification action directly');
+notifDirectCtx.discardNotification(10);
+assert.equal(dismissedDirect, 1, 'discardNotification dismisses entry.notification directly');
+console.log('Notification deduplication and direct object dismiss/invoke tests passed');
+
+let confirmRan = 0;
+const confirmCtx = {
+    root: {pendingConfirmId: ''},
+    confirmResetTimer: {stop() {}, restart() {}}
+};
+serviceFunctions('LauncherActions.qml', ['runWithConfirm', 'clearConfirm'], confirmCtx);
+assert.equal(confirmCtx.runWithConfirm('poweroff', () => { confirmRan++; }), true);
+assert.equal(confirmCtx.root.pendingConfirmId, 'poweroff');
+assert.equal(confirmRan, 0);
+assert.equal(confirmCtx.runWithConfirm('poweroff', () => { confirmRan++; }), false);
+assert.equal(confirmCtx.root.pendingConfirmId, '');
+assert.equal(confirmRan, 1);
+
+const recorderCfgCtx = {
+    root: {videosDir: '/tmp/Videos', starting: false},
+    Config: {system: {recorder: {fps: 120, codec: 'av1'}}},
+    isRecording: false, starting: false,
+    startProcess: {}, prepareProcess: {}, Date
+};
+serviceFunctions('ScreenRecorder.qml', ['startRecording'], recorderCfgCtx);
+recorderCfgCtx.startRecording(false, false, 'screen', '');
+assert.ok(recorderCfgCtx.startProcess.command.includes('120'), 'Custom recorder FPS is passed to gpu-screen-recorder');
+const kIdx = recorderCfgCtx.startProcess.command.indexOf('-k');
+assert.ok(kIdx !== -1 && recorderCfgCtx.startProcess.command[kIdx + 1] === 'av1', 'Custom recorder codec is passed via -k');
+
+const pathsUrlCtx = {root: {}};
+serviceFunctions('../../config/Paths.qml', ['toFileUrl'], pathsUrlCtx);
+assert.equal(pathsUrlCtx.toFileUrl('/tmp/my #1?pic.png'), 'file:///tmp/my%20%231%3Fpic.png');
+assert.equal(pathsUrlCtx.toFileUrl(''), '');
+
+const clipUriCtx = {root: {}};
+serviceFunctions('../widgets/dashboard/clipboard/ClipboardTab.qml', ['getFilePathFromUri'], clipUriCtx);
+assert.equal(clipUriCtx.getFilePathFromUri('# comment\nfile:///tmp/hello%20world.png\n'), '/tmp/hello world.png');
+assert.equal(clipUriCtx.getFilePathFromUri('file:///tmp/bad%ZZname.png'), '/tmp/bad%ZZname.png', 'Malformed percent-encoding falls back without throwing');
+console.log('Skin tone ZWJ, launcher confirmation, recorder FPS/codec, Paths.toFileUrl and clipboard URI tests passed');

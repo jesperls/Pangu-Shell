@@ -60,10 +60,13 @@ QtObject { property var wallpaperManager: ({currentWallpaper: %s}) }
             shutil.copy(SHELL / "assets/colors/Nord/dark.json", root / "cache/pangu/colors.json")
             for command in ("pkill", "gsettings", "pywalfox", "walogram"):
                 stub = root / "bin" / command
-                stub.write_text(f"#!{shutil.which('bash')}\n" + (
-                    'printf \'%s\\n\' "$*" >> "$PANGU_TEST_GSETTINGS_LOG"\n'
-                    if command == "gsettings" else "exit 0\n"
-                ))
+                if command == "gsettings":
+                    body = 'printf \'%s\\n\' "$*" >> "$PANGU_TEST_GSETTINGS_LOG"\n'
+                elif command == "pkill":
+                    body = 'printf \'%s\\n\' "$*" >> "$PANGU_TEST_PKILL_LOG"\n'
+                else:
+                    body = "exit 0\n"
+                stub.write_text(f"#!{shutil.which('bash')}\n" + body)
                 stub.chmod(0o755)
             (root / "shell.qml").write_text('''import QtQuick
 import Quickshell
@@ -92,6 +95,7 @@ ShellRoot {
 ''')
             env = dict(os.environ, XDG_RUNTIME_DIR=str(root / "runtime"),
                        PANGU_TEST_GSETTINGS_LOG=str(root / "gsettings.log"),
+                       PANGU_TEST_PKILL_LOG=str(root / "pkill.log"),
                        XDG_CACHE_HOME=str(root / "cache"), QT_QPA_PLATFORM="offscreen",
                        QML_DISABLE_DISK_CACHE="1", PATH=str(root / "bin") + ":" + os.environ["PATH"])
             env.pop("WAYLAND_DISPLAY", None)
@@ -119,6 +123,9 @@ ShellRoot {
             self.assertIn("background_opacity 0.5", kitty)
             self.assertIn("cursor ", kitty)
             self.assertIn("active_tab_background ", kitty)
+            pkill_calls = (root / "pkill.log").read_text().splitlines()
+            self.assertIn("-USR1 -x kitty", pkill_calls)
+            self.assertIn("-USR1 -x .kitty-wrapped", pkill_calls)
             firefox = (root / "cache/pangu/firefox.css").read_text()
             self.assertIn("--pangu-bg: #123456;", firefox)
             self.assertIn("#navigator-toolbox {", firefox)

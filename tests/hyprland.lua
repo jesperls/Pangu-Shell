@@ -45,6 +45,7 @@ local state = {
 }
 local slots = { [1] = { master = 10, left = { 11 }, right = { 12 } } }
 local weights = { [10] = 2, [11] = 3, [12] = 4, [20] = 2 }
+local master_widths = {}
 local custom_events = {}
 local layout
 package.preload["pangu.generated"] = function()
@@ -59,9 +60,11 @@ package.preload["pangu.gamemode"] = function()
   }
 end
 package.preload["pangu.session"] = function()
+  local tables = { slots = slots, weights = weights, master_widths = master_widths }
   return {
     table = function(key)
-      return key == "slots" and slots or weights
+      tables[key] = tables[key] or {}
+      return tables[key]
     end,
     save = function() end,
   }
@@ -123,9 +126,46 @@ layouts_mod.emit_gaps(false)
 assert(#custom_events == 1, "Unforced emit_gaps re-emitted unchanged centergap")
 layouts_mod.emit_gaps(true)
 assert(#custom_events == 2 and custom_events[2] == "centergap,DP-2,1280,2560,0", "Forced emit_gaps must re-emit centergap for restarted shell")
+layout.layout_msg({ targets = { { window = { workspace = { id = 1 } } } } }, "hresize +0.1")
+assert(math.abs(master_widths[1] - 0.6) < 0.001, "hresize must adjust per-workspace master width ratio")
+layouts_mod.emit_gaps(false)
+assert(custom_events[#custom_events] == "centergap,DP-2,1024,3072,0", "hresize must update centergap width")
+
 layout.layout_msg({ targets = { { window = { workspace = { id = 1 } } } } }, "equalize")
 assert(weights[10] == nil and weights[11] == nil and weights[12] == nil)
+assert(master_widths[1] == nil, "Equalize must reset per-workspace master width")
 assert(weights[20] == 2, "Equalize changed another workspace")
+
+-- Pushing master toward an empty side when the opposite side has a window promotes the opposite window.
+slots[7] = { master = 70, left = {}, right = { 71 } }
+layout.layout_msg({ targets = { { window = { stable_id = 70, active = true, workspace = { id = 7 } } } } }, "move l")
+assert(slots[7].master == 71 and slots[7].left[1] == 70 and #slots[7].right == 0, "Master move into empty side must swap with opposite side")
+
+-- Narrow-side monitor shrinks centergap when more than 1 tiled window is present.
+local orig_monitors, orig_ws_windows = hl.get_monitors, hl.get_workspace_windows
+hl.get_monitors = function()
+  return {
+    {
+      name = "DP-3",
+      x = 0,
+      y = 0,
+      width = 2660,
+      height = 1440,
+      scale = 1,
+      transform = 0,
+      active_workspace = { id = 5, tiled_layout = "lua:centered" },
+    },
+  }
+end
+hl.get_workspace_windows = function()
+  return {
+    { stable_id = 50, floating = false },
+    { stable_id = 51, floating = false },
+  }
+end
+layouts_mod.emit_gaps(true)
+assert(custom_events[#custom_events] == "centergap,DP-3,100,2460,0", "centergap must reserve 200px for side columns when >1 tiled windows exist")
+hl.get_monitors, hl.get_workspace_windows = orig_monitors, orig_ws_windows
 
 local appliedSettings
 hl.config = function(config)
@@ -242,6 +282,18 @@ assert(
   binds["Monitor: focus next"].name == "focus" and binds["Monitor: focus next"].arg.monitor == "+1",
   "period must focus next monitor (+1)"
 )
+assert(binds["Tools: color picker"].arg == "pangu run colorpicker", "Super+Shift+C must route through pangu colorpicker")
+assert(
+  binds["Media: volume up"].arg:find("pangu run volume-up", 1, true) ~= nil,
+  "Volume up key must route through pangu volume-up for overAmplify support"
+)
+dispatch_log = {}
+floating = false
+binds["Window: resize (right)"]()
+assert(dispatch_log[#dispatch_log].name == "layout" and dispatch_log[#dispatch_log].arg == "hresize +0.05", "Super+Ctrl+Right must hresize in centered layout")
+floating = true
+binds["Window: resize (right)"]()
+assert(dispatch_log[#dispatch_log].name == "window.resize", "Floating window resize must use window.resize")
 
 local modes = { [1] = "lua:centered", [2] = "dwindle", [3] = "bogus", [4] = "lua:centered" }
 local ruled = {}
@@ -267,9 +319,21 @@ end
 package.preload["pangu.layouts"] = function()
   return { center_active = function() end, schedule_scan = function() end }
 end
+local layout_events = {}
 hl = {
   get_workspace = function(id)
     return live[id]
+  end,
+  get_active_workspace = function()
+    return live[4]
+  end,
+  dsp = {
+    event = function(payload)
+      return payload
+    end,
+  },
+  dispatch = function(payload)
+    layout_events[#layout_events + 1] = payload
   end,
   on = function(event, callback)
     handlers[event] = callback
@@ -294,7 +358,7 @@ package.preload["pangu.primary"] = function()
     end,
   }
 end
-dofile(source .. "/layout_modes.lua")
+local layout_modes_mod = dofile(source .. "/layout_modes.lua")
 assert(modes[1] == "lua:centered", "A live-primary centered mode was deleted on restore")
 assert(modes[2] == "dwindle")
 assert(modes[3] == nil, "An invalid layout mode target was not discarded")
@@ -311,4 +375,35 @@ live[4].tiled_layout = "dwindle"
 live[4].monitor.name = "primary"
 handlers["workspace.move_to_monitor"](live[4])
 assert(#ruled == 5 and ruled[5].layout == "lua:centered" and ruled[5].enabled == true, "Fresh rule was not recreated on return")
+
+live[1].tiled_layout = "dwindle"
+hl.get_active_workspace = function()
+  return live[1]
+end
+layout_modes_mod.set("lua:centered")
+assert(layout_events[#layout_events] == "layoutmode,primary,lua:centered", "layout_modes.set must emit layoutmode custom event")
+
+local floated_classes = {}
+package.loaded["pangu.generated"] = nil
+package.loaded["pangu.popout"] = nil
+package.loaded["pangu.shell_rules"] = nil
+package.preload["pangu.generated"] = function()
+  return { theme = { translucent_opacity = 0.9, translucent_apps = {} }, tearing = { enable = false, class_patterns = {} } }
+end
+package.preload["pangu.popout"] = function()
+  return { scratchpad_size = { x = 900, y = 700 } }
+end
+package.preload["pangu.shell_rules"] = function()
+  return true
+end
+hl = {
+  window_rule = function(rule)
+    if rule.float and rule.match and rule.match.class then
+      floated_classes[rule.match.class] = true
+    end
+  end,
+}
+dofile(source .. "/windowrules.lua")
+assert(floated_classes["^zenity$"], "zenity dialogs must float")
+assert(floated_classes["^xdg-desktop-portal-hyprland$"], "xdg-desktop-portal-hyprland dialogs must float")
 print("Hyprland syntax, workspace isolation, floating resize and layout-mode restore tests passed")
