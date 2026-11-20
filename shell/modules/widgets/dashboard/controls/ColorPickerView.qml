@@ -36,7 +36,7 @@ Item {
             return val.replace("#", "").toUpperCase();
         }
         const resolved = Colors.resolve(val);
-        return resolved ? resolved.toString().replace("#", "").toUpperCase().slice(0, 6) : "000000";
+        return resolved ? Colors.toHex(resolved).replace("#", "").toUpperCase() : "000000";
     }
 
     ColumnLayout {
@@ -141,14 +141,16 @@ Item {
                         }
                     }
 
-                    Keys.onReturnPressed: {
+                    function commitHex() {
                         let hex = text.trim();
                         if (hex.length >= 6) {
                             root.colorSelected("#" + hex.toUpperCase());
                         }
                         focus = false;
                     }
-                    Keys.onEnterPressed: Keys.onReturnPressed(event)
+
+                    Keys.onReturnPressed: commitHex()
+                    Keys.onEnterPressed: commitHex()
                     Keys.onEscapePressed: event => {
                         root.closed();
                         event.accepted = true;

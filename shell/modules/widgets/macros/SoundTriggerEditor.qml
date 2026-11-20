@@ -398,6 +398,7 @@ ColumnLayout {
             MouseArea {
                 anchors.fill: parent
                 enabled: root.hasSample && root.clipDuration > 0
+                preventStealing: true
                 cursorShape: Qt.SizeHorCursor
 
                 function secAt(px) {

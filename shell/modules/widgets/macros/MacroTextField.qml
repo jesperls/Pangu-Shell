@@ -9,6 +9,7 @@ StyledRect {
     property string value: ""
     property string placeholder: ""
     property bool readOnly: false
+    readonly property alias currentText: input.text
     signal textEdited(string value)
 
     variant: input.activeFocus ? "focus" : "common"

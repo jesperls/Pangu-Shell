@@ -383,11 +383,13 @@ ColumnLayout {
                 size: 32
                 iconSize: 14
                 icon: Icons.plus
-                tone: MacroUtils.normalizeHexColor(root.hexInputText) !== "" ? "primary" : "common"
+                tone: MacroUtils.normalizeHexColor(hexField.currentText) !== "" ? "primary" : "common"
                 tooltip: qsTr("Add hex color")
                 onClicked: {
-                    if (root.addHexColor(hexField.value))
+                    if (root.addHexColor(hexField.currentText)) {
                         root.hexInputText = "";
+                        hexField.value = "";
+                    }
                 }
             }
 

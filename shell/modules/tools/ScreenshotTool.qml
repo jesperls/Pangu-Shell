@@ -118,12 +118,15 @@ PanelWindow {
         }
     }
 
+    property int _freezeSeq: 0
+
     Connections {
         target: Screenshot
         function onMonitorScreenshotReady(monitorName, path) {
             if (monitorName === screenshotPopup.targetScreen.name) {
+                screenshotPopup._freezeSeq++;
                 previewImage.source = "";
-                previewImage.source = "file://" + path;
+                previewImage.source = "file://" + encodeURI(path).replace(/#/g, "%23").replace(/\?/g, "%3F") + "?seq=" + screenshotPopup._freezeSeq;
                 screenshotPopup.state = "active";
                 
                 Screenshot.selectionW = 0;
@@ -177,6 +180,7 @@ PanelWindow {
             Image {
                 mipmap: true
                 id: previewImage
+                cache: false
                 fillMode: Image.Stretch
                 anchors.fill: parent
                 

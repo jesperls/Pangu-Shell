@@ -163,7 +163,12 @@ Rectangle {
                     icon: modelData.icon
                     tooltip: modelData.label
                     tone: root.step.type === modelData.type ? "primary" : "ghost"
-                    onClicked: root.stepEdited(root.withField(root.step, "type", modelData.type))
+                    onClicked: {
+                        const updated = root.withField(root.step, "type", modelData.type);
+                        if (modelData.type === "click" && !updated.button)
+                            updated.button = "left";
+                        root.stepEdited(updated);
+                    }
                 }
             }
         }

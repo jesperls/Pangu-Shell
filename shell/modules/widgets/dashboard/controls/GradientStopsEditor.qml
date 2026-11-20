@@ -484,7 +484,7 @@ Item {
                                     let newStops = root.stops.slice();
                                     newStops.splice(root.selectedStopIndex, 1);
                                     root.updateStops(newStops);
-                                    root.selectedStopIndex = Math.min(root.selectedStopIndex, root.stops.length - 2);
+                                    root.selectedStopIndex = Math.max(0, Math.min(root.selectedStopIndex, newStops.length - 1));
                                 }
                             }
 

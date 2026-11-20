@@ -285,14 +285,14 @@ Rectangle {
                         return Icons.speakerLow;
                     return Icons.speakerHigh;
                 }
-                value: Audio.sink?.audio?.volume ?? 0
+                value: Math.min(1.0, (Audio.sink?.audio?.volume ?? 0) / Math.max(0.01, Audio.hardMaxValue))
                 accentColor: Audio.sink?.audio?.muted ? Colors.outline : Styling.srItem("overprimary")
                 isToggleable: true
                 isToggled: !(Audio.sink?.audio?.muted ?? false)
 
                 onControlValueChanged: newValue => {
                     if (Audio.sink?.audio) {
-                        Audio.sink.audio.volume = newValue;
+                        Audio.sink.audio.volume = newValue * Audio.hardMaxValue;
                     }
                 }
 

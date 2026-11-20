@@ -165,6 +165,8 @@ PanelWindow {
         }
     }
 
+    onVisibleChanged: if (!visible) pickMouse.selecting = false
+
     Shortcut {
         sequence: "Escape"
         enabled: GlobalStates.mousePickActive

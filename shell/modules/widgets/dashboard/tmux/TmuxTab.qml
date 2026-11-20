@@ -216,7 +216,7 @@ Item {
 
     function confirmRenameSession() {
         if (newSessionName.trim() !== "" && newSessionName !== sessionToRename) {
-            renameProcess.command = ["tmux", "rename-session", "-t", sessionToRename, newSessionName.trim()];
+            renameProcess.command = ["tmux", "rename-session", "-t", sessionToRename, "--", newSessionName.trim()];
             renameProcess.running = true;
         } else {
             cancelRenameMode();
@@ -236,7 +236,7 @@ Item {
 
     function createTmuxSession(sessionName) {
         const command = ["xdg-terminal-exec", "tmux"];
-        if (sessionName) command.push("new", "-s", sessionName);
+        if (sessionName) command.push("new", "-s", "--", sessionName);
         ApplicationLauncher.launchCommand(command);
         Visibilities.setActiveModule("");
     }

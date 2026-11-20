@@ -324,7 +324,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
 
         x: Math.min(idx1, idx2) * workspaceButtonWidth + activeWorkspaceMargin + widgetPadding
-        y: parent.height / 2 - implicitHeight / 2
 
         Behavior on activeWorkspaceMargin {
 
@@ -377,7 +376,6 @@ Item {
 
         anchors.horizontalCenter: parent.horizontalCenter
 
-        x: parent.width / 2 - implicitWidth / 2
         y: Math.min(idx1, idx2) * workspaceButtonWidth + activeWorkspaceMargin + widgetPadding
 
         Behavior on activeWorkspaceMargin {

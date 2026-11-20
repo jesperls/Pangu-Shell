@@ -298,8 +298,8 @@ Item {
                         
                     }
                     
-                    root.x = root.initX;
-                    root.y = root.initY;
+                    root.x = Qt.binding(() => root.useOverridePosition ? root.overrideX : root.initX);
+                    root.y = Qt.binding(() => root.useOverridePosition ? root.overrideY : root.initY);
                 } else if (windowData?.floating && (root.x !== root.initX || root.y !== root.initY)) {
                     const relativeX = root.x - root.xOffset;
                     const relativeY = root.y - root.yOffset;
@@ -314,13 +314,13 @@ Item {
                     root.overrideY = draggedY;
                     root.useOverridePosition = true;
                     
-                    root.x = draggedX;
-                    root.y = draggedY;
+                    root.x = Qt.binding(() => root.useOverridePosition ? root.overrideX : root.initX);
+                    root.y = Qt.binding(() => root.useOverridePosition ? root.overrideY : root.initY);
                     
                     resetOverrideTimer.restart();
                 } else {
-                    root.x = root.initX;
-                    root.y = root.initY;
+                    root.x = Qt.binding(() => root.useOverridePosition ? root.overrideX : root.initX);
+                    root.y = Qt.binding(() => root.useOverridePosition ? root.overrideY : root.initY);
                 }
             }
         }

@@ -210,6 +210,7 @@ Item {
                     AudioVolumeEntry {
                         Layout.fillWidth: true
                         node: root.showOutput ? Audio.sink : Audio.source
+                        visible: node !== null
                         icon: root.showOutput ? Icons.speakerHigh : Icons.mic
                         isMainDevice: true
                     }

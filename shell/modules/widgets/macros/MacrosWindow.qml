@@ -210,22 +210,22 @@ FloatingWindow {
         root.syncPreviewDraft();
     }
 
-    Shortcut {
-        sequence: "Escape"
-        enabled: GlobalStates.macrosWindowVisible && !GlobalStates.mousePickActive
-        context: Qt.WindowShortcut
-        onActivated: {
+    StyledRect {
+        id: windowRoot
+        anchors.fill: parent
+        variant: "bg"
+        radius: 0
+        focus: true
+
+        Keys.onEscapePressed: event => {
+            if (!GlobalStates.macrosWindowVisible || GlobalStates.mousePickActive)
+                return;
             if (root.recording)
                 root.recording = false;
             else
                 root.close();
+            event.accepted = true;
         }
-    }
-
-    StyledRect {
-        anchors.fill: parent
-        variant: "bg"
-        radius: 0
 
         Item {
             id: focusCatcher

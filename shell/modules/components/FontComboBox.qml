@@ -179,7 +179,7 @@ Item {
                         }
                     }
 
-                    Keys.onEscapePressed: {
+                    Keys.onEscapePressed: event => {
                         if (text.length > 0) {
                             text = "";
                             root.filterText = "";
@@ -187,6 +187,7 @@ Item {
                         } else {
                             root.listExpanded = false;
                         }
+                        event.accepted = true;
                     }
                 }
             }

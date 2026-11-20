@@ -57,12 +57,13 @@ PanelWindow {
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     }
 
-    function loadClip(path) {
+    function loadClip(path, initialStatus) {
         root.clipPath = path;
         root.posterPath = "";
         root.startRatio = 0.0;
         root.endRatio = 1.0;
-        root.statusLabel = "";
+        root.statusLabel = initialStatus || "";
+        probeProcess.running = false;
         probeProcess.command = [root.scriptPath, "probe", path];
         probeProcess.running = true;
         hideTimer.restart();
@@ -102,8 +103,7 @@ PanelWindow {
                 root.processing = false;
                 const out = text.trim();
                 if (out !== "") {
-                    root.statusLabel = "Copied URI";
-                    root.loadClip(out);
+                    root.loadClip(out, "Copied URI");
                 } else {
                     root.statusLabel = "Failed";
                 }

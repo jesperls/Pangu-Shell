@@ -532,8 +532,8 @@ Item {
                                             windowDelegate.parent = windowDelegate.originalParent;
                                             windowDelegate.originalParent = null;
                                         }
-                                        windowDelegate.x = windowDelegate.initX;
-                                        windowDelegate.y = windowDelegate.initY;
+                                        windowDelegate.x = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseX : windowDelegate.initX);
+                                        windowDelegate.y = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseY : windowDelegate.initY);
                                         
                                     } else if ((windowDelegate.windowData && windowDelegate.windowData.floating !== undefined ? windowDelegate.windowData.floating : false) && (windowDelegate.x !== windowDelegate.initX || windowDelegate.y !== windowDelegate.initY)) {
                                         
@@ -560,8 +560,8 @@ Item {
                                         windowDelegate.overrideBaseY = relativeY;
                                         windowDelegate.useOverridePosition = true;
                                         
-                                        windowDelegate.x = relativeX;
-                                        windowDelegate.y = relativeY;
+                                        windowDelegate.x = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseX : windowDelegate.initX);
+                                        windowDelegate.y = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseY : windowDelegate.initY);
                                         
                                         resetOverrideTimer.restart();
                                     } else {
@@ -569,8 +569,8 @@ Item {
                                             windowDelegate.parent = windowDelegate.originalParent;
                                             windowDelegate.originalParent = null;
                                         }
-                                        windowDelegate.x = windowDelegate.initX;
-                                        windowDelegate.y = windowDelegate.initY;
+                                        windowDelegate.x = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseX : windowDelegate.initX);
+                                        windowDelegate.y = Qt.binding(() => windowDelegate.useOverridePosition ? windowDelegate.overrideBaseY : windowDelegate.initY);
                                     }
 
                                     root.draggingFromWorkspace = -1;

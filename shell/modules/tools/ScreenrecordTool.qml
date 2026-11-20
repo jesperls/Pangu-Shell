@@ -13,6 +13,18 @@ import qs.config
 PanelWindow {
     id: screenrecordPopup
 
+    screen: {
+        const focusedName = Compositor.focusedMonitor?.name ?? "";
+        const screens = Quickshell.screens;
+        if (focusedName) {
+            for (let i = 0; i < screens.length; i++) {
+                if (screens[i].name === focusedName)
+                    return screens[i];
+            }
+        }
+        return screens.length > 0 ? screens[0] : null;
+    }
+
     anchors {
         top: true
         bottom: true
@@ -113,6 +125,8 @@ PanelWindow {
 
         Screenshot.fetchWindows();
 
+        selectionRect = Qt.rect(0, 0, 0, 0);
+        selecting = false;
         screenrecordPopup.state = "active";
 
         if (modeGrid)
@@ -129,6 +143,8 @@ PanelWindow {
     }
 
     function close() {
+        selectionRect = Qt.rect(0, 0, 0, 0);
+        selecting = false;
         screenrecordPopup.state = "idle";
         GlobalStates.screenRecordToolVisible = false;
     }
@@ -140,8 +156,9 @@ PanelWindow {
             if (selectionRect.width > 0) {
                 var w = Math.round(selectionRect.width);
                 var h = Math.round(selectionRect.height);
-                var x = Math.round(selectionRect.x) + (screenrecordPopup.focusedMonitor?.x ?? screenrecordPopup.screen?.x ?? 0);
-                var y = Math.round(selectionRect.y) + (screenrecordPopup.focusedMonitor?.y ?? screenrecordPopup.screen?.y ?? 0);
+                var mon = screenrecordPopup.screen ? Compositor.monitorFor(screenrecordPopup.screen) : screenrecordPopup.focusedMonitor;
+                var x = Math.round(selectionRect.x) + (mon?.x ?? screenrecordPopup.screen?.x ?? 0);
+                var y = Math.round(selectionRect.y) + (mon?.y ?? screenrecordPopup.screen?.y ?? 0);
 
                 startCapture("region", w + "x" + h + "+" + x + "+" + y);
             }

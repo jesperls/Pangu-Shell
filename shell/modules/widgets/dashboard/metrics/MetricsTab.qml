@@ -890,7 +890,7 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 hoverEnabled: true
                                 onClicked: {
-                                    const newInterval = SystemResources.updateInterval + 100;
+                                    const newInterval = Math.min(60000, SystemResources.updateInterval + 100);
                                     SystemResources.updateInterval = newInterval;
                                     StateService.set("metricsRefreshInterval", newInterval);
                                 }

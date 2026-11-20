@@ -232,14 +232,14 @@ FocusScope {
 
                         Process {
                             id: commandProcess
-                            command: ["bash", "-c", delegateWrapper.actionModel.command || ""]
+                            command: ["bash", "-c", typeof delegateWrapper.actionModel.command === "string" ? delegateWrapper.actionModel.command : ""]
                             running: false
                         }
 
                         function triggerAction() {
                             if (!enabled) return;
                             root.actionTriggered(delegateWrapper.actionModel);
-                            if (delegateWrapper.actionModel.command) {
+                            if (typeof delegateWrapper.actionModel.command === "string" && delegateWrapper.actionModel.command.length > 0) {
                                 commandProcess.running = true;
                             }
                         }
