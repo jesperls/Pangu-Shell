@@ -172,18 +172,17 @@ def inspect_clip(path, trim_start=None, trim_end=None, peaks_count=96, do_autotr
     duration = samples.size / float(SAMPLE_RATE)
     if do_autotrim or trim_start is None or trim_end is None or trim_end <= trim_start:
         t0, t1 = auto_trim_bounds(samples)
-        if not do_autotrim and trim_start is not None and trim_end is not None and trim_end > trim_start:
-            t0, t1 = trim_start, trim_end
     else:
         t0 = max(0.0, min(float(trim_start), max(0.0, duration - MIN_CLIP_SEC)))
         t1 = max(t0 + MIN_CLIP_SEC, min(float(trim_end), duration))
     peaks = []
     if samples.size > 0 and peaks_count > 0:
         edges = np.linspace(0, samples.size, peaks_count + 1, dtype=int)
-        raw_peaks = [
-            float(np.max(np.abs(samples[edges[i] : max(edges[i] + 1, edges[i + 1])])))
-            for i in range(peaks_count)
-        ]
+        raw_peaks = []
+        for i in range(peaks_count):
+            a = int(edges[i])
+            b = min(samples.size, max(a + 1, int(edges[i + 1])))
+            raw_peaks.append(float(np.max(np.abs(samples[a:b]))) if a < b else 0.0)
         scale = max(max(raw_peaks, default=0.0), 1e-4)
         peaks = [round(min(1.0, p / scale), 3) for p in raw_peaks]
     s0 = max(0, min(samples.size, int(round(t0 * SAMPLE_RATE))))
@@ -520,6 +519,7 @@ def cmd_record(args):
     max_samples = int(round(float(args.max_seconds) * SAMPLE_RATE))
     chunk_bytes = HOP_SIZE * 2 * 4
     last_emit = 0.0
+    raw_tail = b""
     try:
         while not stop and total_samples < max_samples:
             assert proc.stdout is not None
@@ -531,11 +531,12 @@ def cmd_record(args):
             raw = os.read(proc.stdout.fileno(), chunk_bytes)
             if not raw:
                 break
-            if len(raw) % 2 == 1:
-                raw = raw[:-1]
-            if not raw:
+            buf = raw_tail + raw
+            even = (len(buf) // 2) * 2
+            raw_tail = buf[even:]
+            if even == 0:
                 continue
-            arr = np.frombuffer(raw, dtype=np.int16).copy()
+            arr = np.frombuffer(buf[:even], dtype=np.int16).copy()
             chunks.append(arr)
             total_samples += arr.size
             now = time.monotonic()
@@ -706,6 +707,9 @@ def cmd_monitor(args):
                 procs.pop(src, None)
                 raw_tails[src] = b""
 
+    retry_after = {"desktop": 0.0, "mic": 0.0}
+    retry_delay = {"desktop": 0.5, "mic": 0.5}
+
     try:
         while not stop:
             now = time.monotonic()
@@ -714,16 +718,27 @@ def cmd_monitor(args):
                 try:
                     st = os.stat(args.config)
                     if st.st_mtime_ns != last_mtime:
+                        next_by_source, cfg_tel = _compile_rules(args.config)
                         last_mtime = st.st_mtime_ns
-                        by_source, cfg_tel = _compile_rules(args.config)
+                        by_source = next_by_source
                         telemetry = bool(args.telemetry or cfg_tel)
+                        active_ids = {r.id for pair in by_source.values() for lst in pair for r in lst}
+                        rolling_scores = {k: v for k, v in rolling_scores.items() if k in active_ids}
+                        global_cooldown_until = {k: v for k, v in global_cooldown_until.items() if k in active_ids}
+                        for az in analyzers.values():
+                            az.state = {k: v for k, v in az.state.items() if k in active_ids}
                         sync_streams()
                 except FileNotFoundError:
                     pass
                 except Exception as exc:
                     print(f"sound_trigger: reload failed: {exc}", file=sys.stderr, flush=True)
 
-            sync_streams()
+            if any(
+                (bool(by_source[src][0] or by_source[src][1]) and src not in procs and now >= retry_after[src])
+                or (not (by_source[src][0] or by_source[src][1]) and src in procs)
+                for src in ("desktop", "mic")
+            ):
+                sync_streams()
             fds = {proc.stdout.fileno(): src for src, proc in procs.items() if proc.stdout is not None}
             if not fds:
                 time.sleep(0.15)
@@ -734,9 +749,16 @@ def cmd_monitor(args):
                 src = fds[fd]
                 chunk = os.read(fd, HOP_SIZE * 2 * 4)
                 if not chunk:
-                    procs[src].wait()
-                    procs.pop(src, None)
+                    proc = procs.pop(src, None)
+                    if proc is not None:
+                        if proc.stdout is not None:
+                            proc.stdout.close()
+                        proc.wait()
+                    raw_tails[src] = b""
+                    retry_after[src] = time.monotonic() + retry_delay[src]
+                    retry_delay[src] = min(10.0, retry_delay[src] * 2.0)
                     continue
+                retry_delay[src] = 0.5
                 buf = raw_tails[src] + chunk
                 even = (len(buf) // 2) * 2
                 raw_tails[src] = buf[even:]

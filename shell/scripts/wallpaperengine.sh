@@ -35,61 +35,84 @@ cmd_scan() {
 
         cached="$PREVIEW_CACHE_DIR/$(basename "$wall").jpg"
         if [ ! -f "$cached" ] || [ "$wall/$preview" -nt "$cached" ]; then
-            magick "$wall/$preview[0]" "$cached" 2>/dev/null || continue
+            local src_img="$wall/$preview"
+            if [[ "$preview" != *'['* && "$preview" != *']'* ]]; then
+                src_img="${src_img}[0]"
+            fi
+            magick "$src_img" "$cached" 2>/dev/null || continue
         fi
         echo "$wall|$cached|$title"
     done
 }
 
-gui_setting() {
-    jq -r "$1 | if . == null then empty else . end" "$GUI_CONFIG_DIR/settings.json" 2>/dev/null
-}
-
-gui_override() {
-    jq -r --arg bg "$wall_dir" ".overrides[\$bg]$1 | if . == null then empty else . end" \
-        "$GUI_CONFIG_DIR/wallpaper-overrides.json" 2>/dev/null
-}
-
 cmd_apply() {
-    wall_dir="$1"
+    local wall_dir="$1"
     local screen="$2"
 
     if ! command -v linux-wallpaperengine >/dev/null 2>&1; then
-        notify-send -e "Wallpaper Engine" "linux-wallpaperengine not found on PATH" -i dialog-error
+        command -v notify-send >/dev/null 2>&1 && notify-send -e "Wallpaper Engine" "linux-wallpaperengine not found on PATH" -i dialog-error || true
         exit 1
     fi
 
     local args=(--screen-root "$screen" --bg "$wall_dir")
+    local settings_file="$GUI_CONFIG_DIR/settings.json"
+    local overrides_file="$GUI_CONFIG_DIR/wallpaper-overrides.json"
+    [ -f "$settings_file" ] || settings_file=/dev/null
+    [ -f "$overrides_file" ] || overrides_file=/dev/null
 
-    local volume silent fps scaling assets_dir v
-    silent=$(gui_setting '.silent')
-    volume=$(gui_override '.volume')
-    [ -n "$volume" ] || volume=$(gui_setting '.volume')
+    local silent="" volume="" no_automute="" audio_proc="" fps="" disable_mouse="" disable_parallax="" disable_particles="" pause_fs="" scaling="" assets_dir=""
+    {
+        IFS= read -r -d '' silent || true
+        IFS= read -r -d '' volume || true
+        IFS= read -r -d '' no_automute || true
+        IFS= read -r -d '' audio_proc || true
+        IFS= read -r -d '' fps || true
+        IFS= read -r -d '' disable_mouse || true
+        IFS= read -r -d '' disable_parallax || true
+        IFS= read -r -d '' disable_particles || true
+        IFS= read -r -d '' pause_fs || true
+        IFS= read -r -d '' scaling || true
+        IFS= read -r -d '' assets_dir || true
+    } < <(
+        jq -jn --arg bg "$wall_dir" \
+            --slurpfile s "$settings_file" \
+            --slurpfile o "$overrides_file" '
+            ($s[0] // {}) as $set |
+            (($o[0] // {}).overrides[$bg] // {}) as $ov |
+            def pick($k): if $ov[$k] != null then $ov[$k] else $set[$k] end;
+            def fmt: if . == null then "" else tostring end;
+            [
+                ($set.silent | fmt),
+                (pick("volume") | fmt),
+                ($set.noAutomute | fmt),
+                (pick("audioProcessing") | fmt),
+                ($set.fps | fmt),
+                (pick("disableMouse") | fmt),
+                (pick("disableParallax") | fmt),
+                (pick("disableParticles") | fmt),
+                ($set.pauseOnFullscreen | fmt),
+                ((if $ov.scaling != null then $ov.scaling else $set.defaultScaling end) | fmt),
+                ($set.assetsDir | fmt)
+            ] | map(. + "\u0000") | add
+        ' 2>/dev/null || true
+    )
+
     if [ "$silent" = "true" ]; then
         args+=(--silent)
     elif [ -n "$volume" ]; then
         args+=(--volume "$volume")
     fi
-    [ "$(gui_setting '.noAutomute')" = "true" ] && args+=(--noautomute)
-    v=$(gui_override '.audioProcessing')
-    [ -n "$v" ] || v=$(gui_setting '.audioProcessing')
-    [ "$v" = "false" ] && args+=(--no-audio-processing)
-    fps=$(gui_setting '.fps')
+    [ "$no_automute" = "true" ] && args+=(--noautomute)
+    [ "$audio_proc" = "false" ] && args+=(--no-audio-processing)
     [ -n "$fps" ] && args+=(--fps "$fps")
-    v=$(gui_override '.disableMouse'); [ -n "$v" ] || v=$(gui_setting '.disableMouse')
-    [ "$v" = "true" ] && args+=(--disable-mouse)
-    v=$(gui_override '.disableParallax'); [ -n "$v" ] || v=$(gui_setting '.disableParallax')
-    [ "$v" = "true" ] && args+=(--disable-parallax)
-    v=$(gui_override '.disableParticles'); [ -n "$v" ] || v=$(gui_setting '.disableParticles')
-    [ "$v" = "true" ] && args+=(--disable-particles)
-    [ "$(gui_setting '.pauseOnFullscreen')" = "false" ] && args+=(--no-fullscreen-pause)
-    scaling=$(gui_override '.scaling')
-    [ -n "$scaling" ] || scaling=$(gui_setting '.defaultScaling')
+    [ "$disable_mouse" = "true" ] && args+=(--disable-mouse)
+    [ "$disable_parallax" = "true" ] && args+=(--disable-parallax)
+    [ "$disable_particles" = "true" ] && args+=(--disable-particles)
+    [ "$pause_fs" = "false" ] && args+=(--no-fullscreen-pause)
     if [ -n "$scaling" ] && [ "$scaling" != "default" ]; then
         args+=(--scaling "$scaling")
     fi
 
-    assets_dir=$(gui_setting '.assetsDir')
     if [ -z "$assets_dir" ]; then
         assets_dir="$HOME/.local/share/Steam/steamapps/common/wallpaper_engine/assets"
     fi

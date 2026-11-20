@@ -104,6 +104,9 @@ def insert(db, payload, mime, data_dir, max_items=200):
         raise
 
 
+MAX_PAYLOAD_BYTES = 50 * 1024 * 1024
+
+
 def capture():
     try:
         types = subprocess.run(['wl-paste', '--list-types'], capture_output=True, check=False, timeout=5)
@@ -112,7 +115,9 @@ def capture():
     if types.returncode:
         return None
     offered = types.stdout.decode().splitlines()
-    candidates = ['text/uri-list'] + [mime for mime in offered if mime.startswith('image/')]
+    preferred_images = ['image/png', 'image/webp', 'image/jpeg', 'image/gif']
+    other_images = [mime for mime in offered if mime.startswith('image/') and mime not in preferred_images]
+    candidates = ['text/uri-list'] + [m for m in preferred_images if m in offered] + other_images
     candidates += ['text/plain;charset=utf-8', 'text/plain']
     for mime in candidates:
         if mime not in offered:
@@ -122,6 +127,8 @@ def capture():
         except subprocess.TimeoutExpired:
             continue
         if result.returncode == 0:
+            if len(result.stdout) > MAX_PAYLOAD_BYTES:
+                return None
             return result.stdout, mime
     return None
 
@@ -137,7 +144,7 @@ def copy(db, item_id):
         payload = Path(path).read_bytes()
     else:
         payload = (row['full_content'] or '').encode()
-    subprocess.run(['wl-copy', '--type', row['mime_type']], input=payload, check=True)
+    subprocess.run(['wl-copy', '--type', row['mime_type']], input=payload, check=True, timeout=5)
 
 
 def cleanup(db, data_dir):

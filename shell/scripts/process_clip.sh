@@ -9,8 +9,15 @@ if [ -z "$mode" ] || [ -z "$in_file" ] || [ ! -f "$in_file" ]; then
     exit 1
 fi
 
-runtime_dir="${XDG_RUNTIME_DIR:-/tmp}/pangu/replay-thumbs"
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pangu/replay-thumbs"
 mkdir -p "$runtime_dir"
+
+copy_file_uri() {
+    local abs_path uri
+    abs_path="$(readlink -f -- "$1" 2>/dev/null || printf '%s' "$1")"
+    uri="$(python3 -c 'import urllib.parse, sys; print("file://" + urllib.parse.quote(sys.argv[1]))' "$abs_path" 2>/dev/null || printf 'file://%s' "$abs_path")"
+    printf '%s\r\n' "$uri" | wl-copy --type text/uri-list 2>/dev/null || true
+}
 
 probe_duration() {
     local dur
@@ -39,9 +46,9 @@ case "$mode" in
         start_sec="${3:-0}"
         end_sec="${4:-0}"
         base="${in_file%.*}"
-        out_file="${base}_trim_$(date +%H%M%S).mp4"
+        out_file="${base}_trim_$(date +%H%M%S)_$$.mp4"
         ffmpeg -y -v error -ss "$start_sec" -to "$end_sec" -i "$in_file" -c copy -movflags +faststart -- "$out_file"
-        printf 'file://%s\r\n' "$out_file" | wl-copy --type text/uri-list 2>/dev/null || true
+        copy_file_uri "$out_file"
         printf '%s\n' "$out_file"
         ;;
 
@@ -52,12 +59,11 @@ case "$mode" in
         clip_dur="$total_dur"
         trim_args=()
         if [ -n "$start_sec" ] && [ -n "$end_sec" ]; then
-            clip_dur="$(awk -v s="$start_sec" -v e="$end_sec" -v t="$total_dur" 'BEGIN {
-                d = (e + 0) - (s + 0);
-                if (d <= 0.2) d = t + 0;
-                printf "%.3f", d
-            }')"
-            trim_args=(-ss "$start_sec" -to "$end_sec")
+            valid_trim="$(awk -v s="$start_sec" -v e="$end_sec" 'BEGIN { d = (e + 0) - (s + 0); if (d > 0.2) printf "%.3f", d }')"
+            if [ -n "$valid_trim" ]; then
+                clip_dur="$valid_trim"
+                trim_args=(-ss "$start_sec" -to "$end_sec")
+            fi
         fi
         vbit="$(awk -v d="$clip_dur" 'BEGIN {
             target_kbits = 9.1 * 1024 * 8;
@@ -69,7 +75,7 @@ case "$mode" in
         maxbit="$(( vbit * 115 / 100 ))"
         bufbit="$(( vbit * 2 ))"
         base="${in_file%.*}"
-        out_file="${base}_discord_$(date +%H%M%S).mp4"
+        out_file="${base}_discord_$(date +%H%M%S)_$$.mp4"
 
         if ! ffmpeg -y -v error "${trim_args[@]}" -i "$in_file" \
             -vf "scale='min(1920,iw)':-2" \
@@ -80,7 +86,7 @@ case "$mode" in
                 -c:v libx264 -preset veryfast -b:v "${vbit}k" -maxrate "${maxbit}k" -bufsize "${bufbit}k" \
                 -c:a aac -b:a 128k -movflags +faststart -- "$out_file"
         fi
-        printf 'file://%s\r\n' "$out_file" | wl-copy --type text/uri-list 2>/dev/null || true
+        copy_file_uri "$out_file"
         printf '%s\n' "$out_file"
         ;;
 

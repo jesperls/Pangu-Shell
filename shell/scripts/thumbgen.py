@@ -21,7 +21,8 @@ def generate(source, destination):
         return True
     try:
         if source.suffix.lower() in IMAGE_EXTENSIONS:
-            command = ['magick', '-limit', 'thread', '1', str(source) + '[0]',
+            source_arg = str(source) if '[' in source.name or ']' in source.name else str(source) + '[0]'
+            command = ['magick', '-limit', 'thread', '1', source_arg,
                        '-auto-orient', '-resize', '320x200^', '-gravity', 'center',
                        '-extent', '320x200', '-quality', '85']
             render_atomic(command, destination, 15)
@@ -45,7 +46,8 @@ def main():
     parser.add_argument('fallback', nargs='?')
     parser.add_argument('--directory')
     args = parser.parse_args()
-    config = json.loads(Path(args.config).read_text())
+    config_path = Path(args.config)
+    config = json.loads(config_path.read_text()) if config_path.exists() else {}
     directory = args.directory or config.get('wallPath') or args.fallback
     if not directory:
         raise ValueError('Wallpaper directory is not configured')

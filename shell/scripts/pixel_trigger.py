@@ -131,7 +131,10 @@ def read_image_rgb(path: Path) -> np.ndarray:
                 break
         if w > 0 and h > 0 and bit_depth == 8 and color_type in (2, 6) and interlace == 0 and idat_parts:
             channels = 3 if color_type == 2 else 4
-            decompressed = zlib.decompress(b"".join(idat_parts))
+            try:
+                decompressed = zlib.decompress(b"".join(idat_parts))
+            except zlib.error:
+                decompressed = b""
             stride = 1 + w * channels
             if len(decompressed) == h * stride:
                 rows = np.frombuffer(decompressed, dtype=np.uint8).reshape((h, stride))
@@ -636,8 +639,9 @@ def cmd_monitor(args: argparse.Namespace) -> int:
         try:
             st = cfg_path.stat()
             if st.st_mtime_ns != last_mtime_ns:
+                next_rules, next_telemetry = load_config(cfg_path)
                 last_mtime_ns = st.st_mtime_ns
-                rules, telemetry_enabled = load_config(cfg_path)
+                rules, telemetry_enabled = next_rules, next_telemetry
                 active_ids = {r.id for r in rules}
                 states = {rid: s for rid, s in states.items() if rid in active_ids}
                 telemetry_snapshot = {rid: t for rid, t in telemetry_snapshot.items() if rid in active_ids}

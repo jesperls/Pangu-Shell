@@ -107,7 +107,10 @@ def operate(root, request):
             return {'id': key, 'revision': revision(content)}
         if action == 'create':
             key = str(uuid4())
-            title = request.get('title', '').strip() or 'Untitled Note'
+            raw_title = request.get('title', '')
+            if raw_title is not None and not isinstance(raw_title, str):
+                raise ValueError('Note title must be a string')
+            title = (raw_title or '').strip() or 'Untitled Note'
             markdown = bool(request.get('isMarkdown'))
             now = timestamp()
             index['notes'][key] = dict(title=title, created=now, modified=now, isMarkdown=markdown)
@@ -118,11 +121,14 @@ def operate(root, request):
             try:
                 write_index(root, index)
             except Exception:
-                path.unlink()
+                path.unlink(missing_ok=True)
                 raise
         elif action == 'rename':
             note_path(root, index, key)
-            title = request['title'].strip()
+            raw_title = request.get('title')
+            if not isinstance(raw_title, str):
+                raise ValueError('A note needs a title')
+            title = raw_title.strip()
             if not title:
                 raise ValueError('A note needs a title')
             index['notes'][key]['title'] = title
@@ -136,16 +142,19 @@ def operate(root, request):
             write_index(root, index)
         elif action == 'delete':
             path = note_path(root, index, key)
-            trash = root / 'trash'
-            trash.mkdir(exist_ok=True)
-            destination = trash / (str(uuid4()) + '-' + path.name)
-            os.replace(path, destination)
+            moved = None
+            if path.exists():
+                trash = root / 'trash'
+                trash.mkdir(exist_ok=True)
+                moved = trash / (str(uuid4()) + '-' + path.name)
+                os.replace(path, moved)
             del index['notes'][key]
             index['order'].remove(key)
             try:
                 write_index(root, index)
             except Exception:
-                os.replace(destination, path)
+                if moved is not None and moved.exists():
+                    os.replace(moved, path)
                 raise
         else:
             raise ValueError('Unknown notes operation')

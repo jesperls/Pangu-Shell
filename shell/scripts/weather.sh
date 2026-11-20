@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
 
 LOCATION="${1:-}"
-MAX_RETRIES=3
+MAX_RETRIES=2
 RETRY_DELAY=2
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/pangu"
 GEOIP_CACHE="$CACHE_DIR/geoip"
 GEOCODE_CACHE_DIR="$CACHE_DIR/geocode"
 GEOIP_TTL=86400
 GEOCODE_TTL=604800
+
+write_cache_atomic() {
+	local target="$1" content="$2" tmp
+	mkdir -p "$(dirname -- "$target")"
+	tmp=$(mktemp "$target.XXXXXX") || return 1
+	printf '%s' "$content" >"$tmp"
+	mv -- "$tmp" "$target"
+}
+
+cache_fresh() {
+	local file="$1" ttl="$2" mtime now
+	[[ -s "$file" ]] || return 1
+	mtime=$(stat -c %Y -- "$file" 2>/dev/null) || return 1
+	now=$(date +%s)
+	((now - mtime < ttl))
+}
 
 http_get() {
 	local url="$1"
@@ -20,15 +36,17 @@ http_get() {
 			printf '%s\n' "$response"
 			return 0
 		fi
+		if [[ $attempt -lt $MAX_RETRIES ]]; then
+			sleep "$RETRY_DELAY"
+		fi
 		attempt=$((attempt + 1))
-		sleep $RETRY_DELAY
 	done
 
 	return 1
 }
 
 get_geoip_coords() {
-	if [[ -f "$GEOIP_CACHE" ]] && (($(date +%s) - $(stat -c %Y "$GEOIP_CACHE") < GEOIP_TTL)); then
+	if cache_fresh "$GEOIP_CACHE" "$GEOIP_TTL"; then
 		cat "$GEOIP_CACHE"
 		return 0
 	fi
@@ -50,8 +68,7 @@ get_geoip_coords() {
 		return 1
 	fi
 
-	mkdir -p "$CACHE_DIR"
-	printf '%s' "$lat,$lon" >"$GEOIP_CACHE"
+	write_cache_atomic "$GEOIP_CACHE" "$lat,$lon" || true
 	printf '%s\n' "$lat,$lon"
 }
 
@@ -61,7 +78,7 @@ geocode_city() {
 	cache_key=$(printf '%s' "$city" | sha256sum | cut -d' ' -f1)
 	cache_file="$GEOCODE_CACHE_DIR/$cache_key"
 
-	if [[ -f "$cache_file" ]] && (($(date +%s) - $(stat -c %Y "$cache_file") < GEOCODE_TTL)); then
+	if cache_fresh "$cache_file" "$GEOCODE_TTL"; then
 		cat "$cache_file"
 		return 0
 	fi
@@ -86,8 +103,7 @@ geocode_city() {
 		return 1
 	fi
 
-	mkdir -p "$GEOCODE_CACHE_DIR"
-	printf '%s' "$lat,$lon" >"$cache_file"
+	write_cache_atomic "$cache_file" "$lat,$lon" || true
 	printf '%s\n' "$lat,$lon"
 }
 

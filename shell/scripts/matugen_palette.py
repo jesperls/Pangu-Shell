@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,18 +17,27 @@ def generate(image, template, base_config, scheme, mode, destination):
     os.close(fd_cfg)
     try:
         lines = []
+        replaced_in = False
+        replaced_out = False
         for line in Path(base_config).read_text().splitlines():
-            if line.startswith("input_path ="):
+            if re.match(r"^\s*input_path\s*=", line):
                 lines.append(f"input_path = {json.dumps(str(Path(template).resolve()))}")
-            elif line.startswith("output_path ="):
+                replaced_in = True
+            elif re.match(r"^\s*output_path\s*=", line):
                 lines.append(f"output_path = {json.dumps(tmp_out)}")
+                replaced_out = True
             else:
                 lines.append(line)
+        if not (replaced_in and replaced_out):
+            raise RuntimeError("matugen config missing input_path or output_path")
         Path(tmp_cfg).write_text("\n".join(lines) + "\n")
         subprocess.run(
             ["matugen", "image", image, "--source-color-index", "0", "-c", tmp_cfg, "-t", scheme, "-m", mode],
             check=True,
+            timeout=30,
         )
+        if Path(tmp_out).stat().st_size == 0:
+            raise RuntimeError("matugen produced an empty palette file")
         os.replace(tmp_out, dest)
     finally:
         for path in (tmp_out, tmp_cfg):

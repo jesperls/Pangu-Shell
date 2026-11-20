@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import colorsys
+import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -12,18 +12,44 @@ def cmd(*args, input=None):
     return subprocess.check_output(args, input=input)
 
 
+def parse_ppm_pixel(raw: bytes):
+    idx = 0
+    tokens = []
+    n = len(raw)
+    while len(tokens) < 4 and idx < n:
+        while idx < n and raw[idx] in b" \t\r\n":
+            idx += 1
+        if idx < n and raw[idx] == ord("#"):
+            while idx < n and raw[idx] != ord("\n"):
+                idx += 1
+            continue
+        start = idx
+        while idx < n and raw[idx] not in b" \t\r\n#":
+            idx += 1
+        if start < idx:
+            tokens.append(raw[start:idx])
+    if len(tokens) < 4 or tokens[0] != b"P6":
+        raise ValueError("Invalid PPM header")
+    idx += 1  # single whitespace byte after maxval
+    if idx + 3 > n:
+        raise ValueError("Truncated PPM pixel data")
+    return raw[idx], raw[idx + 1], raw[idx + 2]
+
+
 def main():
     for dep in ("grim", "slurp", "magick", "wl-copy", "notify-send"):
         if shutil.which(dep) is None:
-            subprocess.call(
-                [
-                    "notify-send",
-                    "Color Picker",
-                    f"Missing dependency: {dep}",
-                    "-u",
-                    "critical",
-                ]
-            )
+            print(f"Color picker missing dependency: {dep}", file=sys.stderr)
+            if shutil.which("notify-send"):
+                subprocess.call(
+                    [
+                        "notify-send",
+                        "Color Picker",
+                        f"Missing dependency: {dep}",
+                        "-u",
+                        "critical",
+                    ]
+                )
             sys.exit(1)
 
     selection = subprocess.run(["slurp", "-p"], capture_output=True, text=True)
@@ -32,13 +58,7 @@ def main():
         sys.exit(0)
 
     pixels = cmd("grim", "-g", coords, "-t", "ppm", "-")
-    rgb_str = cmd(
-        "magick", "-", "-format",
-        "%[fx:int(255*r)] %[fx:int(255*g)] %[fx:int(255*b)]",
-        "info:-", input=pixels,
-    ).decode()
-
-    r, g, b = map(int, rgb_str.split())
+    r, g, b = parse_ppm_pixel(pixels)
 
     hex_color = f"#{r:02X}{g:02X}{b:02X}"
     rgb_color = f"rgb({r}, {g}, {b})"
@@ -47,71 +67,72 @@ def main():
     h, s, v = colorsys.rgb_to_hsv(rn, gn, bn)
     hsv_color = f"hsv({round(h*360)}, {round(s*100)}%, {round(v*100)}%)"
 
-    with tempfile.TemporaryDirectory(prefix="pangu-color-") as preview:
-        icon = Path(preview) / "preview.png"
-        cmd("magick", "-size", "64x64", f"xc:{hex_color}", str(icon))
+    runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") / "pangu"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    icon = runtime_dir / "colorpicker-swatch.png"
+    cmd("magick", "-size", "64x64", f"xc:{hex_color}", str(icon))
 
-        subprocess.run(["wl-copy"], input=hex_color.encode(), check=True)
+    subprocess.run(["wl-copy"], input=hex_color.encode(), check=True)
 
-        proc = subprocess.Popen(
+    proc = subprocess.Popen(
+        [
+            "notify-send",
+            "Color Picked",
+            f"{hex_color} copied to clipboard",
+            "-i",
+            str(icon),
+            "-a",
+            "ColorPicker",
+            "-u",
+            "normal",
+            "--action=hex=Copy HEX",
+            "--action=rgb=Copy RGB",
+            "--action=hsv=Copy HSV",
+        ],
+        stdout=subprocess.PIPE,
+    )
+
+    action = proc.communicate()[0].decode().strip()
+
+    if action == "rgb":
+        subprocess.run(["wl-copy"], input=rgb_color.encode(), check=True)
+        subprocess.call(
             [
                 "notify-send",
-                "Color Picked",
-                f"{hex_color} copied to clipboard",
+                "Color Picker",
+                f"RGB copied: {rgb_color}",
                 "-i",
                 str(icon),
-                "-a",
-                "ColorPicker",
                 "-u",
-                "normal",
-                "--action=hex=Copy HEX",
-                "--action=rgb=Copy RGB",
-                "--action=hsv=Copy HSV",
-            ],
-            stdout=subprocess.PIPE,
+                "low",
+            ]
         )
-
-        action = proc.communicate()[0].decode().strip()
-
-        if action == "rgb":
-            subprocess.run(["wl-copy"], input=rgb_color.encode(), check=True)
-            subprocess.call(
-                [
-                    "notify-send",
-                    "Color Picker",
-                    f"RGB copied: {rgb_color}",
-                    "-i",
-                    str(icon),
-                    "-u",
-                    "low",
-                ]
-            )
-        elif action == "hsv":
-            subprocess.run(["wl-copy"], input=hsv_color.encode(), check=True)
-            subprocess.call(
-                [
-                    "notify-send",
-                    "Color Picker",
-                    f"HSV copied: {hsv_color}",
-                    "-i",
-                    str(icon),
-                    "-u",
-                    "low",
-                ]
-            )
-        elif action == "hex":
-            subprocess.run(["wl-copy"], input=hex_color.encode(), check=True)
-            subprocess.call(
-                [
-                    "notify-send",
-                    "Color Picker",
-                    f"HEX copied: {hex_color}",
-                    "-i",
-                    str(icon),
-                    "-u",
-                    "low",
-                ]
-            )
+    elif action == "hsv":
+        subprocess.run(["wl-copy"], input=hsv_color.encode(), check=True)
+        subprocess.call(
+            [
+                "notify-send",
+                "Color Picker",
+                f"HSV copied: {hsv_color}",
+                "-i",
+                str(icon),
+                "-u",
+                "low",
+            ]
+        )
+    elif action == "hex":
+        subprocess.run(["wl-copy"], input=hex_color.encode(), check=True)
+        subprocess.call(
+            [
+                "notify-send",
+                "Color Picker",
+                f"HEX copied: {hex_color}",
+                "-i",
+                str(icon),
+                "-u",
+                "low",
+            ]
+        )
 
 
 if __name__ == "__main__":

@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+notify() {
+	command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true
+}
+
 IMAGE_PATH="${1:-}"
 if [[ -z "$IMAGE_PATH" ]]; then
 	echo "ERROR: no image path given" >&2
@@ -9,13 +13,13 @@ if [[ -z "$IMAGE_PATH" ]]; then
 fi
 
 if [[ ! -f "$IMAGE_PATH" ]]; then
-	notify-send -u critical "Google Lens" "No image found at $IMAGE_PATH" >&2
+	notify -u critical "Google Lens" "No image found at $IMAGE_PATH" >&2
 	echo "ERROR: Image file not found at $IMAGE_PATH" >&2
 	exit 1
 fi
 
 if [[ ! -r "$IMAGE_PATH" ]]; then
-	notify-send -u critical "Google Lens" "Cannot read image at $IMAGE_PATH" >&2
+	notify -u critical "Google Lens" "Cannot read image at $IMAGE_PATH" >&2
 	echo "ERROR: Image file not readable at $IMAGE_PATH" >&2
 	exit 1
 fi
@@ -27,12 +31,12 @@ for cmd in curl jq xdg-open notify-send; do
 	fi
 done
 
-notify-send -u normal "Google Lens" "Uploading image for analysis..."
+notify -u normal "Google Lens" "Uploading image for analysis..."
 
 echo "Uploading image to uguu.se..." >&2
 
 set +e
-uploadResponse=$(curl -sS -f --max-time 30 -F "files[]=@$IMAGE_PATH" 'https://uguu.se/upload' 2>&1)
+uploadResponse=$(curl -sS -f --max-time 30 -F "files[]=@\"$IMAGE_PATH\"" 'https://uguu.se/upload' 2>&1)
 curlExit=$?
 set -e
 

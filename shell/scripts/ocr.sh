@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+notify() {
+    command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true
+}
 
 TMP_IMG="${2:-}"
 DEPS=(tesseract wl-copy notify-send)
@@ -7,8 +12,9 @@ if [ -z "$TMP_IMG" ]; then
 fi
 
 for dep in "${DEPS[@]}"; do
-    if ! command -v "$dep" &> /dev/null; then
-        notify-send "OCR Error" "Missing dependency: $dep" -u critical
+    if ! command -v "$dep" >/dev/null 2>&1; then
+        echo "OCR Error: Missing dependency: $dep" >&2
+        notify "OCR Error" "Missing dependency: $dep" -u critical
         exit 1
     fi
 done
@@ -26,28 +32,28 @@ if [ -z "$TMP_IMG" ]; then
     TMP_IMG=$(mktemp) || exit 1
     trap 'rm -f "$TMP_IMG"' EXIT
     if ! grim -g "$REGION" "$TMP_IMG" 2>/dev/null; then
-        notify-send "OCR Error" "Screenshot capture failed" -u critical
+        notify "OCR Error" "Screenshot capture failed" -u critical
         exit 1
     fi
 elif [ ! -r "$TMP_IMG" ]; then
-    notify-send "OCR Error" "Cannot read selected image" -u critical
+    notify "OCR Error" "Cannot read selected image" -u critical
     exit 1
 fi
 
 if ! TEXT=$(tesseract "$TMP_IMG" - -l "$LANGS" 2>/dev/null); then
-    notify-send "OCR Error" "Text recognition failed" -u critical
+    notify "OCR Error" "Text recognition failed" -u critical
     exit 1
 fi
 
-TEXT="${TEXT#"${TEXT%%[![:cntrl:]]*}"}"
+TEXT="${TEXT#"${TEXT%%[![:space:]]*}"}"
 TEXT="${TEXT%"${TEXT##*[![:space:]]}"}"
 
 if [ -n "$TEXT" ]; then
     if ! printf '%s' "$TEXT" | wl-copy; then
-        notify-send "OCR Error" "Could not copy text to clipboard" -u critical
+        notify "OCR Error" "Could not copy text to clipboard" -u critical
         exit 1
     fi
-    notify-send "OCR Result" "Text copied to clipboard" -i edit-paste
+    notify "OCR Result" "Text copied to clipboard" -i edit-paste
 else
-    notify-send "OCR Result" "No text detected" -u low -i dialog-error
+    notify "OCR Result" "No text detected" -u low -i dialog-error
 fi

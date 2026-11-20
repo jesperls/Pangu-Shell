@@ -135,31 +135,58 @@ class SystemMonitor:
         except Exception:
             return 0.0
 
-    def get_cpu_temp(self):
+    def _find_cpu_temp_path(self):
         base = "/sys/class/hwmon"
         if not os.path.exists(base):
-            return -1
-        for hwmon in os.listdir(base):
+            return None
+        preferred = ("tctl", "package id 0", "tdie", "cpu")
+        fallback = None
+        for hwmon in sorted(os.listdir(base)):
             path = os.path.join(base, hwmon)
             try:
                 with open(os.path.join(path, "name"), "r") as f:
                     name = f.read().strip()
-                if name in [
+                if name not in (
                     "coretemp",
                     "k10temp",
                     "zenpower",
                     "cpu_thermal",
                     "x86_pkg_temp",
                     "amd_energy",
-                ]:
-                    for item in os.listdir(path):
-                        if item.endswith("_input") and item.startswith("temp"):
-                            with open(os.path.join(path, item), "r") as f:
-                                val = int(f.read().strip())
-                                if 10000 < val < 120000:
-                                    return val // 1000
+                ):
+                    continue
+                for item in sorted(os.listdir(path)):
+                    if not (item.endswith("_input") and item.startswith("temp")):
+                        continue
+                    sensor = os.path.join(path, item)
+                    label_path = os.path.join(path, item[:-6] + "_label")
+                    label = ""
+                    if os.path.exists(label_path):
+                        try:
+                            with open(label_path, "r") as lf:
+                                label = lf.read().strip().lower()
+                        except Exception:
+                            pass
+                    if any(p in label for p in preferred):
+                        return sensor
+                    if fallback is None:
+                        fallback = sensor
             except Exception:
                 continue
+        return fallback
+
+    def get_cpu_temp(self):
+        if not hasattr(self, "_cpu_temp_path"):
+            self._cpu_temp_path = self._find_cpu_temp_path()
+        if not self._cpu_temp_path:
+            return -1
+        try:
+            with open(self._cpu_temp_path, "r") as f:
+                val = int(f.read().strip())
+                if 10000 < val < 120000:
+                    return val // 1000
+        except Exception:
+            self._cpu_temp_path = self._find_cpu_temp_path()
         return -1
 
     def get_mem(self):

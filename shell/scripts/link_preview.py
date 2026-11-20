@@ -34,6 +34,8 @@ def _resolves_public(hostname):
         infos = socket.getaddrinfo(hostname, None)
     except OSError:
         return False
+    if not infos:
+        return False
     return all(not _is_blocked_ip(info[4][0]) for info in infos)
 
 
@@ -73,8 +75,6 @@ def fetch_youtube_metadata(url, timeout=5):
             data = json.loads(response.read(256 * 1024).decode("utf-8"))
 
         thumbnail = data.get("thumbnail_url", "")
-        if "hqdefault" in thumbnail:
-            thumbnail = thumbnail.replace("hqdefault", "maxresdefault")
 
         return {
             "title": data.get("title", ""),
@@ -141,21 +141,29 @@ class MetaTagParser(HTMLParser):
             "type": "website",
             "favicon": "",
         }
+        self.in_head = False
+        self.svg_depth = 0
         self.in_title = False
         self.title_text = ""
         self.favicon_candidates = []
 
     def handle_starttag(self, tag, attrs):
         attrs_dict = dict(attrs)
+        tag = tag.lower()
 
-        if tag == "title":
+        if tag == "head":
+            self.in_head = True
+        elif tag == "svg":
+            self.svg_depth += 1
+
+        if tag == "title" and self.svg_depth == 0 and (self.in_head or not self.metadata["title"]):
             self.in_title = True
 
         if tag == "link":
-            rel = attrs_dict.get("rel", "")
-            href = attrs_dict.get("href", "")
-            sizes = attrs_dict.get("sizes", "")
-            link_type = attrs_dict.get("type", "")
+            rel = attrs_dict.get("rel") or ""
+            href = attrs_dict.get("href") or ""
+            sizes = attrs_dict.get("sizes") or ""
+            link_type = attrs_dict.get("type") or ""
 
             if rel and href and ("icon" in rel.lower()):
                 size = 0
@@ -183,7 +191,7 @@ class MetaTagParser(HTMLParser):
                     self.metadata["favicon"] = href
 
         if tag == "meta":
-            content = attrs_dict.get("content", "")
+            content = attrs_dict.get("content") or ""
 
             if "property" in attrs_dict and content:
                 prop = attrs_dict["property"]
@@ -218,7 +226,12 @@ class MetaTagParser(HTMLParser):
             self.title_text += data
 
     def handle_endtag(self, tag):
-        if tag == "title":
+        tag = tag.lower()
+        if tag == "head":
+            self.in_head = False
+        elif tag == "svg":
+            self.svg_depth = max(0, self.svg_depth - 1)
+        elif tag == "title" and self.in_title:
             self.in_title = False
             if not self.metadata["title"]:
                 self.metadata["title"] = self.title_text.strip()
@@ -249,7 +262,11 @@ def _safe_http_asset(candidate, base_url):
         return ""
     resolved = candidate if candidate.startswith(("http://", "https://")) else urljoin(base_url, candidate)
     parsed = urlparse(resolved)
-    return resolved if parsed.scheme in ("http", "https") and parsed.netloc else ""
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+    if not _resolves_public(parsed.hostname):
+        return ""
+    return resolved
 
 
 def fetch_preview(url, timeout=5):
@@ -291,8 +308,8 @@ def fetch_preview(url, timeout=5):
             if not _resolves_public(final_parsed.hostname):
                 return {"error": "Blocked address"}
 
-            content_type = response.headers.get("Content-Type", "")
-            if "text/html" not in content_type:
+            content_type = (response.headers.get("Content-Type") or "").lower()
+            if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
                 return {"error": "Not an HTML page"}
 
             html = response.read(500 * 1024).decode("utf-8", errors="ignore")
