@@ -119,7 +119,7 @@ Singleton {
         var userFile = colorPresetsDir + "/" + activeColorPreset + "/" + mode;
         var dest = Paths.cachePath("colors.json");
 
-        requestPalette(["bash", "-c", 'set -e; source=$1; [ -f "$source" ] || source=$2; tmp=$(mktemp "$3.XXXXXX"); trap \'rm -f "$tmp"\' EXIT; cp -- "$source" "$tmp"; mv -- "$tmp" "$3"', "pangu-preset", officialFile, userFile, dest]);
+        requestPalette(["bash", "-c", 'set -e; source=$1; [ -f "$source" ] || source=$2; mkdir -p -- "$(dirname -- "$3")"; tmp=$(mktemp "$3.XXXXXX"); trap \'rm -f "$tmp"\' EXIT; cp -- "$source" "$tmp"; mv -- "$tmp" "$3"', "pangu-preset", userFile, officialFile, dest]);
     }
 
     function setColorPreset(name) {
