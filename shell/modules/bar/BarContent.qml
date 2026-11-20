@@ -36,13 +36,7 @@ Item {
     readonly property string launcherPosition: (Config.bar && Config.bar.launcherPosition === "end" ? "end" : "start")
     readonly property bool islandsMode: (Config.bar && Config.bar.style === "islands")
 
-    onPinnedChanged: {
-        if (Config.bar && Config.bar.pinnedOnStartup !== pinned) {
-            Config.bar.pinnedOnStartup = pinned;
-        }
-    }
-
-    property bool pinned: (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true)
+    readonly property bool pinned: (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true)
 
     readonly property var compositorMonitor: Compositor.monitorFor(screen)
 
@@ -170,6 +164,8 @@ Item {
     readonly property int baseOuterMargin: barBg.outerMargin
 
     readonly property bool shadowsEnabled: Config.showBackground && (!actualContainBar || (Config.bar && Config.bar.keepBarShadow !== undefined ? Config.bar.keepBarShadow : false))
+    readonly property bool barOuterShadow: shadowsEnabled && (Config.theme?.shadowOpacity ?? 0) > 0
+    readonly property bool childShadowsEnabled: shadowsEnabled && !barOuterShadow // outer bar layer already casts the shadow
 
     readonly property var centerGap: (Config.bar && Config.bar.splitOnCenteredLayout !== undefined ? Config.bar.splitOnCenteredLayout : true) ? Compositor.gapFor(screenName) : null
     readonly property int splitGapPadding: (centerGap && centerGap.square) ? 0 : (Config.bar && Config.bar.splitGapPadding !== undefined ? Config.bar.splitGapPadding : 4)
@@ -256,7 +252,7 @@ Item {
 
         Item {
             id: bar
-            layer.enabled: root.shadowsEnabled && (Config.theme?.shadowOpacity ?? 0) > 0
+            layer.enabled: root.barOuterShadow
             layer.effect: Shadow {}
 
             anchors {
@@ -410,7 +406,7 @@ Item {
                             visible: root.showLauncherButton && root.launcherPosition !== "end"
                             startRadius: root.outerRadius
                             endRadius: (!root.showWorkspaces && !pinButtonLoader.visible && !root.dockAtStart) ? root.outerRadius : root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -418,6 +414,7 @@ Item {
                             id: workspacesItem
                             visible: root.showWorkspaces
                             orientation: root.orientation
+                            enableShadow: root.childShadowsEnabled
                             bar: QtObject {
                                 property var screen: root.screen
                             }
@@ -439,7 +436,7 @@ Item {
                                 background: StyledRect {
                                     id: pinButtonBg
                                     variant: root.pinned ? "primary" : "bg"
-                                    enableShadow: root.shadowsEnabled
+                                    enableShadow: root.childShadowsEnabled
                                     
                                     property real startRadius: ((!root.showLauncherButton || root.launcherPosition === "end") && !root.showWorkspaces) ? root.outerRadius : root.innerRadius
                                     property real endRadius: root.dockAtStart ? root.innerRadius : root.outerRadius
@@ -488,7 +485,7 @@ Item {
                                     }
                                 }
 
-                                onClicked: root.pinned = !root.pinned
+                                onClicked: if (Config.bar) Config.bar.pinnedOnStartup = !root.pinned
 
                                 StyledToolTip {
                                     show: pinButton.hovered
@@ -507,7 +504,7 @@ Item {
                                 bar: root
                                 orientation: root.orientation
                                 anchors.verticalCenter: parent.verticalCenter
-                                enableShadow: root.shadowsEnabled
+                                enableShadow: root.childShadowsEnabled
 
                                 startRadius: root.dockAtStart ? root.innerRadius : root.outerRadius
                                 endRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
@@ -543,7 +540,7 @@ Item {
                             visible: root.showPetsButton
                             startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -552,14 +549,14 @@ Item {
                             screenName: root.screenName
                             startRadius: (petsButton.visible || root.dockAtEnd) ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
                         SysTray {
                             id: sysTrayItem
                             bar: root
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: (!petsButton.visible && !toolsButton.visible && !root.dockAtEnd) ? root.outerRadius : root.innerRadius
                             endRadius: root.innerRadius
@@ -569,14 +566,14 @@ Item {
                             id: recordingIndicatorItem
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
                         ControlsButton {
                             id: controlsButton
                             bar: root
-                            layerEnabled: root.shadowsEnabled
+                            layerEnabled: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
@@ -585,7 +582,7 @@ Item {
                         Bar.BatteryIndicator {
                             id: batteryIndicator
                             bar: root
-                            layerEnabled: root.shadowsEnabled
+                            layerEnabled: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
@@ -599,7 +596,7 @@ Item {
                             Layout.preferredWidth: item ? item.implicitWidth : 0
                             sourceComponent: Clock {
                                 bar: root
-                                layerEnabled: root.shadowsEnabled
+                                layerEnabled: root.childShadowsEnabled
                                 flatStyle: root.flatButtons
                                 startRadius: root.innerRadius
                                 endRadius: root.innerRadius
@@ -611,7 +608,7 @@ Item {
                             screenName: root.screenName
                             startRadius: root.innerRadius
                             endRadius: (!root.showLauncherButton || root.launcherPosition !== "end") ? root.outerRadius : root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -621,7 +618,7 @@ Item {
                             visible: root.showLauncherButton && root.launcherPosition === "end"
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
                     }
@@ -642,13 +639,13 @@ Item {
                             startRadius: root.outerRadius
                             endRadius: root.innerRadius
                             vertical: true
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
                         SysTray {
                             bar: root
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
@@ -658,7 +655,7 @@ Item {
                             vertical: true
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -668,7 +665,7 @@ Item {
                             startRadius: root.innerRadius
                             endRadius: petsButtonVert.visible ? root.innerRadius : root.outerRadius
                             vertical: true
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -678,7 +675,7 @@ Item {
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             vertical: true
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -709,6 +706,7 @@ Item {
                                     id: workspacesVert
                                     visible: root.showWorkspaces
                                     orientation: root.orientation
+                                    enableShadow: root.childShadowsEnabled
                                     bar: QtObject {
                                         property var screen: root.screen
                                     }
@@ -730,7 +728,7 @@ Item {
                                         background: StyledRect {
                                             id: pinButtonVBg
                                             variant: root.pinned ? "primary" : "bg"
-                                            enableShadow: root.shadowsEnabled
+                                            enableShadow: root.childShadowsEnabled
                                         
                                             property real startRadius: root.innerRadius
                                             property real endRadius: root.integratedDockEnabled ? root.innerRadius : root.outerRadius
@@ -779,7 +777,7 @@ Item {
                                             }
                                         }
 
-                                        onClicked: root.pinned = !root.pinned
+                                        onClicked: if (Config.bar) Config.bar.pinnedOnStartup = !root.pinned
 
                                         StyledToolTip {
                                             show: pinButtonV.hovered
@@ -797,7 +795,7 @@ Item {
                                     Layout.preferredHeight: implicitHeight
                                     Layout.maximumHeight: implicitHeight
                                     Layout.fillHeight: true
-                                    enableShadow: root.shadowsEnabled
+                                    enableShadow: root.childShadowsEnabled
 
                                     startRadius: root.innerRadius
                                     endRadius: root.outerRadius
@@ -808,7 +806,7 @@ Item {
                         ControlsButton {
                             id: controlsButtonVert
                             bar: root
-                            layerEnabled: root.shadowsEnabled
+                            layerEnabled: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.outerRadius
                             endRadius: root.innerRadius
@@ -817,7 +815,7 @@ Item {
                         Bar.BatteryIndicator {
                             id: batteryIndicatorVert
                             bar: root
-                            layerEnabled: root.shadowsEnabled
+                            layerEnabled: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
@@ -826,7 +824,7 @@ Item {
                         Clock {
                             id: clockComponentVert
                             bar: root
-                            layerEnabled: root.shadowsEnabled
+                            layerEnabled: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
@@ -839,7 +837,7 @@ Item {
                             startRadius: root.innerRadius
                             endRadius: (!root.showLauncherButton || root.launcherPosition !== "end") ? root.outerRadius : root.innerRadius
                             vertical: true
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
 
@@ -851,7 +849,7 @@ Item {
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             vertical: true
-                            enableShadow: root.shadowsEnabled
+                            enableShadow: root.childShadowsEnabled
                             flatStyle: root.flatButtons
                         }
                     }
@@ -866,7 +864,7 @@ Item {
                 sourceComponent: Clock {
                     bar: root
                     flatStyle: root.flatButtons
-                    layerEnabled: root.shadowsEnabled
+                    layerEnabled: root.childShadowsEnabled
                     startRadius: root.innerRadius
                     endRadius: root.innerRadius
                 }

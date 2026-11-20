@@ -71,7 +71,7 @@ MouseArea {
 
         QsMenuOpener {
             id: menuOpener
-            menu: root.item.menu
+            menu: systrayPopup.isOpen ? root.item.menu : null
         }
 
         ScrollView {
@@ -131,7 +131,7 @@ MouseArea {
 
                             QsMenuOpener {
                                 id: subMenuOpener
-                                menu: modelData.hasChildren ? modelData : null
+                                menu: (systrayPopup.isOpen && submenuExpanded && modelData.hasChildren) ? modelData : null
                             }
 
                             Repeater {

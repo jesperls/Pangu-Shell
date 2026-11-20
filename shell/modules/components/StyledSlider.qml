@@ -29,7 +29,7 @@ Item {
     property bool isDragging: false
     property real dragPosition: 0.0
     readonly property real effectiveValue: isDragging ? dragPosition : value
-    property real progressRatio: effectiveValue
+    property real progressRatio: Math.max(0, Math.min(1, effectiveValue))
     property string tooltipText: `${Math.round(effectiveValue * 100)}%`
     property color progressColor: Styling.srItem("overprimary")
     property color progressColor2: progressColor
@@ -115,206 +115,216 @@ Item {
         GradientStop { position: 1.0; color: root.progressColor2 }
     }
 
-    RowLayout {
-        id: horizontalLayout
-        visible: !root.vertical
+    Loader {
+        id: horizontalLoader
         anchors.fill: parent
-        anchors.leftMargin: root.iconPos === "start" && root.icon !== "" ? iconText.width + spacing : 0
-        anchors.rightMargin: root.iconPos === "end" && root.icon !== "" ? iconText.width + spacing : 0
-        spacing: 4
+        active: !root.vertical
+        visible: active
+        sourceComponent: RowLayout {
+            id: horizontalLayout
+            anchors.fill: parent
+            anchors.leftMargin: root.iconPos === "start" && root.icon !== "" ? iconText.width + spacing : 0
+            anchors.rightMargin: root.iconPos === "end" && root.icon !== "" ? iconText.width + spacing : 0
+            spacing: 4
 
-        Item {
-            id: hSliderItem
-            Layout.fillWidth: true
-            Layout.preferredHeight: 4
-            Layout.alignment: Qt.AlignVCenter
-            opacity: root.sliderVisible ? 1 : 0
-            Behavior on opacity {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: Easing.OutQuart
-                }
-            }
-
-            Rectangle {
-                id: hDragHandle
-                anchors.verticalCenter: parent.verticalCenter
-                x: parent.width * root.animatedProgress - width / 2
-                width: root.isDragging ? 2 : 4
-                height: root.isDragging ? Math.max(20, root.thickness + 12) : Math.max(16, root.thickness + 8)
-                radius: Styling.radius(0)
-                color: Colors.overBackground
-                z: 2
-                Behavior on width {
-                    enabled: root.smoothDrag
+            Item {
+                id: hSliderItem
+                Layout.fillWidth: true
+                Layout.preferredHeight: 4
+                Layout.alignment: Qt.AlignVCenter
+                opacity: root.sliderVisible ? 1 : 0
+                Behavior on opacity {
+                    enabled: Styling.animDuration > 0
                     NumberAnimation {
                         duration: Styling.animDuration
                         easing.type: Easing.OutQuart
                     }
                 }
-                Behavior on height {
-                    enabled: root.smoothDrag
-                    NumberAnimation {
-                        duration: Styling.animDuration
-                        easing.type: Easing.OutQuart
+
+                Rectangle {
+                    id: hDragHandle
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: parent.width * root.animatedProgress - width / 2
+                    width: root.isDragging ? 2 : 4
+                    height: root.isDragging ? Math.max(20, root.thickness + 12) : Math.max(16, root.thickness + 8)
+                    radius: Styling.radius(0)
+                    color: Colors.overBackground
+                    z: 2
+                    Behavior on width {
+                        enabled: root.smoothDrag
+                        NumberAnimation {
+                            duration: Styling.animDuration
+                            easing.type: Easing.OutQuart
+                        }
+                    }
+                    Behavior on height {
+                        enabled: root.smoothDrag
+                        NumberAnimation {
+                            duration: Styling.animDuration
+                            easing.type: Easing.OutQuart
+                        }
                     }
                 }
-            }
 
-            Rectangle {
-                anchors.left: hDragHandle.right
-                anchors.leftMargin: root.handleSpacing
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                height: root.thickness
-                radius: Styling.radius(0) / 4
-                color: root.backgroundColor
-                z: 0
-            }
-
-            Loader {
-                active: root.wavy
-                anchors.left: parent.left
-                anchors.right: hDragHandle.left
-                anchors.rightMargin: root.handleSpacing
-                anchors.verticalCenter: parent.verticalCenter
-                height: hSliderItem.height * root.heightMultiplier
-                z: 1
-                sourceComponent: CarouselProgress {
-                    anchors.fill: parent
-                    frequency: root.wavyFrequency
-                    color: root.progressColor
-                    amplitudeMultiplier: root.wavyAmplitude
-                    lineWidth: root.thickness
-                    fullLength: hSliderItem.width
-                    active: root.playing
+                Rectangle {
+                    anchors.left: hDragHandle.right
+                    anchors.leftMargin: root.handleSpacing
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: root.thickness
+                    radius: Styling.radius(0) / 4
+                    color: root.backgroundColor
+                    z: 0
                 }
-            }
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: hDragHandle.left
-                anchors.rightMargin: root.handleSpacing
-                anchors.verticalCenter: parent.verticalCenter
-                height: root.thickness
-                radius: Styling.radius(0) / 4
-                color: root.gradientProgress ? "transparent" : root.progressColor
-                gradient: root.gradientProgress ? progressGradient : null
-                visible: !root.wavy
-                z: 1
-            }
 
-            StyledToolTip {
-                tooltipText: root.tooltipText
-                delay: 0
-                show: root.isDragging && root.tooltip && !root.vertical
-                x: hDragHandle.x + hDragHandle.width / 2 - width / 2
-                y: hDragHandle.y - height - 5
+                Loader {
+                    active: root.wavy
+                    anchors.left: parent.left
+                    anchors.right: hDragHandle.left
+                    anchors.rightMargin: root.handleSpacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: hSliderItem.height * root.heightMultiplier
+                    z: 1
+                    sourceComponent: CarouselProgress {
+                        anchors.fill: parent
+                        frequency: root.wavyFrequency
+                        color: root.progressColor
+                        amplitudeMultiplier: root.wavyAmplitude
+                        lineWidth: root.thickness
+                        fullLength: hSliderItem.width
+                        active: root.playing
+                    }
+                }
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: hDragHandle.left
+                    anchors.rightMargin: root.handleSpacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: root.thickness
+                    radius: Styling.radius(0) / 4
+                    color: root.gradientProgress ? "transparent" : root.progressColor
+                    gradient: root.gradientProgress ? progressGradient : null
+                    visible: !root.wavy
+                    z: 1
+                }
+
+                StyledToolTip {
+                    tooltipText: root.tooltipText
+                    delay: 0
+                    show: root.isDragging && root.tooltip && !root.vertical
+                    x: hDragHandle.x + hDragHandle.width / 2 - width / 2
+                    y: hDragHandle.y - height - 5
+                }
             }
         }
     }
 
-    ColumnLayout {
-        id: verticalLayout
-        visible: root.vertical
+    Loader {
+        id: verticalLoader
         anchors.fill: parent
-        anchors.topMargin: root.iconPos === "start" && root.icon !== "" ? iconText.height + spacing : 0
-        anchors.bottomMargin: root.iconPos === "end" && root.icon !== "" ? iconText.height + spacing : 0
-        spacing: 4
+        active: root.vertical
+        visible: active
+        sourceComponent: ColumnLayout {
+            id: verticalLayout
+            anchors.fill: parent
+            anchors.topMargin: root.iconPos === "start" && root.icon !== "" ? iconText.height + spacing : 0
+            anchors.bottomMargin: root.iconPos === "end" && root.icon !== "" ? iconText.height + spacing : 0
+            spacing: 4
 
-        Item {
-            id: vSliderItem
-            Layout.fillHeight: true
-            Layout.preferredWidth: 4
-            Layout.alignment: Qt.AlignHCenter
-            opacity: root.sliderVisible ? 1 : 0
-            Behavior on opacity {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: Easing.OutQuart
-                }
-            }
-
-            Rectangle {
-                id: vDragHandle
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: parent.height * (1 - root.animatedProgress) - height / 2
-                height: root.isDragging ? 2 : 4
-                width: root.isDragging ? Math.max(20, root.thickness + 12) : Math.max(16, root.thickness + 8)
-                radius: Styling.radius(0)
-                color: Colors.overBackground
-                z: 2
-                Behavior on width {
-                    enabled: root.smoothDrag
+            Item {
+                id: vSliderItem
+                Layout.fillHeight: true
+                Layout.preferredWidth: 4
+                Layout.alignment: Qt.AlignHCenter
+                opacity: root.sliderVisible ? 1 : 0
+                Behavior on opacity {
+                    enabled: Styling.animDuration > 0
                     NumberAnimation {
                         duration: Styling.animDuration
                         easing.type: Easing.OutQuart
                     }
                 }
-                Behavior on height {
-                    enabled: root.smoothDrag
-                    NumberAnimation {
-                        duration: Styling.animDuration
-                        easing.type: Easing.OutQuart
+
+                Rectangle {
+                    id: vDragHandle
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: parent.height * (1 - root.animatedProgress) - height / 2
+                    height: root.isDragging ? 2 : 4
+                    width: root.isDragging ? Math.max(20, root.thickness + 12) : Math.max(16, root.thickness + 8)
+                    radius: Styling.radius(0)
+                    color: Colors.overBackground
+                    z: 2
+                    Behavior on width {
+                        enabled: root.smoothDrag
+                        NumberAnimation {
+                            duration: Styling.animDuration
+                            easing.type: Easing.OutQuart
+                        }
+                    }
+                    Behavior on height {
+                        enabled: root.smoothDrag
+                        NumberAnimation {
+                            duration: Styling.animDuration
+                            easing.type: Easing.OutQuart
+                        }
                     }
                 }
-            }
 
-            Rectangle {
-                anchors.top: parent.top
-                anchors.bottom: vDragHandle.top
-                anchors.bottomMargin: root.handleSpacing
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.thickness
-                radius: Styling.radius(0) / 4
-                color: root.backgroundColor
-                z: 0
-            }
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.bottom: vDragHandle.top
+                    anchors.bottomMargin: root.handleSpacing
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: root.thickness
+                    radius: Styling.radius(0) / 4
+                    color: root.backgroundColor
+                    z: 0
+                }
 
-            Loader {
-                active: root.wavy
-                anchors.top: vDragHandle.bottom
-                anchors.topMargin: root.handleSpacing
-                anchors.bottom: parent.bottom
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width * heightMultiplier
-                sourceComponent: Item {
-                    anchors.fill: parent
-                    CarouselProgress {
-                        anchors.centerIn: parent
-                        rotation: -90
-                        frequency: root.wavyFrequency
-                        color: root.progressColor
-                        amplitudeMultiplier: root.wavyAmplitude
-                        height: parent.width
-                        width: parent.height
-                        lineWidth: root.thickness
-                        fullLength: vSliderItem.height
-                        z: 1
-                        active: root.playing
+                Loader {
+                    active: root.wavy
+                    anchors.top: vDragHandle.bottom
+                    anchors.topMargin: root.handleSpacing
+                    anchors.bottom: parent.bottom
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width * root.heightMultiplier
+                    sourceComponent: Item {
+                        anchors.fill: parent
+                        CarouselProgress {
+                            anchors.centerIn: parent
+                            rotation: -90
+                            frequency: root.wavyFrequency
+                            color: root.progressColor
+                            amplitudeMultiplier: root.wavyAmplitude
+                            height: parent.width
+                            width: parent.height
+                            lineWidth: root.thickness
+                            fullLength: vSliderItem.height
+                            z: 1
+                            active: root.playing
+                        }
                     }
                 }
-            }
-            Rectangle {
-                anchors.top: vDragHandle.bottom
-                anchors.topMargin: root.handleSpacing
-                anchors.bottom: parent.bottom
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.thickness
-                radius: Styling.radius(0) / 4
-                color: root.gradientProgress ? "transparent" : root.progressColor
-                gradient: root.gradientProgress ? progressGradientVertical : null
-                visible: !root.wavy
-                z: 1
-            }
+                Rectangle {
+                    anchors.top: vDragHandle.bottom
+                    anchors.topMargin: root.handleSpacing
+                    anchors.bottom: parent.bottom
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: root.thickness
+                    radius: Styling.radius(0) / 4
+                    color: root.gradientProgress ? "transparent" : root.progressColor
+                    gradient: root.gradientProgress ? progressGradientVertical : null
+                    visible: !root.wavy
+                    z: 1
+                }
 
-            StyledToolTip {
-                tooltipText: root.tooltipText
-                delay: 0
-                show: root.isDragging && root.tooltip && root.vertical
-                x: vDragHandle.x + vDragHandle.width + 5
-                y: vDragHandle.y + vDragHandle.height / 2 - height / 2
+                StyledToolTip {
+                    tooltipText: root.tooltipText
+                    delay: 0
+                    show: root.isDragging && root.tooltip && root.vertical
+                    x: vDragHandle.x + vDragHandle.width + 5
+                    y: vDragHandle.y + vDragHandle.height / 2 - height / 2
+                }
             }
         }
     }
@@ -363,16 +373,17 @@ Item {
         z: 3
         preventStealing: true
         propagateComposedEvents: false
-        property var activeLayout: !root.vertical ? horizontalLayout : verticalLayout
-        property real layoutStart: !root.vertical ? activeLayout.x : activeLayout.y
-        property real layoutSize: !root.vertical ? activeLayout.width : activeLayout.height
+        property var activeLayout: !root.vertical ? horizontalLoader.item : verticalLoader.item
+        property real layoutStart: activeLayout ? (!root.vertical ? activeLayout.x : activeLayout.y) : 0
+        property real layoutSize: activeLayout ? (!root.vertical ? activeLayout.width : activeLayout.height) : 0
 
         function isInIconArea(mouseX, mouseY) {
             if (iconText.visible) {
+                const gap = activeLayout ? activeLayout.spacing : 4;
                 if (!root.vertical) {
-                    return (root.iconPos === "start" && mouseX < iconText.width + horizontalLayout.spacing) || (root.iconPos === "end" && mouseX > parent.width - iconText.width - horizontalLayout.spacing);
+                    return (root.iconPos === "start" && mouseX < iconText.width + gap) || (root.iconPos === "end" && mouseX > parent.width - iconText.width - gap);
                 } else {
-                    return (root.iconPos === "start" && mouseY < iconText.height + verticalLayout.spacing) || (root.iconPos === "end" && mouseY > parent.height - iconText.height - verticalLayout.spacing);
+                    return (root.iconPos === "start" && mouseY < iconText.height + gap) || (root.iconPos === "end" && mouseY > parent.height - iconText.height - gap);
                 }
             }
             return false;

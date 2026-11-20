@@ -227,16 +227,19 @@ ClippingRectangle {
         }
     }
 
-    ClippingRectangle {
+    Loader {
         anchors.fill: parent
-        radius: root.radius
-        topLeftRadius: root.topLeftRadius
-        topRightRadius: root.topRightRadius
-        bottomLeftRadius: root.bottomLeftRadius
-        bottomRightRadius: root.bottomRightRadius
-        color: "transparent"
-        border.color: Colors.resolve(borderData && borderData.length > 0 ? borderData[0] : "transparent")
-        border.width: root.explicitBorderWidth
-        visible: root.enableBorder && border.width > 0
+        active: root.enableBorder && root.explicitBorderWidth > 0
+
+        sourceComponent: ClippingRectangle {
+            radius: root.radius
+            topLeftRadius: root.topLeftRadius
+            topRightRadius: root.topRightRadius
+            bottomLeftRadius: root.bottomLeftRadius
+            bottomRightRadius: root.bottomRightRadius
+            color: "transparent"
+            border.color: Colors.resolve(root.borderData && root.borderData.length > 0 ? root.borderData[0] : "transparent")
+            border.width: root.explicitBorderWidth
+        }
     }
 }

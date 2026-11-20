@@ -20,13 +20,7 @@ Item {
     readonly property string screenName: screen?.name ?? ""
 
     readonly property bool keepHidden: Config.dock?.keepHidden ?? false
-    property bool pinned: Config.dock?.pinnedOnStartup ?? false
-
-    onPinnedChanged: {
-        if (Config.dock && Config.dock.pinnedOnStartup !== pinned) {
-            Config.dock.pinnedOnStartup = pinned;
-        }
-    }
+    readonly property bool pinned: Config.dock?.pinnedOnStartup ?? false
 
     readonly property string theme: Config.dock?.theme ?? "default"
     readonly property bool isFloating: theme === "floating"
@@ -442,7 +436,7 @@ Item {
                             }
                         }
 
-                        onClicked: root.pinned = !root.pinned
+                        onClicked: if (Config.dock) Config.dock.pinnedOnStartup = !root.pinned
 
                         StyledToolTip {
                             show: pinButton.hovered
@@ -573,7 +567,7 @@ Item {
                             }
                         }
 
-                        onClicked: root.pinned = !root.pinned
+                        onClicked: if (Config.dock) Config.dock.pinnedOnStartup = !root.pinned
 
                         StyledToolTip {
                             show: pinButtonV.hovered

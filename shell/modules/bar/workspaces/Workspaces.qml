@@ -28,6 +28,25 @@ Item {
     property real startRadius: radius
     property real endRadius: radius
     property bool flatStyle: Config.bar?.flatButtons ?? false
+    property bool enableShadow: false
+    property var _desktopEntryCache: ({})
+
+    function lookupDesktopEntry(windowClass) {
+        if (!windowClass)
+            return null;
+        if (Object.prototype.hasOwnProperty.call(_desktopEntryCache, windowClass))
+            return _desktopEntryCache[windowClass];
+        const entry = DesktopEntries.heuristicLookup(windowClass) || null;
+        _desktopEntryCache[windowClass] = entry;
+        return entry;
+    }
+
+    Connections {
+        target: AppSearch
+        function onListChanged() {
+            workspacesWidget._desktopEntryCache = {};
+        }
+    }
     
     property int baseSize: 36
     property int workspaceButtonSize: baseSize - widgetPadding * 2
@@ -163,7 +182,7 @@ Item {
         id: bgRect
         variant: workspacesWidget.flatStyle ? "transparent" : "bg"
         anchors.fill: parent
-        enableShadow: !workspacesWidget.flatStyle && Config.showBackground && (!effectiveContainBar || Config.bar.keepBarShadow)
+        enableShadow: !workspacesWidget.flatStyle && workspacesWidget.enableShadow
         
         topLeftRadius: workspacesWidget.startRadius
         topRightRadius: orientation === "vertical" ? workspacesWidget.startRadius : workspacesWidget.endRadius
@@ -199,483 +218,359 @@ Item {
         }
     }
 
-    Item {
-        id: rowLayout
-        visible: orientation === "horizontal"
-        z: 1
+    Component {
+        id: workspaceButtonDelegate
+        Button {
+            id: button
+            required property int index
+            property int workspaceValue: workspacesWidget.getWorkspaceId(index)
+            Layout.fillHeight: workspacesWidget.orientation === "horizontal"
+            Layout.fillWidth: workspacesWidget.orientation === "vertical"
+            width: workspacesWidget.workspaceButtonWidth
+            height: workspacesWidget.workspaceButtonWidth
+            onPressed: workspacesWidget.switchOnMonitor(`workspace ${workspaceValue}`)
 
+            background: Item {
+                id: workspaceButtonBackground
+                implicitWidth: workspacesWidget.workspaceButtonWidth
+                implicitHeight: workspacesWidget.workspaceButtonWidth
+                property var focusedWindow: {
+                    const windowsInThisWorkspace = Compositor.workspaceWindowsMap[button.workspaceValue] || [];
+                    if (windowsInThisWorkspace.length === 0)
+                        return null;
+                    return windowsInThisWorkspace.reduce((best, win) => {
+                        const bestFocus = (best && best.focusHistoryID !== undefined ? best.focusHistoryID : Infinity);
+                        const winFocus = (win && win.focusHistoryID !== undefined ? win.focusHistoryID : Infinity);
+                        return winFocus < bestFocus ? win : best;
+                    }, null);
+                }
+                readonly property string focusedWindowClass: focusedWindow?.class ?? ""
+                readonly property var focusedDesktopEntry: workspacesWidget.lookupDesktopEntry(focusedWindowClass)
+                property var mainAppIconSource: {
+                    if (focusedDesktopEntry && focusedDesktopEntry.icon) {
+                        return Quickshell.iconPath(focusedDesktopEntry.icon, "image-missing");
+                    }
+                    return Quickshell.iconPath(AppSearch.getCachedIcon(focusedWindowClass !== "" ? focusedWindowClass : undefined), "image-missing");
+                }
+
+                Text {
+                    opacity: Config.workspaces.alwaysShowNumbers || ((Config.workspaces.showNumbers && (!Config.workspaces.showAppIcons || !workspaceButtonBackground.focusedWindow || Config.workspaces.alwaysShowNumbers)) || (Config.workspaces.alwaysShowNumbers && !Config.workspaces.showAppIcons)) ? 1 : 0
+                    z: 3
+
+                    anchors.centerIn: parent
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.family: Config.theme.font
+                    font.pixelSize: workspacesWidget.workspaceLabelFontSize(text)
+                    text: `${button.workspaceValue}`
+                    elide: Text.ElideRight
+                    color: ((workspacesWidget.monitor && workspacesWidget.monitor.activeWorkspace ? workspacesWidget.monitor.activeWorkspace.id : undefined) == button.workspaceValue) ? Styling.srItem("primary") : (workspacesWidget.workspaceOccupied[button.index] ? Colors.overBackground : Colors.overSecondaryFixedVariant)
+
+                    Behavior on opacity {
+                        enabled: Styling.animDuration > 0
+                        NumberAnimation {
+                            duration: 150
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                }
+                Rectangle {
+                    opacity: (Config.workspaces.showNumbers || Config.workspaces.alwaysShowNumbers || (Config.workspaces.showAppIcons && workspaceButtonBackground.focusedWindow)) ? 0 : (((workspacesWidget.monitor && workspacesWidget.monitor.activeWorkspace ? workspacesWidget.monitor.activeWorkspace.id : undefined) == button.workspaceValue) || workspacesWidget.workspaceOccupied[button.index] ? 1 : 0.5)
+                    visible: opacity > 0
+                    anchors.centerIn: parent
+                    width: workspacesWidget.workspaceButtonWidth * 0.2
+                    height: width
+                    radius: width / 2
+                    color: ((workspacesWidget.monitor && workspacesWidget.monitor.activeWorkspace ? workspacesWidget.monitor.activeWorkspace.id : undefined) == button.workspaceValue) ? Styling.srItem("primary") : Colors.overBackground
+
+                    Behavior on opacity {
+                        enabled: Styling.animDuration > 0
+                        NumberAnimation {
+                            duration: 150
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                }
+                Item {
+                    anchors.centerIn: parent
+                    width: workspacesWidget.workspaceButtonWidth
+                    height: workspacesWidget.workspaceButtonWidth
+                    opacity: !Config.workspaces.showAppIcons ? 0 : (workspaceButtonBackground.focusedWindow && !Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? 1 : workspaceButtonBackground.focusedWindow ? workspacesWidget.workspaceIconOpacityShrinked : 0
+                    visible: opacity > 0
+                    IconImage {
+                        id: mainAppIcon
+                        anchors.bottom: parent.bottom
+                        anchors.right: parent.right
+                        anchors.bottomMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspacesWidget.workspaceButtonWidth - workspacesWidget.workspaceIconSize) / 2) : workspacesWidget.workspaceIconMarginShrinked
+                        anchors.rightMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspacesWidget.workspaceButtonWidth - workspacesWidget.workspaceIconSize) / 2) : workspacesWidget.workspaceIconMarginShrinked
+
+                        source: workspaceButtonBackground.mainAppIconSource
+                        implicitSize: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? workspacesWidget.workspaceIconSize : workspacesWidget.workspaceIconSizeShrinked
+
+                        Behavior on opacity {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: 150
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on anchors.bottomMargin {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: 150
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on anchors.rightMargin {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: 150
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on implicitSize {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: 150
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                    }
+
+                    Tinted {
+                        sourceItem: mainAppIcon
+                        anchors.fill: mainAppIcon
+                    }
+                }
+            }
+        }
+    }
+
+    Loader {
+        id: horizontalWorkspacesLoader
         anchors.fill: parent
-        anchors.margins: widgetPadding
+        active: workspacesWidget.orientation === "horizontal"
+        visible: active
+        sourceComponent: Item {
+            anchors.fill: parent
 
-        Repeater {
-            model: occupiedRanges
+            Item {
+                id: rowLayout
+                z: 1
+                anchors.fill: parent
+                anchors.margins: workspacesWidget.widgetPadding
+
+                Repeater {
+                    model: workspacesWidget.occupiedRanges
+
+                    StyledRect {
+                        variant: "focus"
+                        required property int index
+                        required property var modelData
+                        z: 1
+                        width: (modelData.end - modelData.start + 1) * workspacesWidget.workspaceButtonWidth
+                        height: workspacesWidget.workspaceButtonWidth
+                        radius: workspacesWidget.startRadius > 0 ? Math.max(workspacesWidget.startRadius - workspacesWidget.widgetPadding, 0) : 0
+                        opacity: Config.theme.srFocus.opacity
+                        x: modelData.start * workspacesWidget.workspaceButtonWidth
+                        y: 0
+
+                        Behavior on opacity {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on x {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on width {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                    }
+                }
+            }
 
             StyledRect {
-                variant: "focus"
-                required property int index
-                required property var modelData
-                z: 1
-                width: (modelData.end - modelData.start + 1) * workspaceButtonWidth
-                height: workspaceButtonWidth
+                id: activeHighlightH
+                variant: "primary"
+                z: 2
+                property real activeWorkspaceMargin: 4
+                property real idx1: workspacesWidget.workspaceIndexInGroup
+                property real idx2: workspacesWidget.workspaceIndexInGroup
 
-                radius: workspacesWidget.startRadius > 0 ? Math.max(workspacesWidget.startRadius - widgetPadding, 0) : 0
+                implicitWidth: Math.abs(idx1 - idx2) * workspacesWidget.workspaceButtonWidth + workspacesWidget.workspaceButtonWidth - activeWorkspaceMargin * 2
+                implicitHeight: workspacesWidget.workspaceButtonWidth - activeWorkspaceMargin * 2
 
-                opacity: Config.theme.srFocus.opacity
+                radius: {
+                    const activeWorkspaceId = (workspacesWidget.monitor && workspacesWidget.monitor.activeWorkspace ? workspacesWidget.monitor.activeWorkspace.id : undefined) || 1;
+                    const currentWorkspaceHasWindows = Compositor.workspaceOccupationMap[activeWorkspaceId];
+                    if (workspacesWidget.radius === 0)
+                        return 0;
+                    return currentWorkspaceHasWindows ? workspacesWidget.radius > 0 ? Math.max(workspacesWidget.radius - workspacesWidget.widgetPadding - activeWorkspaceMargin, 0) : 0 : implicitHeight / 2;
+                }
 
-                x: modelData.start * workspaceButtonWidth
-                y: 0
+                anchors.verticalCenter: parent.verticalCenter
+                x: Math.min(idx1, idx2) * workspacesWidget.workspaceButtonWidth + activeWorkspaceMargin + workspacesWidget.widgetPadding
 
-                Behavior on opacity {
+                Behavior on activeWorkspaceMargin {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
+                        duration: Styling.animDuration / 2
                         easing.type: Easing.OutQuad
                     }
                 }
-                Behavior on x {
+                Behavior on idx1 {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
-                        easing.type: Easing.OutQuad
+                        duration: Styling.animDuration / 3
+                        easing.type: Easing.OutSine
                     }
                 }
-                Behavior on width {
+                Behavior on idx2 {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
-                        easing.type: Easing.OutQuad
+                        duration: Styling.animDuration
+                        easing.type: Easing.OutSine
                     }
+                }
+            }
+
+            RowLayout {
+                id: rowLayoutNumbers
+                z: 3
+                spacing: 0
+                anchors.fill: parent
+                anchors.margins: workspacesWidget.widgetPadding
+                implicitHeight: workspacesWidget.workspaceButtonWidth
+
+                Repeater {
+                    model: workspacesWidget.effectiveWorkspaceCount
+                    delegate: workspaceButtonDelegate
                 }
             }
         }
     }
 
-    Item {
-        id: columnLayout
-        visible: orientation === "vertical"
-        z: 1
-
+    Loader {
+        id: verticalWorkspacesLoader
         anchors.fill: parent
-        anchors.margins: widgetPadding
+        active: workspacesWidget.orientation === "vertical"
+        visible: active
+        sourceComponent: Item {
+            anchors.fill: parent
 
-        Repeater {
-            model: occupiedRanges
+            Item {
+                id: columnLayout
+                z: 1
+                anchors.fill: parent
+                anchors.margins: workspacesWidget.widgetPadding
+
+                Repeater {
+                    model: workspacesWidget.occupiedRanges
+
+                    StyledRect {
+                        variant: "focus"
+                        required property int index
+                        required property var modelData
+                        z: 1
+                        width: workspacesWidget.workspaceButtonWidth
+                        height: (modelData.end - modelData.start + 1) * workspacesWidget.workspaceButtonWidth
+                        radius: workspacesWidget.startRadius > 0 ? Math.max(workspacesWidget.startRadius - workspacesWidget.widgetPadding, 0) : 0
+                        opacity: Config.theme.srFocus.opacity
+                        x: 0
+                        y: modelData.start * workspacesWidget.workspaceButtonWidth
+
+                        Behavior on opacity {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on y {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                        Behavior on height {
+                            enabled: Styling.animDuration > 0
+                            NumberAnimation {
+                                duration: Math.max(0, Styling.animDuration - 100)
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+                    }
+                }
+            }
 
             StyledRect {
-                variant: "focus"
-                required property int index
-                required property var modelData
-                z: 1
-                width: workspaceButtonWidth
-                height: (modelData.end - modelData.start + 1) * workspaceButtonWidth
+                id: activeHighlightV
+                variant: "primary"
+                z: 2
+                property real activeWorkspaceMargin: 4
+                property real idx1: workspacesWidget.workspaceIndexInGroup
+                property real idx2: workspacesWidget.workspaceIndexInGroup
 
-                radius: workspacesWidget.startRadius > 0 ? Math.max(workspacesWidget.startRadius - widgetPadding, 0) : 0
+                implicitWidth: workspacesWidget.workspaceButtonWidth - activeWorkspaceMargin * 2
+                implicitHeight: Math.abs(idx1 - idx2) * workspacesWidget.workspaceButtonWidth + workspacesWidget.workspaceButtonWidth - activeWorkspaceMargin * 2
 
-                opacity: Config.theme.srFocus.opacity
+                radius: {
+                    const activeWorkspaceId = (workspacesWidget.monitor && workspacesWidget.monitor.activeWorkspace ? workspacesWidget.monitor.activeWorkspace.id : undefined) || 1;
+                    const currentWorkspaceHasWindows = Compositor.workspaceOccupationMap[activeWorkspaceId];
+                    if (workspacesWidget.radius === 0)
+                        return 0;
+                    return currentWorkspaceHasWindows ? workspacesWidget.radius > 0 ? Math.max(workspacesWidget.radius - workspacesWidget.widgetPadding - activeWorkspaceMargin, 0) : 0 : implicitWidth / 2;
+                }
 
-                x: 0
-                y: modelData.start * workspaceButtonWidth
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: Math.min(idx1, idx2) * workspacesWidget.workspaceButtonWidth + activeWorkspaceMargin + workspacesWidget.widgetPadding
 
-                Behavior on opacity {
+                Behavior on activeWorkspaceMargin {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
+                        duration: Styling.animDuration / 2
                         easing.type: Easing.OutQuad
                     }
                 }
-                Behavior on y {
+                Behavior on idx1 {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
-                        easing.type: Easing.OutQuad
+                        duration: Styling.animDuration / 3
+                        easing.type: Easing.OutSine
                     }
                 }
-                Behavior on height {
+                Behavior on idx2 {
                     enabled: Styling.animDuration > 0
                     NumberAnimation {
-                        duration: Math.max(0, Styling.animDuration - 100)
-                        easing.type: Easing.OutQuad
+                        duration: Styling.animDuration
+                        easing.type: Easing.OutSine
                     }
                 }
             }
-        }
-    }
 
-    StyledRect {
-        id: activeHighlightH
-        variant: "primary"
-        visible: orientation === "horizontal"
-        z: 2
-        property real activeWorkspaceMargin: 4
-        property real idx1: workspaceIndexInGroup
-        property real idx2: workspaceIndexInGroup
+            ColumnLayout {
+                id: columnLayoutNumbers
+                z: 3
+                spacing: 0
+                anchors.fill: parent
+                anchors.margins: workspacesWidget.widgetPadding
+                implicitWidth: workspacesWidget.workspaceButtonWidth
 
-        implicitWidth: Math.abs(idx1 - idx2) * workspaceButtonWidth + workspaceButtonWidth - activeWorkspaceMargin * 2
-        implicitHeight: workspaceButtonWidth - activeWorkspaceMargin * 2
-
-        radius: {
-            const activeWorkspaceId = (monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1;
-            const currentWorkspaceHasWindows = Compositor.workspaceOccupationMap[activeWorkspaceId];
-            if (workspacesWidget.radius === 0)
-                return 0;
-            return currentWorkspaceHasWindows ? workspacesWidget.radius > 0 ? Math.max(workspacesWidget.radius - parent.widgetPadding - activeWorkspaceMargin, 0) : 0 : implicitHeight / 2;
-        }
-
-        anchors.verticalCenter: parent.verticalCenter
-
-        x: Math.min(idx1, idx2) * workspaceButtonWidth + activeWorkspaceMargin + widgetPadding
-
-        Behavior on activeWorkspaceMargin {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration / 2
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on idx1 {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration / 3
-                easing.type: Easing.OutSine
-            }
-        }
-        Behavior on idx2 {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: Easing.OutSine
-            }
-        }
-    }
-
-    StyledRect {
-        id: activeHighlightV
-        variant: "primary"
-        visible: orientation === "vertical"
-        z: 2
-        property real activeWorkspaceMargin: 4
-        property real idx1: workspaceIndexInGroup
-        property real idx2: workspaceIndexInGroup
-
-        implicitWidth: workspaceButtonWidth - activeWorkspaceMargin * 2
-        implicitHeight: Math.abs(idx1 - idx2) * workspaceButtonWidth + workspaceButtonWidth - activeWorkspaceMargin * 2
-
-        radius: {
-            const activeWorkspaceId = (monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) || 1;
-            const currentWorkspaceHasWindows = Compositor.workspaceOccupationMap[activeWorkspaceId];
-            if (workspacesWidget.radius === 0)
-                return 0;
-            return currentWorkspaceHasWindows ? workspacesWidget.radius > 0 ? Math.max(workspacesWidget.radius - parent.widgetPadding - activeWorkspaceMargin, 0) : 0 : implicitWidth / 2;
-        }
-
-        anchors.horizontalCenter: parent.horizontalCenter
-
-        y: Math.min(idx1, idx2) * workspaceButtonWidth + activeWorkspaceMargin + widgetPadding
-
-        Behavior on activeWorkspaceMargin {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration / 2
-                easing.type: Easing.OutQuad
-            }
-        }
-        Behavior on idx1 {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration / 3
-                easing.type: Easing.OutSine
-            }
-        }
-        Behavior on idx2 {
-
-            enabled: Styling.animDuration > 0
-
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: Easing.OutSine
-            }
-        }
-    }
-
-    RowLayout {
-        id: rowLayoutNumbers
-        visible: orientation === "horizontal"
-        z: 3
-
-        spacing: 0
-        anchors.fill: parent
-        anchors.margins: widgetPadding
-        implicitHeight: workspaceButtonWidth
-
-        Repeater {
-            model: effectiveWorkspaceCount
-
-            Button {
-                id: button
-                property int workspaceValue: getWorkspaceId(index)
-                Layout.fillHeight: true
-                onPressed: workspacesWidget.switchOnMonitor(`workspace ${workspaceValue}`)
-                width: workspaceButtonWidth
-
-                background: Item {
-                    id: workspaceButtonBackground
-                    implicitWidth: workspaceButtonWidth
-                    implicitHeight: workspaceButtonWidth
-                    property var focusedWindow: {
-                        const windowsInThisWorkspace = Compositor.workspaceWindowsMap[button.workspaceValue] || [];
-                        if (windowsInThisWorkspace.length === 0)
-                            return null;
-                        return windowsInThisWorkspace.reduce((best, win) => {
-                            const bestFocus = (best && best.focusHistoryID !== undefined ? best.focusHistoryID : Infinity);
-                            const winFocus = (win && win.focusHistoryID !== undefined ? win.focusHistoryID : Infinity);
-                            return winFocus < bestFocus ? win : best;
-                        }, null);
-                    }
-                    readonly property string focusedWindowClass: focusedWindow?.class ?? ""
-                    readonly property var focusedDesktopEntry: focusedWindowClass !== "" ? DesktopEntries.heuristicLookup(focusedWindowClass) : null
-                    property var mainAppIconSource: {
-                        if (focusedDesktopEntry && focusedDesktopEntry.icon) {
-                            return Quickshell.iconPath(focusedDesktopEntry.icon, "image-missing");
-                        }
-                        return Quickshell.iconPath(AppSearch.getCachedIcon(focusedWindowClass !== "" ? focusedWindowClass : undefined), "image-missing");
-                    }
-
-                    Text {
-                        opacity: Config.workspaces.alwaysShowNumbers || ((Config.workspaces.showNumbers && (!Config.workspaces.showAppIcons || !workspaceButtonBackground.focusedWindow || Config.workspaces.alwaysShowNumbers)) || (Config.workspaces.alwaysShowNumbers && !Config.workspaces.showAppIcons)) ? 1 : 0
-                        z: 3
-
-                        anchors.centerIn: parent
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        font.family: Config.theme.font
-                        font.pixelSize: workspaceLabelFontSize(text)
-                        text: `${button.workspaceValue}`
-                        elide: Text.ElideRight
-                        color: ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == button.workspaceValue) ? Styling.srItem("primary") : (workspaceOccupied[index] ? Colors.overBackground : Colors.overSecondaryFixedVariant)
-
-                        Behavior on opacity {
-                            enabled: Styling.animDuration > 0
-                            NumberAnimation {
-                                duration: 150
-                                easing.type: Easing.OutQuad
-                            }
-                        }
-                    }
-                    Rectangle {
-                        opacity: (Config.workspaces.showNumbers || Config.workspaces.alwaysShowNumbers || (Config.workspaces.showAppIcons && workspaceButtonBackground.focusedWindow)) ? 0 : (((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == button.workspaceValue) || workspaceOccupied[index] ? 1 : 0.5)
-                        visible: opacity > 0
-                        anchors.centerIn: parent
-                        width: workspaceButtonWidth * 0.2
-                        height: width
-                        radius: width / 2
-                        color: ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == button.workspaceValue) ? Styling.srItem("primary") : Colors.overBackground
-
-                        Behavior on opacity {
-                            enabled: Styling.animDuration > 0
-                            NumberAnimation {
-                                duration: 150
-                                easing.type: Easing.OutQuad
-                            }
-                        }
-                    }
-                    Item {
-                        anchors.centerIn: parent
-                        width: workspaceButtonWidth
-                        height: workspaceButtonWidth
-                        opacity: !Config.workspaces.showAppIcons ? 0 : (workspaceButtonBackground.focusedWindow && !Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? 1 : workspaceButtonBackground.focusedWindow ? workspaceIconOpacityShrinked : 0
-                        visible: opacity > 0
-                        IconImage {
-                            id: mainAppIcon
-                            anchors.bottom: parent.bottom
-                            anchors.right: parent.right
-                            anchors.bottomMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspaceButtonWidth - workspaceIconSize) / 2) : workspaceIconMarginShrinked
-                            anchors.rightMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspaceButtonWidth - workspaceIconSize) / 2) : workspaceIconMarginShrinked
-
-                            source: workspaceButtonBackground.mainAppIconSource
-                            implicitSize: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? workspaceIconSize : workspaceIconSizeShrinked
-
-                            Behavior on opacity {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on anchors.bottomMargin {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on anchors.rightMargin {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on implicitSize {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                        }
-
-                        Tinted {
-                            sourceItem: mainAppIcon
-                            anchors.fill: mainAppIcon
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    ColumnLayout {
-        id: columnLayoutNumbers
-        visible: orientation === "vertical"
-        z: 3
-
-        spacing: 0
-        anchors.fill: parent
-        anchors.margins: widgetPadding
-        implicitWidth: workspaceButtonWidth
-
-        Repeater {
-            model: effectiveWorkspaceCount
-
-            Button {
-                id: buttonVert
-                property int workspaceValue: getWorkspaceId(index)
-                Layout.fillWidth: true
-                onPressed: workspacesWidget.switchOnMonitor(`workspace ${workspaceValue}`)
-                height: workspaceButtonWidth
-
-                background: Item {
-                    id: workspaceButtonBackgroundVert
-                    implicitWidth: workspaceButtonWidth
-                    implicitHeight: workspaceButtonWidth
-                    property var focusedWindow: {
-                        const windowsInThisWorkspace = Compositor.workspaceWindowsMap[buttonVert.workspaceValue] || [];
-                        if (windowsInThisWorkspace.length === 0)
-                            return null;
-                        return windowsInThisWorkspace.reduce((best, win) => {
-                            const bestFocus = (best && best.focusHistoryID !== undefined ? best.focusHistoryID : Infinity);
-                            const winFocus = (win && win.focusHistoryID !== undefined ? win.focusHistoryID : Infinity);
-                            return winFocus < bestFocus ? win : best;
-                        }, null);
-                    }
-                    readonly property string focusedWindowClass: focusedWindow?.class ?? ""
-                    readonly property var focusedDesktopEntry: focusedWindowClass !== "" ? DesktopEntries.heuristicLookup(focusedWindowClass) : null
-                    property var mainAppIconSource: {
-                        if (focusedDesktopEntry && focusedDesktopEntry.icon) {
-                            return Quickshell.iconPath(focusedDesktopEntry.icon, "image-missing");
-                        }
-                        return Quickshell.iconPath(AppSearch.getCachedIcon(focusedWindowClass !== "" ? focusedWindowClass : undefined), "image-missing");
-                    }
-
-                    Text {
-                        opacity: Config.workspaces.alwaysShowNumbers || ((Config.workspaces.showNumbers && (!Config.workspaces.showAppIcons || !workspaceButtonBackgroundVert.focusedWindow || Config.workspaces.alwaysShowNumbers)) || (Config.workspaces.alwaysShowNumbers && !Config.workspaces.showAppIcons)) ? 1 : 0
-                        z: 3
-
-                        anchors.centerIn: parent
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        font.family: Config.theme.font
-                        font.pixelSize: workspaceLabelFontSize(text)
-                        text: `${buttonVert.workspaceValue}`
-                        elide: Text.ElideRight
-                        color: ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == buttonVert.workspaceValue) ? Styling.srItem("primary") : (workspaceOccupied[index] ? Colors.overBackground : Colors.overSecondaryFixedVariant)
-
-                        Behavior on opacity {
-                            enabled: Styling.animDuration > 0
-                            NumberAnimation {
-                                duration: 150
-                                easing.type: Easing.OutQuad
-                            }
-                        }
-                    }
-                    Rectangle {
-                        opacity: (Config.workspaces.showNumbers || Config.workspaces.alwaysShowNumbers || (Config.workspaces.showAppIcons && workspaceButtonBackgroundVert.focusedWindow)) ? 0 : (((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == buttonVert.workspaceValue) || workspaceOccupied[index] ? 1 : 0.5)
-                        visible: opacity > 0
-                        anchors.centerIn: parent
-                        width: workspaceButtonWidth * 0.2
-                        height: width
-                        radius: width / 2
-                        color: ((monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : undefined) == buttonVert.workspaceValue) ? Styling.srItem("primary") : Colors.overBackground
-
-                        Behavior on opacity {
-                            enabled: Styling.animDuration > 0
-                            NumberAnimation {
-                                duration: 150
-                                easing.type: Easing.OutQuad
-                            }
-                        }
-                    }
-                    Item {
-                        anchors.centerIn: parent
-                        width: workspaceButtonWidth
-                        height: workspaceButtonWidth
-                        opacity: !Config.workspaces.showAppIcons ? 0 : (workspaceButtonBackgroundVert.focusedWindow && !Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? 1 : workspaceButtonBackgroundVert.focusedWindow ? workspaceIconOpacityShrinked : 0
-                        visible: opacity > 0
-                        IconImage {
-                            id: mainAppIconVert
-                            anchors.bottom: parent.bottom
-                            anchors.right: parent.right
-                            anchors.bottomMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspaceButtonWidth - workspaceIconSize) / 2) : workspaceIconMarginShrinked
-                            anchors.rightMargin: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? Math.round((workspaceButtonWidth - workspaceIconSize) / 2) : workspaceIconMarginShrinked
-
-                            source: workspaceButtonBackgroundVert.mainAppIconSource
-                            implicitSize: (!Config.workspaces.alwaysShowNumbers && Config.workspaces.showAppIcons) ? workspaceIconSize : workspaceIconSizeShrinked
-
-                            Behavior on opacity {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on anchors.bottomMargin {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on anchors.rightMargin {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                            Behavior on implicitSize {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: 150
-                                    easing.type: Easing.OutQuad
-                                }
-                            }
-                        }
-
-                        Tinted {
-                            sourceItem: mainAppIconVert
-                            anchors.fill: mainAppIconVert
-                        }
-                    }
+                Repeater {
+                    model: workspacesWidget.effectiveWorkspaceCount
+                    delegate: workspaceButtonDelegate
                 }
             }
         }

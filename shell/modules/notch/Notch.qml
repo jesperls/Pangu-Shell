@@ -81,48 +81,10 @@ Item {
         animateRadius: false
         backgroundOpacity: notchContainer.dashboardBgOpacity
 
-        property int defaultRadius: Config.roundness > 0 ? (screenNotchOpen || hasActiveNotifications ? Config.roundness + 20 : Config.roundness + 4) : 0
-
-        topLeftRadius: notchContainer.position === "bottom" ? defaultRadius : 0
-        topRightRadius: notchContainer.position === "bottom" ? defaultRadius : 0
-        bottomLeftRadius: notchContainer.position === "top" ? defaultRadius : 0
-        bottomRightRadius: notchContainer.position === "top" ? defaultRadius : 0
-
-        Behavior on bottomLeftRadius {
-            enabled: Styling.animDuration > 0
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-            }
-        }
-
-        Behavior on bottomRightRadius {
-            enabled: Styling.animDuration > 0
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-            }
-        }
-
-        Behavior on topLeftRadius {
-            enabled: Styling.animDuration > 0
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-            }
-        }
-
-        Behavior on topRightRadius {
-            enabled: Styling.animDuration > 0
-            NumberAnimation {
-                duration: Styling.animDuration
-                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-            }
-        }
+        topLeftRadius: notchRect.topLeftRadius
+        topRightRadius: notchRect.topRightRadius
+        bottomLeftRadius: notchRect.bottomLeftRadius
+        bottomRightRadius: notchRect.bottomRightRadius
 
         layer.enabled: Config.notchTheme === "default"
         layer.smooth: true
@@ -216,6 +178,42 @@ Item {
             : islandRadius)
         : (notchContainer.position === "top" ? defaultRadius : 0)
 
+        Behavior on topLeftRadius {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration
+                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
+                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
+            }
+        }
+
+        Behavior on topRightRadius {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration
+                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
+                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
+            }
+        }
+
+        Behavior on bottomLeftRadius {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration
+                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
+                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
+            }
+        }
+
+        Behavior on bottomRightRadius {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration
+                easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
+                easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
+            }
+        }
+
         StyledRect {
             id: notchIslandBg
             variant: "bg"
@@ -233,42 +231,6 @@ Item {
             topRightRadius: parent.topRightRadius
             bottomLeftRadius: parent.bottomLeftRadius
             bottomRightRadius: parent.bottomRightRadius
-
-            Behavior on topLeftRadius {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                    easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-                }
-            }
-
-            Behavior on topRightRadius {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                    easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-                }
-            }
-
-            Behavior on bottomLeftRadius {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                    easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-                }
-            }
-
-            Behavior on bottomRightRadius {
-                enabled: Styling.animDuration > 0
-                NumberAnimation {
-                    duration: Styling.animDuration
-                    easing.type: screenNotchOpen || hasActiveNotifications ? Easing.OutBack : Easing.OutQuart
-                    easing.overshoot: screenNotchOpen || hasActiveNotifications ? 1.2 : 1.0
-                }
-            }
         }
 
         HoverHandler {
@@ -524,64 +486,76 @@ Item {
 
             ctx.stroke();
         }
+        property bool _paintScheduled: false
+        function schedulePaint() {
+            if (!visible || _paintScheduled)
+                return;
+            _paintScheduled = true;
+            Qt.callLater(() => {
+                _paintScheduled = false;
+                if (outlineCanvas.visible)
+                    outlineCanvas.requestPaint();
+            });
+        }
+
         Connections {
             target: Colors
             function onPrimaryChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: Config.theme.srBg
             function onBorderChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: notchRect
             function onTopLeftRadiusChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onTopRightRadiusChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onBottomLeftRadiusChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onBottomRightRadiusChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onWidthChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onHeightChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: notchContainer
             function onImplicitWidthChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
             function onImplicitHeightChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: Config
             function onNotchThemeChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: leftCornerMaskPart
             function onWidthChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
         Connections {
             target: rightCornerMaskPart
             function onWidthChanged() {
-                outlineCanvas.requestPaint();
+                outlineCanvas.schedulePaint();
             }
         }
     }

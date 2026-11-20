@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
+import Quickshell.Widgets
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
@@ -164,28 +165,21 @@ Rectangle {
                         radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
                         variant: "primary"
 
-                        Image {
-                            id: userAvatar
+                        ClippingRectangle {
                             anchors.fill: parent
                             anchors.margins: 2
-                            source: GlobalStates.hasAvatar ? "file://" + Paths.avatar + "?" + GlobalStates.avatarCacheBuster : ""
-                            fillMode: Image.PreserveAspectCrop
-                            smooth: true
-                            asynchronous: true
-                            visible: status === Image.Ready
+                            radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
+                            color: "transparent"
 
-                            layer.enabled: true
-                            layer.effect: MultiEffect {
-                                maskEnabled: true
-                                maskThresholdMin: 0.5
-                                maskSpreadAtMin: 1.0
-                                maskSource: ShaderEffectSource {
-                                    sourceItem: Rectangle {
-                                        width: userAvatar.width
-                                        height: userAvatar.height
-                                        radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
-                                    }
-                                }
+                            Image {
+                                id: userAvatar
+                                anchors.fill: parent
+                                source: GlobalStates.hasAvatar ? Paths.toFileUrl(Paths.avatar) + (GlobalStates.avatarCacheBuster ? "?" + GlobalStates.avatarCacheBuster : "") : ""
+                                sourceSize: Qt.size(192, 192)
+                                fillMode: Image.PreserveAspectCrop
+                                smooth: true
+                                asynchronous: true
+                                visible: status === Image.Ready
                             }
                         }
 
