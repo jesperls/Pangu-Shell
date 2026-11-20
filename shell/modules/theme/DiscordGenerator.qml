@@ -22,14 +22,12 @@ QtObject {
         const font = String(Config.theme.font || "gg sans").replace(/[;"'\n\r{}]/g, "").trim() || "gg sans"
 
         const isLight = Config.theme.lightMode
-        
-        const bg = Colors.background
-        const backgroundaccent = isLight ? toRGB(Qt.darker(bg, 1.05)) : toRGB(Qt.lighter(bg, 1.66))
-        const backgroundprimary = toRGB(bg)
-        const backgroundsecondary = isLight ? toRGB(Qt.darker(bg, 1.1)) : toRGB(Qt.darker(bg, 1.5))
-        const backgroundsecondaryalt = isLight ? toRGB(Qt.darker(bg, 1.15)) : toRGB(Qt.darker(bg, 2.0))
-        const backgroundtertiary = isLight ? toRGB(Qt.darker(bg, 1.2)) : toRGB(Qt.darker(bg, 3.0))
-        const backgroundfloating = isLight ? toRGB(Qt.darker(bg, 1.05)) : "0,0,0"
+        const backgroundaccent = toRGB(Colors.surfaceContainerHighest)
+        const backgroundprimary = toRGB(Colors.surface)
+        const backgroundsecondary = toRGB(Colors.surfaceContainerLow)
+        const backgroundsecondaryalt = toRGB(Colors.surfaceContainer)
+        const backgroundtertiary = toRGB(Colors.background)
+        const backgroundfloating = toRGB(Colors.surfaceContainerHigh)
 
         const fg = Colors.overBackground
         const textbrightest = toRGB(fg)
@@ -58,7 +56,7 @@ QtObject {
   --textdark: ${textdark};
   --textdarker: ${textdarker};
   --textdarkest: ${textdarkest};
-  --font: ${font}, gg sans;
+  --font: "${font}", "gg sans";
   --backgroundaccent: ${backgroundaccent};
   --backgroundprimary: ${backgroundprimary};
   --backgroundsecondary: ${backgroundsecondary};

@@ -10,8 +10,24 @@ FileView {
     path: Paths.cachePath("colors.json")
     preload: true
     watchChanges: true
+    property bool ready: false
     onFileChanged: reload()
-    onLoaded: generationTimer.restart()
+    onLoaded: {
+        ready = true;
+        generationTimer.restart();
+    }
+    onLoadFailed: {
+        ready = true;
+        generationTimer.restart();
+    }
+
+    function toHex(c) {
+        if (!c)
+            return "#000000";
+        return "#" + [c.r, c.g, c.b]
+            .map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0"))
+            .join("");
+    }
 
     readonly property string exportSettings: JSON.stringify([
         Config.oledMode,
@@ -74,7 +90,7 @@ FileView {
         interval: 100
         repeat: false
         onTriggered: {
-            if (!colors.loaded || !Config.initialLoadComplete) return;
+            if (!colors.ready || !Config.initialLoadComplete) return;
             if (Config.theme.exports?.qt ?? true)
                 qtCtGenerator.generate(colors);
             if (Config.theme.exports?.gtk ?? true)

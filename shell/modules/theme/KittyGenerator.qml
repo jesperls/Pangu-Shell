@@ -10,7 +10,7 @@ QtObject {
     function generate(Colors) {
         if (!Colors)
             return;
-        const fmt = c => c.toString();
+        const fmt = c => Colors.toHex(c);
 
         const cursor = fmt(Colors.primary);
         const cursorText = fmt(Colors.overPrimary);
@@ -111,10 +111,11 @@ QtObject {
     property GeneratedFile kittyFile: GeneratedFile {
         id: kittyFile
         path: Paths.cachePath("kitty.conf")
-        onWritten: reloadProcess.running = true
+        onWritten: Qt.callLater(root.reloader.reload)
     }
 
-    property Process reloadProcess: Process {
+    property ThemeReloader reloader: ThemeReloader {
+        files: [kittyFile]
         command: ["pkill", "-USR1", "-x", "kitty"]
     }
 }

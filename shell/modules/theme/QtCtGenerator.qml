@@ -10,95 +10,59 @@ QtObject {
     function generate(Colors) {
         if (!Colors) return
 
-        const fmt = (c) => "#" + [c.r, c.g, c.b]
+        const argb = (c, alphaHex) => "#" + (alphaHex || "ff") + [c.r, c.g, c.b]
             .map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0"))
             .join("")
 
-        const bg = fmt(Colors.background)
-        const fg = fmt(Colors.overBackground)
-        const surface = fmt(Colors.surface)
-        const primary = fmt(Colors.primary)
-        const secondary = fmt(Colors.secondary)
-        const error = fmt(Colors.error)
-        const inactive = fmt(Colors.outline)
-        const link = fmt(Colors.tertiary)
-        const selection = fmt(Colors.primary)
-        const selectionFg = fmt(Colors.overPrimary)
+        const bg = argb(Colors.background)
+        const fg = argb(Colors.overBackground)
+        const disabledFg = argb(Colors.outline)
+        const surface = argb(Colors.surface)
+        const surfaceBright = argb(Colors.surfaceBright)
+        const surfaceLow = argb(Colors.surfaceContainerLow)
+        const surfaceLowest = argb(Colors.surfaceContainerLowest)
+        const surfaceMid = argb(Colors.surfaceContainer)
+        const surfaceHigh = argb(Colors.surfaceContainerHigh)
+        const shadow = argb(Colors.shadow)
+        const primary = argb(Colors.primary)
+        const overPrimary = argb(Colors.overPrimary)
+        const secondary = argb(Colors.secondary)
+        const tertiary = argb(Colors.tertiary)
+        const placeholder = argb(Colors.overBackground, "80")
 
-        const colorSection = (name, backgroundAlternate, backgroundNormal, decoration, foreground, foregroundInactive) => `[Colors:${name}]\n`
-            + `BackgroundAlternate=${backgroundAlternate}\n`
-            + `BackgroundNormal=${backgroundNormal}\n`
-            + `DecorationFocus=${decoration}\n`
-            + `DecorationHover=${decoration}\n`
-            + `ForegroundActive=${foreground}\n`
-            + `ForegroundInactive=${foregroundInactive}\n`
-            + `ForegroundLink=${link}\n`
-            + `ForegroundNegative=${error}\n`
-            + `ForegroundNeutral=${foreground}\n`
-            + `ForegroundNormal=${foreground}\n`
-            + `ForegroundPositive=${secondary}\n`
-            + `ForegroundVisited=${link}\n\n`
+        // QPalette::ColorRole enum order 0..20 required by qt5ct/qt6ct.
+        const active = [
+            fg, surfaceMid, surfaceBright, surfaceHigh, surfaceLowest, surfaceLow,
+            fg, overPrimary, fg, surface, bg, shadow, primary, overPrimary,
+            tertiary, secondary, surfaceLow, fg, surfaceHigh, fg, placeholder
+        ]
+        const disabled = [
+            disabledFg, surfaceMid, surfaceBright, surfaceHigh, surfaceLowest, surfaceLow,
+            disabledFg, overPrimary, disabledFg, surface, bg, shadow, surfaceHigh, disabledFg,
+            tertiary, secondary, surfaceLow, disabledFg, surfaceHigh, disabledFg, placeholder
+        ]
+        const inactive = [
+            fg, surfaceMid, surfaceBright, surfaceHigh, surfaceLowest, surfaceLow,
+            fg, overPrimary, fg, surface, bg, shadow, primary, overPrimary,
+            tertiary, secondary, surfaceLow, fg, surfaceHigh, fg, placeholder
+        ]
 
-        let ini = ""
+        const conf = "[ColorScheme]\n"
+            + `active_colors=${active.join(", ")}\n`
+            + `disabled_colors=${disabled.join(", ")}\n`
+            + `inactive_colors=${inactive.join(", ")}\n`
 
-        ini += "[ColorEffects:Disabled]\n"
-        ini += `Color=${bg}\n`
-        ini += "ColorAmount=0.5\n"
-        ini += "ColorEffect=3\n"
-        ini += "ContrastAmount=0\n"
-        ini += "ContrastEffect=0\n"
-        ini += "IntensityAmount=0\n"
-        ini += "IntensityEffect=0\n\n"
-
-        ini += "[ColorEffects:Inactive]\n"
-        ini += "ChangeSelectionColor=true\n"
-        ini += `Color=${bg}\n`
-        ini += "ColorAmount=0.025\n"
-        ini += "ColorEffect=0\n"
-        ini += "ContrastAmount=0.1\n"
-        ini += "ContrastEffect=0\n"
-        ini += "Enable=true\n"
-        ini += "IntensityAmount=0\n"
-        ini += "IntensityEffect=0\n\n"
-
-        ini += colorSection("Button", surface, surface, primary, fg, inactive)
-        ini += colorSection("Complementary", bg, bg, primary, fg, inactive)
-        ini += colorSection("Header", bg, bg, primary, fg, inactive)
-        ini += colorSection("Header][Inactive", bg, bg, primary, fg, inactive)
-        ini += colorSection("Selection", selection, selection, selection, selectionFg, selectionFg)
-        ini += colorSection("Tooltip", surface, bg, primary, fg, inactive)
-        ini += colorSection("View", surface, bg, primary, fg, inactive)
-        ini += colorSection("Window", surface, bg, primary, fg, inactive)
-
-        ini += "[General]\n"
-        ini += "ColorScheme=Pangu\n"
-        ini += "Name=Pangu\n"
-        ini += "shadeSortColumn=true\n"
-        ini += "\n"
-
-        ini += "[KDE]\n"
-        ini += "contrast=4\n"
-        ini += "\n"
-
-        ini += "[WM]\n"
-        ini += `activeBackground=${bg}\n`
-        ini += "activeBlend=252,252,252\n"
-        ini += `activeForeground=${fg}\n`
-        ini += `inactiveBackground=${fmt(Colors.surfaceDim)}\n`
-        ini += "inactiveBlend=161,169,177\n"
-        ini += `inactiveForeground=${inactive}\n`
-
-        qt5File.write(ini);
-        qt6File.write(ini);
+        qt5File.write(conf);
+        qt6File.write(conf);
     }
 
     property GeneratedFile qt5File: GeneratedFile {
         id: qt5File
-        path: Paths.configHome + "/qt5ct/colors/pangu.colors"
+        path: Paths.configHome + "/qt5ct/colors/pangu.conf"
     }
 
     property GeneratedFile qt6File: GeneratedFile {
         id: qt6File
-        path: Paths.configHome + "/qt6ct/colors/pangu.colors"
+        path: Paths.configHome + "/qt6ct/colors/pangu.conf"
     }
 }

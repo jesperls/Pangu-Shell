@@ -8,7 +8,7 @@ QtObject {
     function generate(Colors) {
         if (!Colors)
             return;
-        const fmt = c => c.toString();
+        const fmt = c => Colors.toHex(c);
         const rgba = (c, a) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
 
         const bg = fmt(Colors.background);
@@ -23,7 +23,7 @@ QtObject {
         const border = rgba(Colors.outlineVariant, 0.55);
         const rim = rgba(Colors.overBackground, Config.theme.lightMode ? 0.12 : 0.08);
 
-        const css = `:root {
+        const chromeCss = `:root {
   --pangu-bg: ${bg};
   --pangu-surface: ${surface};
   --pangu-surface-low: ${surfaceLow};
@@ -94,23 +94,39 @@ QtObject {
   background-color: var(--pangu-surface-high) !important;
   border-color: var(--pangu-primary) !important;
 }
+`;
 
-::selection {
-  background-color: var(--pangu-primary) !important;
-  color: var(--pangu-over-primary) !important;
-}
+        const contentCss = `@-moz-document url("about:newtab"), url("about:home"), url("about:blank") {
+  :root {
+    --pangu-bg: ${bg};
+    --pangu-fg: ${fg};
+    --pangu-primary: ${primary};
+    --pangu-over-primary: ${overPrimary};
+    --newtab-background-color: ${bg} !important;
+    --newtab-background-color-secondary: ${surfaceMid} !important;
+    --newtab-text-primary-color: ${fg} !important;
+  }
 
-@-moz-document url("about:newtab"), url("about:home"), url("about:blank") {
   body {
     background-color: var(--pangu-bg) !important;
     color: var(--pangu-fg) !important;
   }
+
+  ::selection {
+    background-color: var(--pangu-primary) !important;
+    color: var(--pangu-over-primary) !important;
+  }
 }
 `;
-        firefoxFile.write(css);
+        firefoxFile.write(chromeCss);
+        firefoxContentFile.write(contentCss);
     }
 
     property GeneratedFile firefoxFile: GeneratedFile {
         path: Paths.cachePath("firefox.css")
+    }
+
+    property GeneratedFile firefoxContentFile: GeneratedFile {
+        path: Paths.cachePath("firefox-content.css")
     }
 }

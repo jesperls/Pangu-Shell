@@ -26,7 +26,7 @@ FileView {
         onTriggered: root.savingSelf = false
     }
 
-    path: root.pathOverride !== "" ? root.pathOverride : Config.configDir + "/" + root.name + ".json"
+    path: Config.dirsReady ? (root.pathOverride !== "" ? root.pathOverride : Config.configDir + "/" + root.name + ".json") : ""
     preload: false
     atomicWrites: true
     watchChanges: true

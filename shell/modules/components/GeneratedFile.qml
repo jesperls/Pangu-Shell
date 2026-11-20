@@ -16,6 +16,11 @@ FileView {
     signal written()
     signal failed()
 
+    onPathChanged: {
+        directoryReady = false;
+        savedText = null;
+    }
+
     function write(text) {
         writeFailures = 0;
         pendingText = text;
@@ -37,9 +42,14 @@ FileView {
         const text = pendingText;
         pendingText = null;
         if (text === "") {
-            // FileView.setText("") would not emit saved() from its empty initial state.
-            savedText = "";
-            written();
+            if (savedText === null || savedText === "") {
+                savedText = "";
+                written();
+                return;
+            }
+            saving = true;
+            writingText = "";
+            truncateProcess.running = true;
             return;
         }
         saving = true;
@@ -87,9 +97,18 @@ FileView {
     onLoaded: finishResync()
     onLoadFailed: finishResync()
 
+    property Process truncateProcess: Process {
+        id: truncateProcess
+        command: ["truncate", "-s", "0", "--", root.path]
+        onExited: code => root.finishWrite(code === 0)
+    }
+
     property Process prepareDirectory: Process {
         id: prepareDirectory
-        command: ["mkdir", "-p", "--", root.path.slice(0, root.path.lastIndexOf("/"))]
+        command: {
+            const idx = root.path.lastIndexOf("/");
+            return ["mkdir", "-p", "--", idx > 0 ? root.path.slice(0, idx) : "."];
+        }
         onExited: code => {
             root.directoryReady = code === 0;
             if (root.directoryReady)

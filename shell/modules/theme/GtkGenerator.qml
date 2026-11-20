@@ -30,7 +30,7 @@ QtObject {
         if (!Colors) return
         root.syncColorScheme();
 
-        const fmt = (c) => c.toString()
+        const fmt = (c) => Colors.toHex(c)
         const toRgba = (c, a) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`
 
         const primary = fmt(Colors.primary)
@@ -73,6 +73,15 @@ QtObject {
 
     property ThemeReloader reloader: ThemeReloader {
         files: [paletteFile]
-        command: ["bash", "-c", "theme=$(gsettings get org.gnome.desktop.interface gtk-theme); gsettings set org.gnome.desktop.interface gtk-theme \"''\" && gsettings set org.gnome.desktop.interface gtk-theme \"$theme\""]
+        command: [
+            "bash", "-c",
+            "theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null) || exit 0; "
+            + "[ -n \"$theme\" ] && [ \"$theme\" != \"''\" ] || exit 0; "
+            + "if [ \"$1\" = \"1\" ] && [ \"$theme\" = \"'adw-gtk3-dark'\" ]; then theme=\"'adw-gtk3'\"; "
+            + "elif [ \"$1\" = \"0\" ] && [ \"$theme\" = \"'adw-gtk3'\" ]; then theme=\"'adw-gtk3-dark'\"; fi; "
+            + "gsettings set org.gnome.desktop.interface gtk-theme \"''\" && gsettings set org.gnome.desktop.interface gtk-theme \"$theme\"",
+            "pangu-gtk-reload",
+            Config.theme.lightMode ? "1" : "0"
+        ]
     }
 }

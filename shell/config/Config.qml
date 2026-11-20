@@ -92,10 +92,13 @@ Singleton {
             file.saveAdapter();
     }
 
+    property bool dirsReady: false
+
     Process {
         command: ["mkdir", "-p", root.configDir, Paths.configPath("colors"), Paths.dataDir, Paths.cacheDir]
         running: true
         onExited: {
+            root.dirsReady = true;
             for (const name in root.files)
                 root.files[name].reloadConfig();
         }
