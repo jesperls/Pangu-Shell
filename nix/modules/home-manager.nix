@@ -47,7 +47,7 @@ let
   '';
   qtPalette = ver: {
     Appearance.custom_palette = true;
-    Appearance.color_scheme_path = "${config.xdg.configHome}/${ver}/colors/pangu.colors";
+    Appearance.color_scheme_path = "${config.xdg.configHome}/${ver}/colors/pangu.conf";
   };
 in
 {
@@ -158,8 +158,12 @@ in
       lib.types.submodule {
         config = lib.mkIf (cfg.enable && cfg.theme.firefox.enable) {
           settings."toolkit.legacyUserProfileCustomizations.stylesheets" = lib.mkDefault true;
-          userChrome = lib.mkBefore ''@import url("file://${config.xdg.cacheHome}/pangu/firefox.css");'';
-          userContent = lib.mkBefore ''@import url("file://${config.xdg.cacheHome}/pangu/firefox.css");'';
+          userChrome = lib.mkBefore ''
+            @import url("file://${config.xdg.cacheHome}/pangu/firefox.css");
+          '';
+          userContent = lib.mkBefore ''
+            @import url("file://${config.xdg.cacheHome}/pangu/firefox-content.css");
+          '';
         };
       }
     );
@@ -171,7 +175,7 @@ in
         home.packages = [
           cfg.package
         ]
-        ++ lib.optionals cfg.hyprland.preset.enable cfg.package.runtimeInputs;
+        ++ lib.optionals cfg.hyprland.preset.enable cfg.package.hyprlandInputs;
         systemd.user.tmpfiles.rules = [
           "d ${config.xdg.configHome}/pangu/config 0755 - - -"
           "d ${config.xdg.configHome}/pangu/colors 0755 - - -"
@@ -275,9 +279,9 @@ in
         qt.qt6ctSettings = qtPalette "qt6ct";
         systemd.user.tmpfiles.rules = [
           "d ${config.xdg.configHome}/qt5ct/colors 0755 - - -"
-          "f ${config.xdg.configHome}/qt5ct/colors/pangu.colors 0644 - - -"
+          "f ${config.xdg.configHome}/qt5ct/colors/pangu.conf 0644 - - -"
           "d ${config.xdg.configHome}/qt6ct/colors 0755 - - -"
-          "f ${config.xdg.configHome}/qt6ct/colors/pangu.colors 0644 - - -"
+          "f ${config.xdg.configHome}/qt6ct/colors/pangu.conf 0644 - - -"
         ];
       })
       (lib.mkIf cfg.theme.kitty.enable {
@@ -285,7 +289,10 @@ in
         systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/kitty.conf 0644 - - -" ];
       })
       (lib.mkIf cfg.theme.firefox.enable {
-        systemd.user.tmpfiles.rules = [ "f ${config.xdg.cacheHome}/pangu/firefox.css 0644 - - -" ];
+        systemd.user.tmpfiles.rules = [
+          "f ${config.xdg.cacheHome}/pangu/firefox.css 0644 - - -"
+          "f ${config.xdg.cacheHome}/pangu/firefox-content.css 0644 - - -"
+        ];
       })
       (lib.mkIf cfg.theme.spicetify.enable {
         systemd.user.tmpfiles.rules = [

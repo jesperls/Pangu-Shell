@@ -86,13 +86,24 @@ local function sign_step(value, step)
   return (value > 0 and "+" or "-") .. step
 end
 
-for key, delta in pairs({ up = -30, down = 30, k = -30, j = 30 }) do
+for key, spec in pairs({
+  up = { delta = -30, resize = { 0, -30 } },
+  down = { delta = 30, resize = { 0, 30 } },
+  k = { delta = -30, resize = { 0, -30 } },
+  j = { delta = 30, resize = { 0, 30 } },
+  left = { resize = { -30, 0 } },
+  right = { resize = { 30, 0 } },
+  h = { resize = { -30, 0 } },
+  l = { resize = { 30, 0 } },
+}) do
   bind(mainMod .. " CTRL", key, function()
     local window = hl.get_active_window()
-    if in_centered() and window and not window.floating then
-      hl.dispatch(hl.dsp.layout("vresize " .. sign_step(delta, state.layouts.centered.height_resize_step)))
+    if spec.delta and in_centered() and window and not window.floating then
+      hl.dispatch(hl.dsp.layout("vresize " .. sign_step(spec.delta, state.layouts.centered.height_resize_step)))
+    else
+      hl.dispatch(hl.dsp.window.resize({ x = spec.resize[1], y = spec.resize[2] }))
     end
-  end, "Centered: grow/shrink side window (" .. key .. ")", { repeating = true })
+  end, "Window: resize (" .. key .. ")", { repeating = true })
 end
 
 local layouts = require("pangu.layouts")
@@ -185,10 +196,10 @@ for _, scratch in ipairs(apps.scratchpads or {}) do
   )
 end
 
-bind(mainMod .. " CTRL", "period", hl.dsp.focus({ monitor = "-1" }), "Monitor: focus previous")
-bind(mainMod .. " CTRL", "comma", hl.dsp.focus({ monitor = "+1" }), "Monitor: focus next")
-bind(mainMod .. " SHIFT", "period", hl.dsp.window.move({ monitor = "-1" }), "Monitor: move window to previous")
-bind(mainMod .. " SHIFT", "comma", hl.dsp.window.move({ monitor = "+1" }), "Monitor: move window to next")
+bind(mainMod .. " CTRL", "comma", hl.dsp.focus({ monitor = "-1" }), "Monitor: focus previous")
+bind(mainMod .. " CTRL", "period", hl.dsp.focus({ monitor = "+1" }), "Monitor: focus next")
+bind(mainMod .. " SHIFT", "comma", hl.dsp.window.move({ monitor = "-1" }), "Monitor: move window to previous")
+bind(mainMod .. " SHIFT", "period", hl.dsp.window.move({ monitor = "+1" }), "Monitor: move window to next")
 
 bind_exec(mainMod, "V", "pangu run clipboard", "Shell: clipboard history")
 bind_exec(mainMod .. " SHIFT", "C", "hyprpicker -a", "Tools: color picker")

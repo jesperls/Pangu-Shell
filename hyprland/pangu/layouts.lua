@@ -432,7 +432,7 @@ local function drag_tick()
     stop_drag()
     return
   end
-  if not drag.super and os.clock() - drag.started_at > 15 then
+  if not drag.super and os.time() - drag.started_at > 15 then
     stop_drag()
     return
   end
@@ -498,7 +498,7 @@ function M.start_drag()
     y = pos.y,
     grab_top = at and size and pos.y < at.y + size.y / 2 or false,
     super = hl.is_key_down("Super_L") or hl.is_key_down("Super_R"),
-    started_at = os.clock(),
+    started_at = os.time(),
   }
 
   if drag_timer then

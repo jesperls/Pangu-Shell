@@ -30,7 +30,6 @@
   hypridle,
   hyprpicker,
   imagemagick,
-  inetutils,
   jq,
   kitty,
   libnotify,
@@ -54,6 +53,7 @@
   systemd,
   tesseract,
   tmux,
+  unixtools,
   wireplumber,
   wl-clipboard,
   wlsunset,
@@ -194,7 +194,6 @@ let
     hypridle
     hyprpicker
     imagemagick
-    inetutils # hostname
     jq
     kitty # the dashboard's tmux tab opens sessions in it
     libnotify
@@ -215,6 +214,7 @@ let
     systemd # systemctl, loginctl
     (tesseract.override { enableLanguages = ocrLanguages; })
     tmux # the dashboard's tmux tab drives real sessions
+    unixtools.hostname
     wireplumber
     wl-clipboard
     wlsunset
@@ -229,6 +229,18 @@ let
   ]
   ++ lib.optionals (withWallpaperEngine && linux-wallpaperengine != null) [
     linux-wallpaperengine
+  ];
+
+  # Commands invoked directly by Hyprland Lua bindings outside the pangu wrapper PATH.
+  hyprlandInputs = [
+    grim
+    hyprpicker
+    libnotify
+    playerctl
+    wireplumber
+    wl-clipboard
+    xdg-terminal-exec
+    xdg-utils
   ];
 in
 writeShellApplication {
@@ -261,7 +273,7 @@ writeShellApplication {
   + builtins.readFile ./cli.sh;
 
   passthru = {
-    inherit runtimeInputs qmlEnv;
+    inherit runtimeInputs hyprlandInputs qmlEnv;
     shellSource = src;
     hyprlandSource = ../../hyprland/pangu;
     recorderPackage = gpu-screen-recorder;

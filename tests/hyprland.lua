@@ -150,10 +150,12 @@ local target = {
 layout.recalculate({ area = { x = 0, y = 44, w = 5120, h = 1396 }, targets = { target } })
 assert(placed.w == 2560 and placed.x == 1280, "Single centered window lost its width")
 
-local binds, bind_flags, dispatched, drag_started, release_binds = {}, {}, 0, 0, 0
+local binds, bind_flags, dispatched, dispatch_log, drag_started, release_binds = {}, {}, 0, {}, 0, 0
 local floating = true
-local function dispatcher()
-  return {}
+local function dispatcher(name)
+  return function(arg)
+    return { name = name, arg = arg }
+  end
 end
 hl = {
   bind = function(_, callback, flags)
@@ -166,22 +168,23 @@ hl = {
   end,
   dsp = setmetatable({
     window = setmetatable({}, {
-      __index = function()
-        return dispatcher
+      __index = function(_, key)
+        return dispatcher("window." .. key)
       end,
     }),
     workspace = setmetatable({}, {
-      __index = function()
-        return dispatcher
+      __index = function(_, key)
+        return dispatcher("workspace." .. key)
       end,
     }),
   }, {
-    __index = function()
-      return dispatcher
+    __index = function(_, key)
+      return dispatcher(key)
     end,
   }),
-  dispatch = function()
+  dispatch = function(cmd)
     dispatched = dispatched + 1
+    dispatch_log[#dispatch_log + 1] = cmd
   end,
   get_active_workspace = function()
     return { tiled_layout = "lua:centered" }
@@ -231,6 +234,14 @@ assert(dispatched == 2 and drag_started == 0, "Floating windows cannot be resize
 floating = false
 binds["Mouse: resize window"]()
 assert(dispatched == 2 and drag_started == 1, "Tiled centered window used the floating resize dispatcher")
+assert(
+  binds["Monitor: focus previous"].name == "focus" and binds["Monitor: focus previous"].arg.monitor == "-1",
+  "comma must focus previous monitor (-1)"
+)
+assert(
+  binds["Monitor: focus next"].name == "focus" and binds["Monitor: focus next"].arg.monitor == "+1",
+  "period must focus next monitor (+1)"
+)
 
 local modes = { [1] = "lua:centered", [2] = "dwindle", [3] = "bogus", [4] = "lua:centered" }
 local ruled = {}

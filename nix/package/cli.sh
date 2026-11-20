@@ -13,7 +13,7 @@ shellPid() {
 		printf '%s' "$pid"
 		return 0
 	fi
-	pgrep -f "$shellRoot/shell.qml" | head -n 1 || true
+	pgrep -f "$shellRoot/shell.qml" | head -n 1 || pgrep -f 'quickshell.*/shell\.qml$' | head -n 1 || true
 }
 
 ipc() {
@@ -41,8 +41,10 @@ saveBrightness() {
 	current=$(listBrightness | awk -F: -v mon="$monitor" '$1 == mon { print $2; exit }')
 	[ -n "$current" ] || die "no brightness reported for monitor $monitor"
 	if [ -f "$brightnessState" ]; then
-		awk -F: -v mon="$monitor" '$1 != mon' "$brightnessState" >"$brightnessState.tmp"
-		mv "$brightnessState.tmp" "$brightnessState"
+		local tmpState
+		tmpState=$(mktemp "$runtimeDir/brightness.XXXXXX")
+		awk -F: -v mon="$monitor" '$1 != mon' "$brightnessState" >"$tmpState"
+		mv -- "$tmpState" "$brightnessState"
 	fi
 	printf '%s:%s\n' "$monitor" "$current" >>"$brightnessState"
 }
@@ -66,11 +68,12 @@ usage() {
 		  (none)                          Run the shell (this is what the user service execs)
 		  run <target>                    Open a shell surface (launcher, dashboard, overview, ...)
 		  lock                            Activate the lockscreen
+		  idle <action>                   Forward an idle IPC command
 		  reload                          Restart the shell service
 		  quit                            Stop the shell service
 		  screen on|off                   Toggle DPMS on all outputs
 		  suspend                         Suspend the system
-		  brightness <0-100> [monitor]    Set brightness
+		  brightness <0-100> [monitor] [-s] Set brightness (optionally save first)
 		  brightness +N|-N [monitor]      Adjust brightness relatively
 		  brightness -s [monitor]         Save current brightness
 		  brightness -r [monitor]         Restore saved brightness

@@ -34,6 +34,9 @@ hl.config({
   dwindle = {
     preserve_split = true,
   },
+  xwayland = {
+    force_zero_scaling = true,
+  },
   binds = {
     scroll_event_delay = 0,
     allow_pin_fullscreen = true,

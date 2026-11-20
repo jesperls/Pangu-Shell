@@ -155,12 +155,13 @@ in
     assert builtins.elem "PANGU_PETS_ENABLE=1" withPets.systemd.user.services.pangu.Service.Environment;
     assert builtins.any (rule: lib.hasInfix "pangu/gtk.css" rule) plain.systemd.user.tmpfiles.rules;
     assert builtins.any (
-      rule: lib.hasInfix "qt6ct/colors/pangu.colors" rule
+      rule: lib.hasInfix "qt6ct/colors/pangu.conf" rule
     ) plain.systemd.user.tmpfiles.rules;
     assert
       themedApps.programs.firefox.profiles.default.settings."toolkit.legacyUserProfileCustomizations.stylesheets";
     assert lib.hasInfix "pangu/firefox.css" themedApps.programs.firefox.profiles.default.userChrome;
-    assert lib.hasInfix "pangu/firefox.css" themedApps.programs.firefox.profiles.default.userContent;
+    assert lib.hasInfix "pangu/firefox-content.css"
+      themedApps.programs.firefox.profiles.default.userContent;
     assert builtins.any (
       rule: lib.hasInfix "spicetify/Themes/Pangu/color.ini" rule
     ) themedApps.systemd.user.tmpfiles.rules;

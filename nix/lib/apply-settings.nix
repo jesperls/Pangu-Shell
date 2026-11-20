@@ -28,7 +28,7 @@ pkgs.writeShellApplication {
         | . * $overrides
       ' "$source" > "$temporary" 2>/dev/null; then
         echo "pangu-apply-settings: backing up invalid JSON $file to $file.corrupt" >&2
-        cp -p -- "$file" "$file.corrupt"
+        if [[ -e "$file" ]]; then cp -p -- "$file" "$file.corrupt"; fi
         jq -n --argjson overrides "$overrides" '{} * $overrides' > "$temporary"
       fi
       if [[ -e "$file" ]]; then
