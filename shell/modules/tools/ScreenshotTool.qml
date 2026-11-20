@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import qs.config
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
@@ -188,11 +189,59 @@ PanelWindow {
             }
         }
 
+        readonly property bool hasRegionCutout: screenshotPopup.state === "active"
+            && screenshotPopup.currentMode === "region"
+            && Screenshot.selectionW > 0 && Screenshot.selectionH > 0
+            && selectionRect.x + selectionRect.width > 0 && selectionRect.x < width
+            && selectionRect.y + selectionRect.height > 0 && selectionRect.y < height
+        readonly property real cutLeft: Math.max(0, Math.min(width, selectionRect.x))
+        readonly property real cutTop: Math.max(0, Math.min(height, selectionRect.y))
+        readonly property real cutRight: Math.max(cutLeft, Math.min(width, selectionRect.x + selectionRect.width))
+        readonly property real cutBottom: Math.max(cutTop, Math.min(height, selectionRect.y + selectionRect.height))
+
         Rectangle {
             anchors.fill: parent
             color: "black"
-            opacity: screenshotPopup.state === "active" ? 0.4 : 0
-            visible: screenshotPopup.state === "active" && screenshotPopup.currentMode !== "screen"
+            opacity: 0.4
+            visible: screenshotPopup.state === "active" && screenshotPopup.currentMode !== "screen" && !mainFocusScope.hasRegionCutout
+        }
+
+        Item {
+            anchors.fill: parent
+            visible: mainFocusScope.hasRegionCutout
+
+            Rectangle {
+                x: 0
+                y: 0
+                width: parent.width
+                height: mainFocusScope.cutTop
+                color: "black"
+                opacity: 0.4
+            }
+            Rectangle {
+                x: 0
+                y: mainFocusScope.cutBottom
+                width: parent.width
+                height: Math.max(0, parent.height - mainFocusScope.cutBottom)
+                color: "black"
+                opacity: 0.4
+            }
+            Rectangle {
+                x: 0
+                y: mainFocusScope.cutTop
+                width: mainFocusScope.cutLeft
+                height: Math.max(0, mainFocusScope.cutBottom - mainFocusScope.cutTop)
+                color: "black"
+                opacity: 0.4
+            }
+            Rectangle {
+                x: mainFocusScope.cutRight
+                y: mainFocusScope.cutTop
+                width: Math.max(0, parent.width - mainFocusScope.cutRight)
+                height: Math.max(0, mainFocusScope.cutBottom - mainFocusScope.cutTop)
+                color: "black"
+                opacity: 0.4
+            }
         }
 
         Item {
@@ -293,7 +342,7 @@ PanelWindow {
 
         Rectangle {
             id: selectionRect
-            visible: screenshotPopup.state === "active" && screenshotPopup.currentMode === "region"
+            visible: screenshotPopup.state === "active" && screenshotPopup.currentMode === "region" && Screenshot.selectionW > 0 && Screenshot.selectionH > 0
             
             x: Screenshot.selectionX - screenshotPopup.screen.x
             y: Screenshot.selectionY - screenshotPopup.screen.y
@@ -304,10 +353,26 @@ PanelWindow {
             border.color: Styling.srItem("overprimary")
             border.width: 2
 
-            Rectangle {
-                anchors.fill: parent
-                color: Styling.srItem("overprimary")
-                opacity: 0.2
+            StyledRect {
+                id: sizeBadge
+                visible: Screenshot.selectionW > 5 && Screenshot.selectionH > 5
+                variant: "popup"
+                radius: Styling.radius(-4)
+                enableShadow: false
+                width: sizeBadgeText.implicitWidth + 14
+                height: sizeBadgeText.implicitHeight + 8
+                x: Math.max(4, Math.min(selectionRect.width - width, 0))
+                y: (selectionRect.y >= height + 8) ? -(height + 6) : 6
+
+                Text {
+                    id: sizeBadgeText
+                    anchors.centerIn: parent
+                    text: Math.round(Screenshot.selectionW) + " × " + Math.round(Screenshot.selectionH)
+                    font.family: Config.theme.monoFont
+                    font.pixelSize: Styling.fontSize(-2)
+                    font.weight: Font.Bold
+                    color: Colors.overBackground
+                }
             }
         }
 

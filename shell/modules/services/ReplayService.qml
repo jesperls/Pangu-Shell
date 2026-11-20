@@ -193,7 +193,15 @@ Singleton {
                 Notifications.notifyInternal({summary: "Replay", body: "Could not create replay directory"});
                 return;
             }
-            var cmd = ["gpu-screen-recorder", "-f", "60", "-fallback-cpu-encoding", "yes"];
+            var fps = (typeof Config !== "undefined" && Config.system?.replay?.fps > 0)
+                ? Math.max(15, Math.min(240, Math.round(Config.system.replay.fps)))
+                : 60;
+            var codec = (typeof Config !== "undefined" && Config.system?.replay?.codec)
+                ? String(Config.system.replay.codec)
+                : "auto";
+            var cmd = ["gpu-screen-recorder", "-f", String(fps), "-fallback-cpu-encoding", "yes"];
+            if (["h264", "hevc", "av1", "hevc_hdr", "av1_hdr"].indexOf(codec) !== -1)
+                cmd.push("-k", codec);
             if (root.captureMode === "region" && root.captureRegion !== "") {
                 cmd.push("-w", "region", "-region", root.captureRegion);
             } else {

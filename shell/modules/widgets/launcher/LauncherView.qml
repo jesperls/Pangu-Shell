@@ -98,13 +98,13 @@ Rectangle {
             }
         }
 
-        if (text === clipPrefix) {
+        if (text.startsWith(clipPrefix)) {
             return 1;
-        } else if (text === emojiPrefix) {
+        } else if (text.startsWith(emojiPrefix)) {
             return 2;
-        } else if (text === tmuxPrefix) {
+        } else if (text.startsWith(tmuxPrefix)) {
             return 3;
-        } else if (text === notesPrefix) {
+        } else if (text.startsWith(notesPrefix)) {
             return 4;
         }
         return 0;
@@ -161,6 +161,7 @@ Rectangle {
 
         property string calcExpr: ""
         property string calcResult: ""
+        property string _pendingCalcExpr: ""
 
         function calcExprFor(text) {
             const t = text.trim();
@@ -190,6 +191,9 @@ Rectangle {
             id: calcDebounce
             interval: 150
             onTriggered: {
+                if (!appLauncher.calcExpr)
+                    return;
+                appLauncher._pendingCalcExpr = appLauncher.calcExpr;
                 calcProcess.running = false;
                 calcProcess.command = ["qalc", "-t", "--", appLauncher.calcExpr];
                 calcProcess.running = true;
@@ -200,6 +204,8 @@ Rectangle {
             id: calcProcess
             stdout: StdioCollector {
                 onStreamFinished: {
+                    if (!appLauncher.calcExpr || appLauncher._pendingCalcExpr !== appLauncher.calcExpr)
+                        return;
                     const result = text.trim();
                     if (result.length > 0 && result.length < 120 && result !== appLauncher.calcExpr && !result.startsWith("error")) {
                         appLauncher.calcResult = result;
@@ -211,16 +217,27 @@ Rectangle {
 
         function updateFilteredApps() {
             if (searchText.startsWith(">")) {
+                calcDebounce.stop();
+                calcProcess.running = false;
+                calcExpr = "";
+                calcResult = "";
+                _pendingCalcExpr = "";
                 filteredApps = LauncherActions.query(searchText.slice(1));
                 return;
             }
 
+            LauncherActions.clearConfirm();
             const expr = calcExprFor(searchText);
             if (expr !== calcExpr) {
                 calcExpr = expr;
                 calcResult = "";
-                if (expr.length > 0)
+                _pendingCalcExpr = "";
+                if (expr.length > 0) {
                     calcDebounce.restart();
+                } else {
+                    calcDebounce.stop();
+                    calcProcess.running = false;
+                }
             }
 
             let apps = searchText.length > 0 ? AppSearch.fuzzyQuery(searchText) : AppSearch.getAllApps();
@@ -294,6 +311,15 @@ Rectangle {
             if (!app || !app.execute)
                 return;
             if (app.isAction) {
+                if (app.confirm) {
+                    const keepOpen = app.execute();
+                    if (keepOpen) {
+                        updateFilteredApps();
+                        return;
+                    }
+                    Visibilities.setActiveModule("");
+                    return;
+                }
                 const run = app.execute;
                 Visibilities.setActiveModule("");
                 Qt.callLater(run);

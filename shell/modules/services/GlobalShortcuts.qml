@@ -46,12 +46,37 @@ QtObject {
             case "config": toggleSettings(); break;
             case "settings": toggleSettings(); break;
             case "screenshot": Screenshot.startCapture(); break;
-            case "screenrecord": ScreenRecorder.initialize(); GlobalStates.screenRecordReplayMode = false; GlobalStates.screenRecordToolVisible = true; break;
+            case "ocr": Screenshot.startCapture("ocr"); break;
+            case "qr": Screenshot.startCapture("qr"); break;
+            case "colorpicker":
+                Visibilities.setActiveModule("");
+                ApplicationLauncher.launchCommand(["python3", Paths.script("colorpicker.py")]);
+                break;
+            case "screenrecord":
+                if (ScreenRecorder.isRecording) {
+                    ScreenRecorder.toggleRecording();
+                } else {
+                    ScreenRecorder.initialize();
+                    GlobalStates.screenRecordReplayMode = false;
+                    GlobalStates.screenRecordToolVisible = true;
+                }
+                break;
             case "lens": Screenshot.startCapture("lens"); break;
             case "mirror": GlobalStates.mirrorWindowVisible = !GlobalStates.mirrorWindowVisible; break;
             case "cheatsheet": GlobalStates.cheatsheetVisible = !GlobalStates.cheatsheetVisible; break;
             case "macros": toggleMacros(); break;
             case "macros-stop": MacroService.stop(); break;
+            case "pomodoro": PomodoroService.toggleTimer(); break;
+            case "volume-up":
+                Audio.setVolume(Audio.value + 0.05);
+                break;
+            case "volume-down":
+                Audio.setVolume(Audio.value - 0.05);
+                break;
+            case "volume-mute":
+                if (Audio.sink?.audio)
+                    Audio.sink.audio.muted = !Audio.sink.audio.muted;
+                break;
             case "vpets":
             case "sanctuary":
                 Visibilities.setActiveModule("");

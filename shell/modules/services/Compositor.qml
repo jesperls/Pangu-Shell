@@ -43,6 +43,7 @@ Singleton {
     }
 
     property var gaps: ({})
+    signal layoutModeChanged(string screenName, string layoutName)
 
     function gapFor(screenName) {
         return root.gaps[screenName] ?? null;
@@ -52,6 +53,13 @@ Singleton {
         if (event.name !== "custom" || !event.data)
             return;
         const parts = event.data.split(",");
+        if (parts[0] === "layoutmode") {
+            const screenName = parts[1] || "";
+            const layoutName = parts[2] || "";
+            if (layoutName)
+                root.layoutModeChanged(screenName, layoutName);
+            return true;
+        }
         if (parts[0] !== "centergap")
             return;
         if (parts.length < 4)

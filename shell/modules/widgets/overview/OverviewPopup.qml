@@ -29,6 +29,7 @@ PanelWindow {
 
     readonly property var screenVisibilities: Visibilities.getForScreen(screen.name)
     readonly property bool overviewOpen: screenVisibilities ? screenVisibilities.overview : false
+    property bool animatedOpen: false
 
     function stepWorkspace(delta) {
         const mon = Compositor.monitorFor(overviewPopup.screen) ?? Compositor.focusedMonitor;
@@ -45,7 +46,7 @@ PanelWindow {
         }
     }
 
-    visible: overviewOpen
+    visible: overviewOpen || backdrop.opacity > 0.001
     exclusionMode: ExclusionMode.Ignore
 
     mask: Region {
@@ -81,7 +82,7 @@ PanelWindow {
         id: backdrop
         anchors.fill: parent
         color: Colors.scrim
-        opacity: overviewOpen ? 0.5 : 0
+        opacity: overviewPopup.animatedOpen ? 0.5 : 0
 
         Behavior on opacity {
             enabled: Styling.animDuration > 0
@@ -105,8 +106,8 @@ PanelWindow {
         width: Math.max(searchContainer.width, overviewContainer.width + (scrollbarContainer.visible ? scrollbarContainer.width + 8 : 0))
         height: searchContainer.height + 8 + overviewContainer.height
 
-        opacity: overviewOpen ? 1 : 0
-        scale: overviewOpen ? 1 : 0.9
+        opacity: overviewPopup.animatedOpen ? 1 : 0
+        scale: overviewPopup.animatedOpen ? 1 : 0.9
 
         Behavior on opacity {
             enabled: Styling.animDuration > 0
@@ -351,15 +352,32 @@ PanelWindow {
         }
     }
 
+    Component.onCompleted: {
+        if (overviewOpen) {
+            Qt.callLater(() => {
+                if (overviewOpen)
+                    animatedOpen = true;
+                searchInput.clear();
+                if (overviewLoader.item)
+                    overviewLoader.item.resetSearch();
+                searchInput.focusInput();
+            });
+        }
+    }
+
     onOverviewOpenChanged: {
         if (overviewOpen) {
             Qt.callLater(() => {
+                if (overviewOpen)
+                    animatedOpen = true;
                 searchInput.clear();
                 if (overviewLoader.item) {
                     overviewLoader.item.resetSearch();
                 }
                 searchInput.focusInput();
             });
+        } else {
+            animatedOpen = false;
         }
     }
 }

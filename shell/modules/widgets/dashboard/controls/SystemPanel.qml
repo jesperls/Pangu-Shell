@@ -887,6 +887,130 @@ Item {
                                 Config.system.replay.seconds = newValue;
                             }
                         }
+
+                        SettingsNumberInputRow {
+                            label: "Recording FPS"
+                            value: Config.system.recorder.fps
+                            minValue: 15
+                            maxValue: 240
+                            suffix: "fps"
+                            onValueEdited: newValue => {
+                                Config.system.recorder.fps = newValue;
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Text {
+                                text: "Recording Codec"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(0)
+                                color: Colors.overBackground
+                                Layout.fillWidth: true
+                            }
+
+                            Flow {
+                                Layout.preferredWidth: 260
+                                spacing: 6
+
+                                Repeater {
+                                    model: ["auto", "h264", "hevc", "av1", "hevc_hdr", "av1_hdr"]
+                                    delegate: StyledRect {
+                                        id: recCodecChip
+                                        required property string modelData
+                                        property bool isSelected: Config.system.recorder.codec === modelData
+                                        property bool isHovered: false
+                                        variant: isSelected ? "primary" : (isHovered ? "focus" : "common")
+                                        width: recCodecLabel.implicitWidth + 16
+                                        height: 28
+                                        radius: Styling.radius(-4)
+
+                                        Text {
+                                            id: recCodecLabel
+                                            anchors.centerIn: parent
+                                            text: recCodecChip.modelData
+                                            font.family: Config.theme.font
+                                            font.pixelSize: Styling.fontSize(-2)
+                                            font.weight: recCodecChip.isSelected ? Font.Bold : Font.Normal
+                                            color: recCodecChip.item
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onEntered: recCodecChip.isHovered = true
+                                            onExited: recCodecChip.isHovered = false
+                                            onClicked: Config.system.recorder.codec = recCodecChip.modelData
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingsNumberInputRow {
+                            label: "Replay FPS"
+                            value: Config.system.replay.fps
+                            minValue: 15
+                            maxValue: 240
+                            suffix: "fps"
+                            onValueEdited: newValue => {
+                                Config.system.replay.fps = newValue;
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Text {
+                                text: "Replay Codec"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(0)
+                                color: Colors.overBackground
+                                Layout.fillWidth: true
+                            }
+
+                            Flow {
+                                Layout.preferredWidth: 260
+                                spacing: 6
+
+                                Repeater {
+                                    model: ["auto", "h264", "hevc", "av1", "hevc_hdr", "av1_hdr"]
+                                    delegate: StyledRect {
+                                        id: repCodecChip
+                                        required property string modelData
+                                        property bool isSelected: Config.system.replay.codec === modelData
+                                        property bool isHovered: false
+                                        variant: isSelected ? "primary" : (isHovered ? "focus" : "common")
+                                        width: repCodecLabel.implicitWidth + 16
+                                        height: 28
+                                        radius: Styling.radius(-4)
+
+                                        Text {
+                                            id: repCodecLabel
+                                            anchors.centerIn: parent
+                                            text: repCodecChip.modelData
+                                            font.family: Config.theme.font
+                                            font.pixelSize: Styling.fontSize(-2)
+                                            font.weight: repCodecChip.isSelected ? Font.Bold : Font.Normal
+                                            color: repCodecChip.item
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onEntered: repCodecChip.isHovered = true
+                                            onExited: repCodecChip.isHovered = false
+                                            onClicked: Config.system.replay.codec = repCodecChip.modelData
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     ColumnLayout {

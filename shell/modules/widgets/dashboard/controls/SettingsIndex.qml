@@ -80,6 +80,10 @@ QtObject {
         { label: "Auto-Switch EasyEffects Presets", keywords: "audio easyeffects preset device switch scarlett headset", section: "system", subSection: "system", subLabel: "System > Resources", icon: Icons.waveform, isIcon: true },
 
         { label: "Replay Buffer Length", keywords: "recording clip instant replay seconds", section: "system", subSection: "recording", subLabel: "System > Recording", icon: Icons.recordScreen, isIcon: true },
+        { label: "Recording FPS", keywords: "screen recorder frame rate fps 60 120 240 video", section: "system", subSection: "recording", subLabel: "System > Recording", icon: Icons.recordScreen, isIcon: true },
+        { label: "Recording Codec", keywords: "screen recorder codec h264 hevc av1 hdr encoder", section: "system", subSection: "recording", subLabel: "System > Recording", icon: Icons.recordScreen, isIcon: true },
+        { label: "Replay FPS", keywords: "instant replay frame rate fps 60 120 240 clip", section: "system", subSection: "recording", subLabel: "System > Recording", icon: Icons.recordScreen, isIcon: true },
+        { label: "Replay Codec", keywords: "instant replay codec h264 hevc av1 hdr encoder", section: "system", subSection: "recording", subLabel: "System > Recording", icon: Icons.recordScreen, isIcon: true },
 
         { label: "Slideshow", keywords: "wallpaper cycle rotate shuffle background", section: "system", subSection: "wallpaper", subLabel: "System > Wallpaper", icon: Icons.image, isIcon: true },
         { label: "Shuffle Wallpapers", keywords: "shuffle random wallpaper slideshow", section: "system", subSection: "wallpaper", subLabel: "System > Wallpaper", icon: Icons.image, isIcon: true },

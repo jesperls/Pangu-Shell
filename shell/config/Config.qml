@@ -726,6 +726,12 @@ Singleton {
             }
             property JsonObject replay: JsonObject {
                 property int seconds: 60
+                property int fps: 60
+                property string codec: "auto"
+            }
+            property JsonObject recorder: JsonObject {
+                property int fps: 60
+                property string codec: "auto"
             }
             property JsonObject nightLight: JsonObject {
                 property int temperature: 4500

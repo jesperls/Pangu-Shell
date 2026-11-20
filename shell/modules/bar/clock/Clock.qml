@@ -36,6 +36,7 @@ Item {
     property bool popupOpen: clockPopup.isOpen
 
     readonly property bool weatherAvailable: WeatherService.dataAvailable
+    readonly property bool pomodoroActive: PomodoroService.isRunning || PomodoroService.alarmActive
 
     Layout.preferredWidth: vertical ? 36 : buttonBg.implicitWidth
     Layout.preferredHeight: vertical ? buttonBg.implicitHeight : 36
@@ -117,6 +118,32 @@ Item {
                 font.family: Config.theme.font
                 font.bold: true
             }
+
+            Separator {
+                visible: root.pomodoroActive
+                vert: true
+            }
+
+            RowLayout {
+                visible: root.pomodoroActive
+                spacing: 4
+                Layout.alignment: Qt.AlignVCenter
+
+                Text {
+                    text: Icons.timer
+                    font.family: Icons.font
+                    font.pixelSize: 14
+                    color: root.popupOpen ? buttonBg.item : (PomodoroService.alarmActive && PomodoroService.blinkPhase ? Colors.error : Colors.primary)
+                }
+
+                Text {
+                    text: PomodoroService.formattedTime
+                    font.family: Config.theme.monoFont
+                    font.pixelSize: Styling.fontSize(-1)
+                    font.weight: Font.Bold
+                    color: root.popupOpen ? buttonBg.item : (PomodoroService.alarmActive && PomodoroService.blinkPhase ? Colors.error : Colors.primary)
+                }
+            }
         }
 
         ColumnLayout {
@@ -176,6 +203,24 @@ Item {
                 font.pixelSize: Styling.fontSize(-2)
                 font.family: Config.theme.font
                 font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.NoWrap
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Separator {
+                visible: root.pomodoroActive
+                vert: false
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                visible: root.pomodoroActive
+                text: PomodoroService.formattedTime
+                font.family: Config.theme.monoFont
+                font.pixelSize: Styling.fontSize(-3)
+                font.weight: Font.Bold
+                color: root.popupOpen ? buttonBg.item : (PomodoroService.alarmActive && PomodoroService.blinkPhase ? Colors.error : Colors.primary)
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.NoWrap
                 Layout.alignment: Qt.AlignHCenter

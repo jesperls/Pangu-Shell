@@ -47,6 +47,13 @@ PanelWindow {
     property bool closing: false
     readonly property real osdValue: GlobalStates.osdValue
     readonly property bool osdMuted: GlobalStates.osdMuted
+    readonly property bool isLayoutOsd: GlobalStates.osdIndicator === "layout"
+    readonly property bool isVolumeBoosted: GlobalStates.osdIndicator === "volume" && !root.osdMuted && root.osdValue > 1.005
+    readonly property real sliderValue: {
+        if (GlobalStates.osdIndicator === "volume")
+            return Math.max(0, Math.min(1, root.osdValue / Math.max(1, Audio.hardMaxValue)));
+        return Math.max(0, Math.min(1, root.osdValue));
+    }
     readonly property bool shown: GlobalStates.osdVisible && isTargetScreen
 
     visible: targetScreen !== null && (shown || closing) && isTargetScreen
@@ -141,6 +148,8 @@ PanelWindow {
                                 return Audio.volumeIcon(root.osdValue, root.osdMuted);
                             } else if (GlobalStates.osdIndicator === "mic") {
                                 return root.osdMuted ? Icons.micSlash : Icons.mic;
+                            } else if (GlobalStates.osdIndicator === "layout") {
+                                return Icons.layout;
                             } else {
                                 return Icons.sun;
                             }
@@ -159,6 +168,8 @@ PanelWindow {
                             return Audio.volumeIcon(root.osdValue, root.osdMuted);
                         } else if (GlobalStates.osdIndicator === "mic") {
                             return root.osdMuted ? Icons.micSlash : Icons.mic;
+                        } else if (GlobalStates.osdIndicator === "layout") {
+                            return Icons.layout;
                         } else {
                             return Icons.sun;
                         }
@@ -186,6 +197,8 @@ PanelWindow {
                                     return "Microphone";
                                 if (GlobalStates.osdIndicator === "brightness")
                                     return "Brightness";
+                                if (GlobalStates.osdIndicator === "layout")
+                                    return "Layout";
                                 return "";
                             }
                             font.family: Config.theme.font
@@ -201,39 +214,30 @@ PanelWindow {
 
                         Text {
                             id: percentText
-                            text: Math.round(root.osdValue * 100) + "%"
+                            text: root.isLayoutOsd ? GlobalStates.osdLabel : (Math.round(root.osdValue * 100) + "%")
                             font.family: Config.theme.font
                             font.pixelSize: Styling.fontSize(0)
                             font.weight: Font.Bold
-                            color: Styling.srItem("overprimary")
-                            visible: (Config.osd && Config.osd.showPercentage !== false)
+                            color: root.isVolumeBoosted ? Colors.tertiary : Styling.srItem("overprimary")
+                            visible: root.isLayoutOsd || (Config.osd && Config.osd.showPercentage !== false)
                             Layout.alignment: Qt.AlignBottom
-
                             scale: root.percentPulse
-                            Behavior on scale {
-                                enabled: Styling.animDuration > 0
-                                NumberAnimation {
-                                    duration: Styling.animDuration / 2
-                                    easing.type: Easing.OutBack
-                                    easing.overshoot: 1.2
-                                }
-                            }
                         }
                     }
 
                     StyledSlider {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 10
-                        value: root.osdValue
+                        value: root.sliderValue
                         wavy: false
                         enabled: false
                         thickness: 4
                         handleSpacing: 0
                         gradientProgress: true
-                        progressColor: root.osdMuted ? Colors.outline : Colors.primary
-                        progressColor2: root.osdMuted ? Colors.outline : Colors.tertiary
+                        progressColor: root.osdMuted ? Colors.outline : (root.isVolumeBoosted ? Colors.tertiary : Colors.primary)
+                        progressColor2: root.osdMuted ? Colors.outline : (root.isVolumeBoosted ? Colors.error : Colors.tertiary)
                         backgroundColor: Qt.rgba(Colors.overBackground.r, Colors.overBackground.g, Colors.overBackground.b, 0.16)
-                        visible: (Config.osd && Config.osd.showSlider !== false)
+                        visible: !root.isLayoutOsd && (Config.osd && Config.osd.showSlider !== false)
                     }
                 }
             }
@@ -243,9 +247,13 @@ PanelWindow {
     property real percentPulse: 1.0
 
     onOsdValueChanged: {
-        if (!root.visible)
+        if (!root.visible || root.isLayoutOsd)
             return;
-        percentPulse = 1.25;
+        if (Styling.animDuration <= 0) {
+            percentPulse = 1.0;
+            return;
+        }
+        percentPulse = 1.2;
         percentPulseAnim.restart();
     }
 
@@ -260,9 +268,6 @@ PanelWindow {
 
     HoverHandler {
         target: osdRect
-        onHoveredChanged: {
-            if (hovered)
-                GlobalStates.restartOsdTimer();
-        }
+        onHoveredChanged: GlobalStates.setOsdHovered(hovered)
     }
 }

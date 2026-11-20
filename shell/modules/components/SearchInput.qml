@@ -117,6 +117,15 @@ StyledRect {
                         root.accepted();
                     }
                     event.accepted = true;
+                } else if ((event.key === Qt.Key_J || event.key === Qt.Key_N) && (event.modifiers & Qt.ControlModifier)) {
+                    root.downPressed();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_K && (event.modifiers & Qt.ControlModifier)) {
+                    root.upPressed();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
+                    clear();
+                    event.accepted = true;
                 } else if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
                     root.ctrlRPressed();
                     event.accepted = true;
@@ -159,11 +168,15 @@ StyledRect {
                     root.pageUpPressed();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Home) {
-                    root.homePressed();
-                    event.accepted = true;
+                    if ((event.modifiers & Qt.ControlModifier) || textField.text.length === 0) {
+                        root.homePressed();
+                        event.accepted = true;
+                    }
                 } else if (event.key === Qt.Key_End) {
-                    root.endPressed();
-                    event.accepted = true;
+                    if ((event.modifiers & Qt.ControlModifier) || textField.text.length === 0) {
+                        root.endPressed();
+                        event.accepted = true;
+                    }
                 }
             }
         }

@@ -18,6 +18,7 @@ import qs.modules.services
 import qs.modules.corners
 import qs.modules.frame
 import qs.modules.components
+import qs.modules.theme
 import qs.modules.lockscreen
 import qs.modules.dock
 import qs.modules.globals
@@ -106,8 +107,26 @@ ShellRoot {
 
         Loader {
             id: overviewLoader
-            active: modelData !== null && ((Config.overview && Config.overview.enabled !== undefined ? Config.overview.enabled : true)) && SuspendManager.wakeReady && overviewEnabledFor(modelData.name)
             required property ShellScreen modelData
+            property bool wantOpen: modelData !== null && ((Config.overview && Config.overview.enabled !== undefined ? Config.overview.enabled : true)) && SuspendManager.wakeReady && overviewEnabledFor(modelData.name)
+            property bool holdOpen: false
+            onWantOpenChanged: {
+                if (wantOpen) {
+                    overviewCloseTimer.stop();
+                    holdOpen = false;
+                } else if (Styling.animDuration > 0 && active) {
+                    holdOpen = true;
+                    overviewCloseTimer.restart();
+                } else {
+                    holdOpen = false;
+                }
+            }
+            Timer {
+                id: overviewCloseTimer
+                interval: Math.max(1, Styling.animDuration + 30)
+                onTriggered: overviewLoader.holdOpen = false
+            }
+            active: wantOpen || holdOpen
             sourceComponent: OverviewPopup {
                 screen: overviewLoader.modelData
             }
@@ -207,7 +226,25 @@ ShellRoot {
         Loader {
             id: cheatsheetLoader
             required property ShellScreen modelData
-            active: GlobalStates.cheatsheetVisible && (Quickshell.screens.length === 1 || Compositor.focusedMonitor?.name === modelData.name)
+            property bool wantOpen: GlobalStates.cheatsheetVisible && (Quickshell.screens.length === 1 || Compositor.focusedMonitor?.name === modelData.name)
+            property bool holdOpen: false
+            onWantOpenChanged: {
+                if (wantOpen) {
+                    cheatsheetCloseTimer.stop();
+                    holdOpen = false;
+                } else if (Styling.animDuration > 0 && active) {
+                    holdOpen = true;
+                    cheatsheetCloseTimer.restart();
+                } else {
+                    holdOpen = false;
+                }
+            }
+            Timer {
+                id: cheatsheetCloseTimer
+                interval: Math.max(1, Styling.animDuration + 30)
+                onTriggered: cheatsheetLoader.holdOpen = false
+            }
+            active: wantOpen || holdOpen
             sourceComponent: CheatsheetPopup {
                 screen: cheatsheetLoader.modelData
             }
@@ -236,6 +273,13 @@ ShellRoot {
             sourceComponent: MousePickOverlay {
                 targetScreen: mousePickLoader.modelData
             }
+        }
+    }
+
+    Connections {
+        target: Compositor
+        function onLayoutModeChanged(screenName, layoutName) {
+            GlobalStates.showLayoutOsd(layoutName, screenName);
         }
     }
 

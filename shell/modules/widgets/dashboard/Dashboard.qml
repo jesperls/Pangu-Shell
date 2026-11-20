@@ -25,9 +25,9 @@ NotchAnimationBehavior {
     }
 
     readonly property var tabDefs: [
-        { icon: Icons.widgets },
-        { icon: Icons.wallpapers },
-        { icon: Icons.heartbeat }
+        { icon: Icons.widgets, label: "Widgets" },
+        { icon: Icons.wallpapers, label: "Wallpapers" },
+        { icon: Icons.heartbeat, label: "Metrics" }
     ]
 
     readonly property var tabIndices: {
@@ -54,7 +54,7 @@ NotchAnimationBehavior {
         return tabIndices.indexOf(componentIndex);
     }
 
-    readonly property var tabModel: tabIndices.map(i => tabDefs[i].icon)
+    readonly property var tabModel: tabIndices.map(i => tabDefs[i])
 
     readonly property int baseContentWidth: {
         const item = stack.currentItem;
@@ -326,6 +326,11 @@ NotchAnimationBehavior {
                 }
 
                 onClicked: GlobalShortcuts.toggleSettings(root.screenName)
+
+                StyledToolTip {
+                    show: controlsButton.hovered
+                    tooltipText: "Settings"
+                }
             }
         }
 
@@ -509,6 +514,24 @@ NotchAnimationBehavior {
         }
     }
 
+    Shortcut {
+        sequence: "Ctrl+1"
+        enabled: GlobalStates.dashboardOpen && root.tabCount > 0
+        onActivated: stack.navigateToTab(0)
+    }
+
+    Shortcut {
+        sequence: "Ctrl+2"
+        enabled: GlobalStates.dashboardOpen && root.tabCount > 1
+        onActivated: stack.navigateToTab(1)
+    }
+
+    Shortcut {
+        sequence: "Ctrl+3"
+        enabled: GlobalStates.dashboardOpen && root.tabCount > 2
+        onActivated: stack.navigateToTab(2)
+    }
+
     property real animatedWidth: implicitWidth
     property real animatedHeight: implicitHeight
 
@@ -539,11 +562,13 @@ NotchAnimationBehavior {
     Component {
         id: tabButtonComponent
         Button {
+            id: tabBtn
             required property int index
-            required property string modelData
+            required property var modelData
 
-            text: modelData
+            text: modelData.icon
             flat: true
+            hoverEnabled: true
             width: root.tabWidth
             height: root.tabWidth
 
@@ -555,7 +580,7 @@ NotchAnimationBehavior {
             contentItem: Text {
                 text: parent.text
                 textFormat: Text.RichText
-                color: root.state.currentTab === index ? Styling.srItem("primary") : Colors.overBackground
+                color: root.state.currentTab === tabBtn.index ? Styling.srItem("primary") : Colors.overBackground
                 font.family: Icons.font
                 font.pixelSize: 20
                 font.weight: Font.Medium
@@ -572,6 +597,11 @@ NotchAnimationBehavior {
             }
 
             onClicked: stack.navigateToTab(index)
+
+            StyledToolTip {
+                show: tabBtn.hovered
+                tooltipText: tabBtn.modelData.label + " (Ctrl+" + (tabBtn.index + 1) + ")"
+            }
         }
     }
 

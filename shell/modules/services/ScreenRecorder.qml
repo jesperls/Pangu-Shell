@@ -132,7 +132,15 @@ Singleton {
 
         var outputFile = root.videosDir + "/" + new Date().toISOString().replace(/[:.]/g, "-") + ".mp4";
         root.lastOutputFile = outputFile;
-        var cmd = ["gpu-screen-recorder", "-f", "60", "-w", mode, "-fallback-cpu-encoding", "yes"];
+        var fps = (typeof Config !== "undefined" && Config.system?.recorder?.fps > 0)
+            ? Math.max(15, Math.min(240, Math.round(Config.system.recorder.fps)))
+            : 60;
+        var codec = (typeof Config !== "undefined" && Config.system?.recorder?.codec)
+            ? String(Config.system.recorder.codec)
+            : "auto";
+        var cmd = ["gpu-screen-recorder", "-f", String(fps), "-w", mode, "-fallback-cpu-encoding", "yes"];
+        if (["h264", "hevc", "av1", "hevc_hdr", "av1_hdr"].indexOf(codec) !== -1)
+            cmd.push("-k", codec);
         if (mode === "region" && regionStr)
             cmd.push("-region", regionStr);
 
@@ -200,9 +208,22 @@ Singleton {
         running: false
         onExited: exitCode => {
             if (exitCode === 0) {
+                const savedPath = root.lastOutputFile;
+                const savedDir = root.videosDir;
                 Notifications.notifyInternal({
+                    appName: "Screen Recorder",
                     summary: "Screen Recorder",
-                    body: "Recording saved to " + root.lastOutputFile
+                    body: "Recording saved to " + savedPath,
+                    actions: [
+                        { identifier: "open", text: "Open" },
+                        { identifier: "copy", text: "Copy URI" },
+                        { identifier: "folder", text: "Open Folder" }
+                    ],
+                    actionHandlers: {
+                        open: () => ApplicationLauncher.launchCommand(["mpv", "--", savedPath]),
+                        copy: () => Quickshell.execDetached(["bash", "-c", "printf '%s\\r\\n' \"$1\" | wl-copy --type text/uri-list", "pangu-rec-copy", Paths.toFileUrl(savedPath)]),
+                        folder: () => ApplicationLauncher.launchCommand(["xdg-open", savedDir])
+                    }
                 });
             }
         }

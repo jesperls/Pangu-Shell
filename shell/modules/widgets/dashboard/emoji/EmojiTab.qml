@@ -64,6 +64,16 @@ Rectangle {
     property bool clearButtonFocused: false
     property bool clearButtonConfirmState: false
 
+    function applySkinTone(baseEmoji, modifier) {
+        if (!baseEmoji || !modifier)
+            return baseEmoji || "";
+        const zwj = "\u200D";
+        const zwjIndex = baseEmoji.indexOf(zwj);
+        const head = (zwjIndex !== -1 ? baseEmoji.slice(0, zwjIndex) : baseEmoji).replace(/\uFE0F/g, "");
+        const tail = zwjIndex !== -1 ? baseEmoji.slice(zwjIndex) : "";
+        return head + modifier + tail;
+    }
+
     function getSkinToneName(modifier) {
         for (var i = 0; i < skinTones.length; i++) {
             if (skinTones[i].modifier === modifier)
@@ -160,6 +170,63 @@ Rectangle {
         updateFilteredEmojis();
     }
 
+    property var _pendingEmojis: []
+    property int _loadedEmojis: 0
+
+    Timer {
+        id: emojiBatchTimer
+        interval: 16
+        repeat: true
+        running: false
+        onTriggered: {
+            const total = root._pendingEmojis.length;
+            if (root._loadedEmojis >= total) {
+                running = false;
+                return;
+            }
+            const end = Math.min(root._loadedEmojis + 120, total);
+            for (let i = root._loadedEmojis; i < end; i++) {
+                const e = root._pendingEmojis[i];
+                emojisModel.append({
+                    emojiId: e.search,
+                    emojiData: e,
+                    isRecentContainer: false
+                });
+            }
+            root._loadedEmojis = end;
+            if (end >= total)
+                running = false;
+        }
+    }
+
+    function _populateEmojiModel(list, includeRecent) {
+        if (typeof emojiBatchTimer !== "undefined")
+            emojiBatchTimer.stop();
+        emojisModel.clear();
+        if (includeRecent) {
+            emojisModel.append({
+                emojiId: "recent_container",
+                emojiData: {},
+                isRecentContainer: true
+            });
+        }
+        const batch = typeof emojiBatchTimer !== "undefined" ? Math.min(40, list.length) : list.length;
+        for (let i = 0; i < batch; i++) {
+            const e = list[i];
+            emojisModel.append({
+                emojiId: e.search,
+                emojiData: e,
+                isRecentContainer: false
+            });
+        }
+        if (typeof emojiBatchTimer !== "undefined") {
+            _pendingEmojis = list;
+            _loadedEmojis = batch;
+            if (batch < list.length)
+                emojiBatchTimer.start();
+        }
+    }
+
     function updateFilteredEmojis() {
         var filtered = [];
         var searchLower = searchText.toLowerCase();
@@ -173,13 +240,17 @@ Rectangle {
             }
         }
         filteredEmojis = filtered;
-        emojisModel.clear();
-        for (var i = 0; i < filtered.length; i++) {
-            emojisModel.append({
-                emojiId: filtered[i].search,
-                emojiData: filtered[i],
-                isRecentContainer: false
-            });
+        if (typeof _populateEmojiModel === "function") {
+            _populateEmojiModel(filtered, false);
+        } else {
+            emojisModel.clear();
+            for (var j = 0; j < filtered.length; j++) {
+                emojisModel.append({
+                    emojiId: filtered[j].search,
+                    emojiData: filtered[j],
+                    isRecentContainer: false
+                });
+            }
         }
         selectedIndex = filteredEmojis.length > 0 ? 0 : -1;
     }
@@ -195,31 +266,12 @@ Rectangle {
     }
 
     function loadInitialEmojis() {
-        emojisModel.clear();
-        if (recentEmojis.length > 0 && searchText === "") {
-            emojisModel.append({
-                emojiId: "recent_container",
-                emojiData: {},
-                isRecentContainer: true
-            });
-        }
-        var initial = [];
-        for (var i = 0; i < emojiData.length; i++) {
-            var e = emojiData[i];
-            emojisModel.append({
-                emojiId: e.search,
-                emojiData: e,
-                isRecentContainer: false
-            });
-            initial.push(e);
-        }
-        filteredEmojis = initial;
+        filteredEmojis = emojiData.slice();
+        _populateEmojiModel(filteredEmojis, recentEmojis.length > 0 && searchText === "");
     }
 
     function copyEmoji(emoji, skinToneModifier) {
-        var emojiToCopy = emoji.emoji;
-        if (skinToneModifier && skinToneModifier !== "")
-            emojiToCopy = emoji.emoji + skinToneModifier;
+        var emojiToCopy = applySkinTone(emoji.emoji, skinToneModifier);
         var emojiForRecent = {
             emoji: emojiToCopy,
             name: emoji.name + (skinToneModifier ? " (" + getSkinToneName(skinToneModifier) + ")" : ""),
@@ -736,7 +788,7 @@ Rectangle {
                                             anchors.margins: 8
                                             spacing: 8
                                             Text {
-                                                text: emojiData.emoji + modelData.modifier
+                                                text: root.applySkinTone(emojiData.emoji, modelData.modifier)
                                                 font.pixelSize: 20
                                             }
                                             Text {

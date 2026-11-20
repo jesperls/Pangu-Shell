@@ -4,7 +4,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Widgets
 import qs.modules.components
 import qs.modules.corners
 import qs.modules.services
@@ -17,8 +19,48 @@ WlSessionLockSurface {
     id: root
 
     property bool startAnim: false
+    property bool capsLockOn: false
+    property string pendingPowerAction: ""
     readonly property bool authenticating: LockscreenService.authenticating
     readonly property bool isPrimaryScreen: Compositor.focusedMonitor ? root.screen?.name === Compositor.focusedMonitor.name : (Quickshell.screens.length <= 1 || root.screen === Quickshell.screens[0])
+
+    function probeCapsLock() {
+        if (!capsLockProbe.running)
+            capsLockProbe.running = true;
+    }
+
+    function triggerPowerAction(id, cmd, requireConfirm) {
+        if (requireConfirm && root.pendingPowerAction !== id) {
+            root.pendingPowerAction = id;
+            powerConfirmTimer.restart();
+            return;
+        }
+        powerConfirmTimer.stop();
+        root.pendingPowerAction = "";
+        Quickshell.execDetached(cmd);
+    }
+
+    Process {
+        id: capsLockProbe
+        command: ["sh", "-c", "cat /sys/class/leds/*::capslock/brightness 2>/dev/null | grep -q 1 && echo 1 || echo 0"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.capsLockOn = this.text.trim() === "1";
+            }
+        }
+    }
+
+    Timer {
+        id: capsProbeTimer
+        interval: 30 // Let kernel LED state settle after CapsLock key toggle.
+        onTriggered: root.probeCapsLock()
+    }
+
+    Timer {
+        id: powerConfirmTimer
+        interval: 4000
+        onTriggered: root.pendingPowerAction = ""
+    }
 
     color: "transparent"
 
@@ -35,7 +77,7 @@ WlSessionLockSurface {
             return GlobalStates.wallpaperManager.getLockscreenFramePath(GlobalStates.wallpaperManager.currentWallpaper);
         }
 
-        source: lockscreenFramePath ? "file://" + lockscreenFramePath + "?v=" + (GlobalStates.wallpaperManager?.lockscreenVersion ?? 0) : ""
+        source: lockscreenFramePath ? Paths.toFileUrl(lockscreenFramePath) + "?v=" + (GlobalStates.wallpaperManager?.lockscreenVersion ?? 0) : ""
 
         opacity: startAnim ? 1 : 0
         visible: true
@@ -422,6 +464,7 @@ WlSessionLockSurface {
 
             property real shakeOffset: 0
             property bool showError: false
+            property bool showPassword: false
 
             transform: Translate {
                 x: passwordInputBox.shakeOffset
@@ -433,7 +476,7 @@ WlSessionLockSurface {
                 anchors.rightMargin: 24
                 spacing: 12
 
-                Rectangle {
+                ClippingRectangle {
                     id: avatarContainer
                     width: 64
                     height: 64
@@ -446,25 +489,12 @@ WlSessionLockSurface {
                         mipmap: true
                         id: userAvatar
                         anchors.fill: parent
-                        source: GlobalStates.hasAvatar ? "file://" + Paths.avatar + (GlobalStates.avatarCacheBuster ? "?t=" + GlobalStates.avatarCacheBuster : "") : ""
+                        source: GlobalStates.hasAvatar ? Paths.toFileUrl(Paths.avatar) + (GlobalStates.avatarCacheBuster ? "?t=" + GlobalStates.avatarCacheBuster : "") : ""
+                        sourceSize: Qt.size(128, 128)
                         fillMode: Image.PreserveAspectCrop
                         smooth: true
                         asynchronous: true
                         visible: status === Image.Ready
-
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1.0
-                            maskSource: ShaderEffectSource {
-                                sourceItem: Rectangle {
-                                    width: userAvatar.width
-                                    height: userAvatar.height
-                                    radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
-                                }
-                            }
-                        }
                     }
 
                     Text {
@@ -488,7 +518,7 @@ WlSessionLockSurface {
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 16
-                        anchors.rightMargin: 32
+                        anchors.rightMargin: 12
                         spacing: 8
 
                         Text {
@@ -538,7 +568,7 @@ WlSessionLockSurface {
                             font.pixelSize: Styling.fontSize(0)
                             color: passwordFieldBg.item
                             background: null
-                            echoMode: TextInput.Password
+                            echoMode: passwordInputBox.showPassword ? TextInput.Normal : TextInput.Password
                             verticalAlignment: TextInput.AlignVCenter
                             enabled: !root.authenticating
 
@@ -563,8 +593,19 @@ WlSessionLockSurface {
                                     LockscreenService.clearError();
                             }
 
+                            Keys.onPressed: event => {
+                                if (event.key === Qt.Key_CapsLock)
+                                    capsProbeTimer.restart();
+                            }
+
+                            Keys.onReleased: event => {
+                                if (event.key === Qt.Key_CapsLock)
+                                    capsProbeTimer.restart();
+                            }
+
                             Keys.onEscapePressed: {
                                 passwordInput.text = "";
+                                passwordInputBox.showPassword = false;
                                 LockscreenService.clearError();
                             }
 
@@ -574,7 +615,39 @@ WlSessionLockSurface {
 
                                 const submitted = passwordInput.text;
                                 passwordInput.text = "";
+                                passwordInputBox.showPassword = false;
                                 LockscreenService.authenticate(submitted);
+                            }
+                        }
+
+                        Item {
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
+                            Layout.alignment: Qt.AlignVCenter
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: passwordInputBox.showPassword ? Icons.eyeSlash : Icons.eye
+                                font.family: Icons.font
+                                font.pixelSize: 18
+                                color: passwordFieldBg.item
+                                opacity: showPassMouse.containsMouse ? 1.0 : 0.65
+                            }
+
+                            MouseArea {
+                                id: showPassMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    passwordInputBox.showPassword = !passwordInputBox.showPassword;
+                                    passwordInput.forceActiveFocus();
+                                }
+                            }
+
+                            StyledToolTip {
+                                tooltipText: passwordInputBox.showPassword ? qsTr("Hide password") : qsTr("Show password")
+                                visible: showPassMouse.containsMouse
                             }
                         }
                     }
@@ -625,6 +698,142 @@ WlSessionLockSurface {
                 }
             }
         }
+        StyledRect {
+            id: capsWarningPill
+            variant: "error"
+            visible: root.capsLockOn
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: passwordContainer.isTopPosition ? undefined : passwordInputBox.top
+            anchors.bottomMargin: passwordContainer.isTopPosition ? 0 : 10
+            anchors.top: passwordContainer.isTopPosition ? passwordInputBox.bottom : undefined
+            anchors.topMargin: passwordContainer.isTopPosition ? 10 : 0
+            width: capsWarningRow.implicitWidth + 20
+            height: 28
+            radius: Styling.radius(14)
+
+            Row {
+                id: capsWarningRow
+                anchors.centerIn: parent
+                spacing: 6
+
+                Text {
+                    text: Icons.alert
+                    font.family: Icons.font
+                    font.pixelSize: 14
+                    color: capsWarningPill.item
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: qsTr("Caps Lock is on")
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(-2)
+                    font.weight: Font.Medium
+                    color: capsWarningPill.item
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
+    StyledRect {
+        id: powerActionsContainer
+        variant: "bg"
+        z: 10
+        visible: root.isPrimaryScreen
+        property bool isTopPosition: Config.lockscreen.position === "top"
+
+        anchors {
+            right: parent.right
+            rightMargin: startAnim ? 32 : -(powerActionsContainer.width + 64)
+            top: isTopPosition ? parent.top : undefined
+            topMargin: isTopPosition ? 32 : 0
+            bottom: !isTopPosition ? parent.bottom : undefined
+            bottomMargin: !isTopPosition ? 32 : 0
+        }
+        width: powerActionsRow.implicitWidth + 16
+        height: 52
+        radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
+        opacity: startAnim ? 1 : 0
+
+        Behavior on anchors.rightMargin {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration * 2
+                easing.type: Easing.OutExpo
+            }
+        }
+
+        Behavior on opacity {
+            enabled: Styling.animDuration > 0
+            NumberAnimation {
+                duration: Styling.animDuration * 2
+                easing.type: Easing.OutQuad
+            }
+        }
+
+        Row {
+            id: powerActionsRow
+            anchors.centerIn: parent
+            spacing: 8
+
+            Repeater {
+                model: [
+                    {
+                        id: "suspend",
+                        icon: Icons.suspend,
+                        label: qsTr("Suspend"),
+                        cmd: ["systemctl", "suspend"],
+                        confirm: false
+                    },
+                    {
+                        id: "reboot",
+                        icon: Icons.reboot,
+                        label: qsTr("Reboot"),
+                        cmd: ["systemctl", "reboot"],
+                        confirm: true
+                    },
+                    {
+                        id: "poweroff",
+                        icon: Icons.shutdown,
+                        label: qsTr("Power Off"),
+                        cmd: ["systemctl", "poweroff"],
+                        confirm: true
+                    }
+                ]
+
+                StyledRect {
+                    id: powerChip
+                    required property var modelData
+                    readonly property bool confirming: root.pendingPowerAction === modelData.id
+                    width: 36
+                    height: 36
+                    radius: Config.roundness > 0 ? (height / 2) * (Config.roundness / 16) : 0
+                    variant: confirming ? "error" : (powerChipMouse.containsMouse ? "primary" : "common")
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: powerChip.modelData.icon
+                        font.family: Icons.font
+                        font.pixelSize: 18
+                        color: powerChip.item
+                    }
+
+                    MouseArea {
+                        id: powerChipMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.triggerPowerAction(powerChip.modelData.id, powerChip.modelData.cmd, powerChip.modelData.confirm)
+                    }
+
+                    StyledToolTip {
+                        tooltipText: powerChip.confirming ? qsTr("Click again to %1").arg(powerChip.modelData.label) : powerChip.modelData.label
+                        visible: powerChipMouse.containsMouse
+                    }
+                }
+            }
+        }
     }
 
     Timer {
@@ -640,10 +849,15 @@ WlSessionLockSurface {
         function onLocked() {
             unlockTimer.stop();
             root.startAnim = true;
+            root.pendingPowerAction = "";
+            passwordInputBox.showPassword = false;
+            root.probeCapsLock();
             passwordInput.forceActiveFocus();
         }
         function onUnlocked() {
             root.startAnim = false;
+            root.pendingPowerAction = "";
+            passwordInputBox.showPassword = false;
             unlockTimer.start();
         }
         function onAuthFailed() {
@@ -701,6 +915,7 @@ WlSessionLockSurface {
 
     Component.onCompleted: {
         startAnim = true;
+        root.probeCapsLock();
         passwordInput.forceActiveFocus();
     }
 }

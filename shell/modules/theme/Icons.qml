@@ -239,4 +239,6 @@ QtObject {
     readonly property string headset: "\ue584"
     readonly property string filmStrip: "\ue792"
     readonly property string fileVideo: "\uea22"
+    readonly property string eye: "\ue220"
+    readonly property string eyeSlash: "\ue224"
 }

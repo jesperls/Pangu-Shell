@@ -239,62 +239,92 @@ Singleton {
         return results;
     }
     
+    function fuzzyScore(query, target) {
+        if (!query || !target) return -1;
+        if (target === query) return 120;
+        if (target.startsWith(query)) return 95 - Math.min(15, target.length - query.length);
+        const subIdx = target.indexOf(query);
+        if (subIdx !== -1) {
+            const boundary = subIdx === 0 || " -_./".includes(target[subIdx - 1]);
+            return (boundary ? 82 : 68) - Math.min(12, subIdx);
+        }
+        let qi = 0;
+        let score = 0;
+        let consecutive = 0;
+        let acronymHits = 0;
+        for (let i = 0; i < target.length && qi < query.length; i++) {
+            if (target[i] === query[qi]) {
+                const boundary = i === 0 || " -_./".includes(target[i - 1]);
+                if (boundary) {
+                    score += 14;
+                    acronymHits++;
+                } else {
+                    score += 4;
+                }
+                consecutive++;
+                score += Math.min(consecutive, 4) * 3;
+                qi++;
+            } else {
+                consecutive = 0;
+            }
+        }
+        if (qi !== query.length) return -1;
+        if (acronymHits === query.length) score += 20;
+        return Math.max(10, Math.min(64, score - Math.min(20, Math.floor((target.length - query.length) / 3))));
+    }
+
+    function scoreEntry(entry, searchLower, tokens) {
+        let best = 0;
+        const nameScore = fuzzyScore(searchLower, entry.name);
+        if (nameScore > 0) best = Math.max(best, nameScore);
+
+        if (entry.executable) {
+            const execBase = entry.executable.split("/").pop();
+            const execScore = fuzzyScore(searchLower, execBase);
+            if (execScore > 0) best = Math.max(best, Math.round(execScore * 0.85));
+        }
+        if (entry.command && entry.command.includes(searchLower)) best = Math.max(best, 42);
+        if (entry.genericName) {
+            const genScore = fuzzyScore(searchLower, entry.genericName);
+            if (genScore > 0) best = Math.max(best, Math.round(genScore * 0.65));
+        }
+        if (entry.comment && entry.comment.includes(searchLower)) best = Math.max(best, 30);
+        for (let j = 0; j < entry.keywords.length; j++) {
+            const kwScore = fuzzyScore(searchLower, entry.keywords[j]);
+            if (kwScore > 0) best = Math.max(best, Math.round(kwScore * 0.6));
+        }
+
+        if (best > 0 || tokens.length <= 1) return best;
+
+        const haystack = [entry.name, entry.executable, entry.genericName, entry.comment, entry.keywords.join(" ")].join(" ");
+        let tokenSum = 0;
+        for (let t = 0; t < tokens.length; t++) {
+            const tok = tokens[t];
+            const s = Math.max(
+                fuzzyScore(tok, entry.name),
+                entry.genericName ? Math.round(fuzzyScore(tok, entry.genericName) * 0.7) : -1,
+                haystack.includes(tok) ? 35 : -1
+            );
+            if (s <= 0) return 0;
+            tokenSum += s;
+        }
+        return Math.round(tokenSum / tokens.length);
+    }
+
     function fuzzyQuery(search) {
         if (!search || search.length === 0) return [];
         
-        const searchLower = search.toLowerCase();
+        const searchLower = search.trim().toLowerCase();
+        if (searchLower.length === 0) return [];
+        const tokens = searchLower.split(/\s+/).filter(t => t.length > 0);
         const results = [];
         
         if (searchIndex.length === 0 && list.length > 0) buildIndex();
         
         for (let i = 0; i < searchIndex.length; i++) {
             const entry = searchIndex[i];
-            let score = 0;
-            let matchFound = false;
-            
-            if (entry.name === searchLower) {
-                score += 100;
-                matchFound = true;
-            } else if (entry.name.startsWith(searchLower)) {
-                score += 80;
-                matchFound = true;
-            } else if (entry.name.includes(searchLower)) {
-                score += 60;
-                matchFound = true;
-            }
-            
-            if (entry.command) {
-                if (entry.command.includes(searchLower)) {
-                    score += 40;
-                    matchFound = true;
-                }
-                if (entry.executable.includes(searchLower)) {
-                    score += 50;
-                    matchFound = true;
-                }
-            }
-            
-            if (entry.comment && entry.comment.includes(searchLower)) {
-                score += 30;
-                matchFound = true;
-            }
-            
-            if (entry.genericName && entry.genericName.includes(searchLower)) {
-                score += 25;
-                matchFound = true;
-            }
-            
-            if (entry.keywords.length > 0) {
-                for (let j = 0; j < entry.keywords.length; j++) {
-                    if (entry.keywords[j].includes(searchLower)) {
-                        score += 20;
-                        matchFound = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (matchFound) {
+            const score = scoreEntry(entry, searchLower, tokens);
+            if (score > 0) {
                 const app = entry.original;
                 const usageScore = (Config.launcher.sortByUsage ?? true) ? UsageTracker.getUsageScore(app.id) : 0;
                 let iconToUse = app.icon || "application-x-executable";

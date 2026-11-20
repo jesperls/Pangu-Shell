@@ -24,7 +24,8 @@ PanelWindow {
     WlrLayershell.namespace: "pangu:cheatsheet"
     WlrLayershell.keyboardFocus: GlobalStates.cheatsheetVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    visible: GlobalStates.cheatsheetVisible
+    property bool animatedOpen: false
+    visible: GlobalStates.cheatsheetVisible || backdrop.opacity > 0.001
     exclusionMode: ExclusionMode.Ignore
 
     property var groups: []
@@ -87,7 +88,7 @@ PanelWindow {
         const byGroup = {};
         const seen = {};
         for (const b of root.allBinds) {
-            if (!b.description || b.key === "")
+            if (!b.description || (b.key === "" && !b.keycode))
                 continue;
             const sep = b.description.indexOf(": ");
             const group = b.submap ? (b.submap.charAt(0).toUpperCase() + b.submap.slice(1) + " mode") : (sep > 0 ? b.description.slice(0, sep) : "Other");
@@ -133,9 +134,10 @@ PanelWindow {
     }
 
     Rectangle {
+        id: backdrop
         anchors.fill: parent
         color: Colors.scrim
-        opacity: GlobalStates.cheatsheetVisible ? 0.5 : 0
+        opacity: root.animatedOpen ? 0.5 : 0
 
         Behavior on opacity {
             enabled: Styling.animDuration > 0
@@ -159,8 +161,8 @@ PanelWindow {
         height: Math.min(root.height - 120, contentColumn.implicitHeight + 48)
         radius: Styling.radius(20)
 
-        opacity: GlobalStates.cheatsheetVisible ? 1 : 0
-        scale: GlobalStates.cheatsheetVisible ? 1 : 0.9
+        opacity: root.animatedOpen ? 1 : 0
+        scale: root.animatedOpen ? 1 : 0.9
 
         Behavior on opacity {
             enabled: Styling.animDuration > 0
@@ -307,19 +309,27 @@ PanelWindow {
     function open() {
         refresh();
         Qt.callLater(() => {
+            if (!GlobalStates.cheatsheetVisible)
+                return;
+            root.animatedOpen = true;
             searchInput.clear();
             root.searchQuery = "";
             searchInput.focusInput();
         });
     }
 
-    onVisibleChanged: {
-        if (visible)
-            open();
+    Connections {
+        target: GlobalStates
+        function onCheatsheetVisibleChanged() {
+            if (GlobalStates.cheatsheetVisible)
+                root.open();
+            else
+                root.animatedOpen = false;
+        }
     }
 
     Component.onCompleted: {
-        if (visible)
+        if (GlobalStates.cheatsheetVisible)
             open();
     }
 }

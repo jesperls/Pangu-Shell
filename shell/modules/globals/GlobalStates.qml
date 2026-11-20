@@ -99,26 +99,65 @@ Singleton {
     property string osdIndicator: "volume"
     property real osdValue: 0
     property bool osdMuted: false
+    property string osdLabel: ""
     property string osdScreenName: ""
+    property bool osdHovered: false
+
+    function formatLayoutLabel(layoutName) {
+        const raw = String(layoutName || "").replace(/^lua:/, "");
+        if (raw === "centered") return "Centered";
+        if (raw === "dwindle") return "Dwindle";
+        if (raw === "master") return "Master";
+        if (raw === "scrolling") return "Scrolling";
+        if (raw === "monocle") return "Monocle";
+        return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "";
+    }
 
     function showOsd(indicator: string, value: real, muted: bool, screenName: string) {
         osdIndicator = indicator;
         osdValue = Math.max(0, Math.min(1.5, isNaN(value) ? 0 : value));
         osdMuted = muted;
+        osdLabel = "";
         osdScreenName = screenName || "";
         osdVisible = true;
-        osdHideTimer.restart();
+        if (!osdHovered)
+            osdHideTimer.restart();
+    }
+
+    function showLayoutOsd(layoutName: string, screenName: string) {
+        const label = formatLayoutLabel(layoutName);
+        if (!label)
+            return;
+        osdIndicator = "layout";
+        osdLabel = label;
+        osdMuted = false;
+        osdScreenName = screenName || "";
+        osdVisible = true;
+        if (!osdHovered)
+            osdHideTimer.restart();
+    }
+
+    function setOsdHovered(hovered: bool) {
+        osdHovered = hovered;
+        if (hovered) {
+            osdHideTimer.stop();
+        } else if (osdVisible) {
+            osdHideTimer.restart();
+        }
     }
 
     function restartOsdTimer() {
-        if (osdVisible)
+        if (osdVisible && !osdHovered)
             osdHideTimer.restart();
     }
 
     Timer {
         id: osdHideTimer
         interval: 2500
-        onTriggered: root.osdVisible = false
+        onTriggered: {
+            if (!root.osdHovered)
+                root.osdVisible = false;
+        }
     }
 
     Connections {

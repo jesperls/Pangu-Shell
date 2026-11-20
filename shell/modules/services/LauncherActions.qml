@@ -10,6 +10,31 @@ import qs.config
 Singleton {
     id: root
 
+    property string pendingConfirmId: ""
+
+    Timer {
+        id: confirmResetTimer
+        interval: 5000
+        repeat: false
+        onTriggered: root.pendingConfirmId = ""
+    }
+
+    function clearConfirm() {
+        confirmResetTimer.stop();
+        root.pendingConfirmId = "";
+    }
+
+    function runWithConfirm(actionId, fn) {
+        if (root.pendingConfirmId === actionId) {
+            root.clearConfirm();
+            fn();
+            return false;
+        }
+        root.pendingConfirmId = actionId;
+        confirmResetTimer.restart();
+        return true; // Keep launcher open until confirmed.
+    }
+
     function ocrLangString() {
         const cfg = Config.system.ocr;
         const langs = [];
@@ -134,13 +159,13 @@ Singleton {
                     }
                 }
             },
-            {
+            ...(ReplayService.active ? [{
                 name: "Save Replay",
                 icon: Icons.clip,
                 comment: "Save the last " + ReplayService.activeSeconds + "s to a clip",
                 keywords: ["clip", "replay", "save", "record"],
                 run: () => ReplayService.saveClip()
-            },
+            }] : []),
             {
                 name: "Color Picker",
                 icon: Icons.picker,
@@ -182,6 +207,34 @@ Singleton {
                 comment: "Open Pangu settings",
                 keywords: ["config", "preferences", "options"],
                 run: () => GlobalShortcuts.toggleSettings()
+            },
+            {
+                name: "Macros & Hotkeys",
+                icon: Icons.keyboard,
+                comment: "Open the macro and hotkey editor",
+                keywords: ["macros", "hotkeys", "automation", "uinput", "triggers"],
+                run: () => GlobalShortcuts.toggleMacros()
+            },
+            {
+                name: "Keybinds Cheatsheet",
+                icon: Icons.keyboard,
+                comment: "View active compositor keybinds",
+                keywords: ["keybinds", "shortcuts", "cheatsheet", "help"],
+                run: () => { GlobalStates.cheatsheetVisible = !GlobalStates.cheatsheetVisible; }
+            },
+            {
+                name: "Workspace Overview",
+                icon: Icons.overview,
+                comment: "Show all workspaces and windows",
+                keywords: ["overview", "expose", "windows", "workspaces"],
+                run: () => GlobalShortcuts.toggleSimpleModule("overview")
+            },
+            {
+                name: PomodoroService.isRunning ? "Pomodoro: Pause" : (PomodoroService.alarmActive ? "Pomodoro: Stop Alarm" : "Pomodoro: Start"),
+                icon: Icons.timer,
+                comment: (PomodoroService.isWorkSession ? "Work" : "Rest") + " · " + PomodoroService.formattedTime,
+                keywords: ["pomodoro", "timer", "focus", "break", "work"],
+                run: () => PomodoroService.toggleTimer()
             },
             {
                 name: "Wallpapers",
@@ -254,18 +307,22 @@ Singleton {
                 run: () => Quickshell.execDetached(["systemctl", "--user", "restart", "pangu.service"])
             },
             {
-                name: "Reboot",
+                id: "reboot",
+                name: root.pendingConfirmId === "reboot" ? "Confirm Reboot" : "Reboot",
                 icon: Icons.reboot,
-                comment: "Restart the system",
-                keywords: ["restart", "system"],
-                run: () => Quickshell.execDetached(["systemctl", "reboot"])
+                comment: root.pendingConfirmId === "reboot" ? "Press Enter again to reboot now" : "Restart the system",
+                keywords: ["restart", "system", "reboot"],
+                confirm: true,
+                run: () => root.runWithConfirm("reboot", () => Quickshell.execDetached(["systemctl", "reboot"]))
             },
             {
-                name: "Power Off",
+                id: "poweroff",
+                name: root.pendingConfirmId === "poweroff" ? "Confirm Power Off" : "Power Off",
                 icon: Icons.shutdown,
-                comment: "Shut the system down",
-                keywords: ["shutdown", "halt"],
-                run: () => Quickshell.execDetached(["systemctl", "poweroff"])
+                comment: root.pendingConfirmId === "poweroff" ? "Press Enter again to shut down now" : "Shut the system down",
+                keywords: ["shutdown", "halt", "poweroff"],
+                confirm: true,
+                run: () => root.runWithConfirm("poweroff", () => Quickshell.execDetached(["systemctl", "poweroff"]))
             }
         ];
     }
@@ -297,7 +354,7 @@ Singleton {
             })).filter(scored => scored.rank > 0).sort((a, b) => b.rank - a.rank).map(scored => scored.action);
         }
         return actions.map(action => ({
-            id: "action:" + action.name,
+            id: "action:" + (action.id || action.name),
             name: action.name,
             icon: "font:" + action.icon,
             comment: action.comment,
@@ -305,6 +362,7 @@ Singleton {
             categories: [],
             runInTerminal: false,
             isAction: true,
+            confirm: action.confirm === true,
             execute: action.run
         }));
     }
