@@ -21,6 +21,7 @@ Singleton {
     property string _pendingPassword: ""
     property string currentUser: Quickshell.env("USER") || Quickshell.env("LOGNAME") || ""
 
+    signal locked()
     signal unlocked()
     signal authFailed()
 
@@ -131,7 +132,13 @@ Singleton {
         root.errorMessage = "";
         root._pendingPassword = password;
         root.authenticating = true;
-        pamAuth.start();
+        if (!pamAuth.start()) {
+            root.authenticating = false;
+            root._pendingPassword = "";
+            root.showError = true;
+            root.errorMessage = "Authentication service unavailable";
+            root.authFailed();
+        }
     }
 
     function clearError() {
@@ -153,6 +160,7 @@ Singleton {
     function lock() {
         root.clearError();
         GlobalStates.lockscreenVisible = true;
+        root.locked();
     }
 
     property IpcHandler ipc: IpcHandler {

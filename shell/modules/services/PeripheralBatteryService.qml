@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
+import qs.modules.globals
 import qs.modules.services
 import qs.modules.theme
 
@@ -12,13 +13,14 @@ Singleton {
     id: root
 
     property var headsetDevices: []
+    property bool headsetControlAvailable: true
 
     readonly property var upowerDevices: {
         const raw = UPower.devices?.values ?? [];
         const out = [];
         for (let i = 0; i < raw.length; i++) {
             const d = raw[i];
-            if (!d || d.isLaptopBattery || d.type === UPowerDevice.LinePower || d.type === UPowerDevice.Battery)
+            if (!d || d.isLaptopBattery || d === UPower.displayDevice || d.type === UPowerDevice.LinePower)
                 continue;
             const rawPct = Number(d.percentage);
             if (!Number.isFinite(rawPct) || rawPct <= 0)
@@ -64,13 +66,14 @@ Singleton {
     }
 
     function refresh() {
-        if (!SuspendManager.isSuspending && !headsetProcess.running)
-            headsetProcess.running = true;
+        if (!root.headsetControlAvailable || SuspendManager.isSuspending || GlobalStates.lockscreenVisible || headsetProcess.running)
+            return;
+        headsetProcess.running = true;
     }
 
     Timer {
         interval: 60000
-        running: !SuspendManager.isSuspending
+        running: root.headsetControlAvailable && !SuspendManager.isSuspending && !GlobalStates.lockscreenVisible
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh()
@@ -78,8 +81,12 @@ Singleton {
 
     Process {
         id: headsetProcess
-        command: ["sh", "-c", "command -v headsetcontrol >/dev/null 2>&1 && headsetcontrol -o json 2>/dev/null || true"]
+        command: ["sh", "-c", "command -v headsetcontrol >/dev/null 2>&1 || exit 127; headsetcontrol -o json 2>/dev/null || true"]
         running: false
+        onExited: code => {
+            if (code === 127)
+                root.headsetControlAvailable = false;
+        }
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: {

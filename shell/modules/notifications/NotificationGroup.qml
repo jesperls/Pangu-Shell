@@ -37,7 +37,7 @@ Item {
     }
 
 
-    property bool expanded: false
+    property bool expanded: notificationCount === 1
 
     ListView.onReused: {
         notificationAnimation.reset();
@@ -55,7 +55,7 @@ Item {
 
     property real dragConfirmThreshold: 70
     property real dismissOvershoot: 20
-    property var qmlParent: root.parent.parent
+    property var qmlParent: root.parent?.parent ?? null
     property var parentDragIndex: qmlParent?.dragIndex ?? -1
     property var parentDragDistance: qmlParent?.dragDistance ?? 0
     property var dragIndexDiff: Math.abs(parentDragIndex - (index ?? 0))

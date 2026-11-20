@@ -188,7 +188,6 @@ Item {
                             required property string modelData
                             width: notificationList.width
                             notificationGroup: Notifications.groupsByAppName[modelData]
-                            expanded: false
                             popup: false
                         }
                     }

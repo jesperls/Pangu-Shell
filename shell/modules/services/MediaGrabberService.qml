@@ -129,6 +129,9 @@ Singleton {
 
     Connections {
         target: ClipboardService
+        function onListCompleted() {
+            pasteDebounce.restart();
+        }
         function onRevisionChanged() {
             pasteDebounce.restart();
         }

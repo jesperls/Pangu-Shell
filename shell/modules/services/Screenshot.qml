@@ -44,6 +44,9 @@ QtObject {
 
     function cancelCapture() {
         captureTimer.stop();
+        if (typeof freezeProcess !== "undefined" && freezeProcess && freezeProcess.running)
+            freezeProcess.running = false;
+        _freezing = false;
         captureMode = "normal";
     }
 
@@ -153,7 +156,10 @@ QtObject {
 
     property Process toolProcess: Process {
         id: toolProcess
-        onExited: cleanupProcess.running = true
+        onExited: {
+            cleanupProcess.command = ["rm", "-f", "--", root.toolImagePath];
+            cleanupProcess.running = true;
+        }
     }
 
     property Process cleanupProcess: Process {

@@ -111,6 +111,8 @@ Singleton {
     }
     Component.onCompleted: configure()
 
+    property bool stoppingForReload: false
+
     GeneratedFile {
         id: configFile
         path: Paths.runtimePath("hypridle.conf")
@@ -125,8 +127,12 @@ Singleton {
             root.generation++;
             root.configReady = true;
             root.restartFailures = 0;
-            if (daemon.running) daemon.running = false;
-            else daemon.running = true;
+            if (daemon.running) {
+                root.stoppingForReload = true;
+                daemon.running = false;
+            } else {
+                daemon.running = true;
+            }
         }
         onFailed: root.writing = false
     }
@@ -135,6 +141,12 @@ Singleton {
         command: ["hypridle", "-q", "-c", configFile.path]
         onExited: {
             root.resumeAll();
+            if (root.stoppingForReload) {
+                root.stoppingForReload = false;
+                if (root.configReady)
+                    daemon.running = true;
+                return;
+            }
             root.restartFailures++;
             restartTimer.interval = Math.min(30000, 1000 * Math.pow(2, Math.min(5, root.restartFailures - 1)));
             restartTimer.restart();

@@ -88,6 +88,7 @@ Singleton {
         interval: 60000
         running: !SuspendManager.isSuspending && (GlobalStates.dashboardOpen || GlobalStates.launcherOpen || GlobalStates.overviewOpen)
         repeat: true
+        triggeredOnStart: true
         onTriggered: root.calculateSunPosition()
     }
 
@@ -185,7 +186,7 @@ Singleton {
         return "Night";
     }
 
-    readonly property real effectiveSunProgress: debugMode ? debugSunProgress : realSunProgress
+    readonly property real effectiveSunProgress: debugMode ? debugSunProgress : root.sunProgress
     readonly property bool effectiveIsDay: debugMode ? debugIsDay : realIsDay
     readonly property int effectiveWeatherCode: debugMode ? debugWeatherCode : weatherCode
     readonly property string effectiveWeatherDescription: debugMode ? getWeatherDescription(debugWeatherCode) : weatherDescription
@@ -538,7 +539,8 @@ Singleton {
             Qt.callLater(root.updateWeather);
             return;
         }
-        if (code === 0) {
+        const trimmed = text ? text.trim() : "";
+        if (code === 0 || (trimmed.startsWith("\x7b") && trimmed.endsWith("\x7d"))) {
             root.handleResponse(text);
         } else {
             root.dataAvailable = false;
@@ -549,8 +551,36 @@ Singleton {
     property Process weatherProcess: Process {
         running: false
         command: []
-        stdout: StdioCollector { id: weatherOutput; waitForEnd: true }
-        onExited: code => root.finishRequest(code, weatherOutput.text)
+        property bool exited: false
+        property int exitCode: -1
+        property bool streamDone: false
+        property string outputText: ""
+
+        function finishIfReady() {
+            if (!exited || !streamDone)
+                return;
+            root.finishRequest(exitCode, outputText);
+        }
+
+        onStarted: {
+            exited = false;
+            streamDone = false;
+            outputText = "";
+        }
+        stdout: StdioCollector {
+            id: weatherOutput
+            waitForEnd: true
+            onStreamFinished: {
+                weatherProcess.outputText = text;
+                weatherProcess.streamDone = true;
+                weatherProcess.finishIfReady();
+            }
+        }
+        onExited: code => {
+            weatherProcess.exitCode = code;
+            weatherProcess.exited = true;
+            weatherProcess.finishIfReady();
+        }
     }
 
     property var weatherConfig: Config.weather

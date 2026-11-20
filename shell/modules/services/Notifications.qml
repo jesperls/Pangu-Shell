@@ -253,18 +253,26 @@ Singleton {
         try {
             const data = JSON.parse(notifFileView.text());
             if (!Array.isArray(data)) throw new Error("Expected a notification list");
-            root.list = data.slice(-200).map(jsonToNotif);
+            const loaded = data.slice(-200).map(jsonToNotif);
+            const live = root.list.filter(n => n && !n.isFromFile);
             let maxId = 0;
-            root.list.forEach(notif => {
+            loaded.forEach(notif => {
                 if (notif.id > maxId)
                     maxId = notif.id;
                 if (notif.id <= -1000000)
                     root.internalIdCounter = Math.max(root.internalIdCounter, Math.abs(notif.id) - 999999);
             });
+            live.forEach(notif => {
+                if (notif.id > maxId)
+                    maxId = notif.id;
+            });
             root.idOffset = maxId + 1;
+            root.list = loaded.concat(live);
         } catch (e) {
-            root.list = [];
-            root.idOffset = 0;
+            if (root.list.length === 0) {
+                root.list = [];
+                root.idOffset = 0;
+            }
         }
     }
 
@@ -350,12 +358,10 @@ Singleton {
                 "time": Date.now()
             });
 
-            Qt.callLater(() => {
-                root.appendNotification(newNotifObject);
-                if (!root.viewingHistory)
-                    root.unreadCount++;
-                saveNotifications();
-            });
+            root.appendNotification(newNotifObject);
+            if (!root.viewingHistory)
+                root.unreadCount++;
+            Qt.callLater(saveNotifications);
 
             if (!root.popupInhibited) {
                 newNotifObject.popup = true;

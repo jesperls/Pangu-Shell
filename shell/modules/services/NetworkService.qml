@@ -123,13 +123,17 @@ Singleton {
         id: scanPulse
         interval: 4000
         repeat: false
-        onTriggered: root.wifiScanning = false
+        onTriggered: {
+            root.wifiScanning = false;
+            root.setScanClient("manual-rescan", false);
+        }
     }
 
     function rescanWifi(): void {
         if (!wifiDevice || !wifiEnabled)
             return;
         wifiScanning = true;
+        setScanClient("manual-rescan", true);
         scanPulse.restart();
         updateFriendlyList();
     }

@@ -130,20 +130,37 @@ ${c.shadowEnabled && c.floatingShadowOnly ? `hl.window_rule({ match = { float = 
     Timer {
         id: debounce
         interval: 100
-        onTriggered: file.write(root.lua)
+        onTriggered: {
+            if (Config.initialLoadComplete && Colors.ready)
+                file.write(root.lua);
+        }
     }
 
-    onLuaChanged: debounce.restart()
+    onLuaChanged: if (Config.initialLoadComplete && Colors.ready) debounce.restart()
 
-    Component.onCompleted: debounce.restart()
+    Component.onCompleted: if (Config.initialLoadComplete && Colors.ready) debounce.restart()
+
+    Connections {
+        target: Config
+        function onInitialLoadCompleteChanged() {
+            if (Config.initialLoadComplete && Colors.ready)
+                debounce.restart();
+        }
+    }
 
     Connections {
         target: Colors
+        function onReadyChanged() {
+            if (Config.initialLoadComplete && Colors.ready)
+                debounce.restart();
+        }
         function onLoaded() {
-            debounce.restart();
+            if (Config.initialLoadComplete)
+                debounce.restart();
         }
         function onFileChanged() {
-            debounce.restart();
+            if (Config.initialLoadComplete)
+                debounce.restart();
         }
     }
 }

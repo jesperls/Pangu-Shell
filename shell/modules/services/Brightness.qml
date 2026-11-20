@@ -61,6 +61,11 @@ Singleton {
     }
 
     function increaseBrightness(): void {
+        if (root.syncBrightness) {
+            for (let i = 0; i < monitors.length; ++i)
+                monitors[i].setBrightness(monitors[i].brightness + 0.05);
+            return;
+        }
         if (!Compositor.focusedMonitor)
             return;
         const focusedName = Compositor.focusedMonitor.name;
@@ -70,6 +75,11 @@ Singleton {
     }
 
     function decreaseBrightness(): void {
+        if (root.syncBrightness) {
+            for (let i = 0; i < monitors.length; ++i)
+                monitors[i].setBrightness(monitors[i].brightness - 0.05);
+            return;
+        }
         if (!Compositor.focusedMonitor)
             return;
         const focusedName = Compositor.focusedMonitor.name;
@@ -141,7 +151,15 @@ Singleton {
                 ddcProc.found.push({model, busNum, connector});
             }
         }
-        onExited: code => root.ddcMonitors = code === 0 ? found : []
+        onExited: code => {
+            root.ddcMonitors = code === 0 ? found : [];
+            if (code === 0) {
+                for (let i = 0; i < root.monitors.length; ++i) {
+                    if (root.monitors[i].isDdc && root.monitors[i].busNum)
+                        root.monitors[i].initialize();
+                }
+            }
+        }
     }
 
     component BrightnessMonitor: QtObject {
@@ -197,7 +215,7 @@ Singleton {
                 return;
             if (isDdc && !busNum)
                 return;
-            initProc.command = isDdc ? ["ddcutil", "-b", busNum, "getvcp", "10"] : ["sh", "-c", "printf '%s %s\\n' \"$(brightnessctl g)\" \"$(brightnessctl m)\""];
+            initProc.command = isDdc ? ["ddcutil", "-b", busNum, "getvcp", "10"] : ["sh", "-c", "printf '%s %s\\n' \"$(brightnessctl --class backlight g)\" \"$(brightnessctl --class backlight m)\""];
             initProc.running = true;
         }
 

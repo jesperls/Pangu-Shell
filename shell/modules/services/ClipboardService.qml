@@ -24,10 +24,20 @@ Singleton {
     readonly property string watchScriptPath: Paths.script("clipboard_watch.sh")
     readonly property string linkPreviewScriptPath: Paths.script("link_preview.py")
     readonly property int maxItems: Math.max(10, Config.system.clipboard?.maxItems ?? 200)
+    onMaxItemsChanged: {
+        if (root._initialized && clipboardWatcher.running) {
+            root.watcherEnabled = false;
+            Qt.callLater(() => {
+                if (root._initialized && !SuspendManager.isSuspending)
+                    root.watcherEnabled = true;
+            });
+        }
+    }
 
     property bool _initialized: false
     property bool watcherEnabled: true
     property bool listPending: false
+    property var _inFlightPreviews: ({})
 
     Connections {
         target: SuspendManager
@@ -247,7 +257,7 @@ Singleton {
                 Qt.callLater(root.list);
             }
             if (code !== 0) {
-                root.items = [];
+                console.warn("ClipboardService: list failed with code:", code);
                 root.listCompleted();
                 root._operationInProgress = false;
             }
@@ -286,38 +296,25 @@ Singleton {
     }
 
     Process {
-        id: loadImageProcess
-        property var pending: []
-        property string itemId: ""
-        property string mimeType: ""
-        stdout: StdioCollector {}
-        onExited: code => {
-            if (code === 0 && loadImageProcess.stdout.text.length > 0) {
-                const next = Object.assign({}, root.imageDataById);
-                next[loadImageProcess.itemId] = "data:" + loadImageProcess.mimeType + ";base64," + loadImageProcess.stdout.text.replace(/\s/g, "");
-                root.imageDataById = next;
-                root.revision++;
-            }
-            Qt.callLater(root.startNext, loadImageProcess);
-        }
-    }
-
-    Process {
         id: linkPreviewProcess
         property var pending: []
         property string requestUrl: ""
         property string requestItemId: ""
         stdout: StdioCollector {}
         onExited: code => {
+            const url = linkPreviewProcess.requestUrl;
+            const nextInFlight = Object.assign({}, root._inFlightPreviews);
+            delete nextInFlight[url];
+            root._inFlightPreviews = nextInFlight;
             let metadata;
             try {
                 if (code !== 0) throw new Error("Preview process failed");
                 metadata = JSON.parse(linkPreviewProcess.stdout.text);
-                if (!metadata.error) root.linkPreviewCache[linkPreviewProcess.requestUrl] = metadata;
+                if (!metadata.error) root.linkPreviewCache[url] = metadata;
             } catch (error) {
                 metadata = {error: String(error)};
             }
-            root.linkPreviewFetched(linkPreviewProcess.requestUrl, metadata, linkPreviewProcess.requestItemId);
+            root.linkPreviewFetched(url, metadata, linkPreviewProcess.requestItemId);
             Qt.callLater(root.startNext, linkPreviewProcess);
         }
     }
@@ -356,8 +353,7 @@ Singleton {
     }
 
     function checkClipboard() {
-        if (!_initialized || _operationInProgress) return;
-        _operationInProgress = true;
+        if (!_initialized || checkAndInsertProcess.running || mutationProcess.running) return;
         checkAndInsertProcess.command = backend("capture", [root.binaryDataDir, String(root.maxItems)]);
         checkAndInsertProcess.running = true;
     }
@@ -368,7 +364,6 @@ Singleton {
             root.listPending = true;
             return;
         }
-        _operationInProgress = true;
         listProcess.command = backend("list", [String(root.maxItems)]);
         listProcess.running = true;
     }
@@ -380,26 +375,26 @@ Singleton {
 
     function deleteItem(id) {
         if (!_initialized) return;
-        _operationInProgress = true;
         enqueue(mutationProcess, {itemId: id, command: backend("delete", [id, root.binaryDataDir])});
     }
 
     function clear() {
         if (!_initialized) return;
-        _operationInProgress = true;
         enqueue(mutationProcess, {itemId: "", command: backend("clear", [root.binaryDataDir])});
     }
 
     function togglePin(id) {
         if (!_initialized) return;
-        _operationInProgress = true;
         enqueue(mutationProcess, {itemId: id, command: backend("pin", [id])});
     }
 
     function setAlias(id, alias) {
         if (!_initialized) return;
-        _operationInProgress = true;
         enqueue(mutationProcess, {itemId: id, command: backend("alias", [id, alias.trim()])});
+    }
+
+    function _toFileUrl(path) {
+        return path ? "file://" + encodeURI(path).replace(/#/g, "%23").replace(/\?/g, "%3F") : "";
     }
 
     function decodeToDataUrl(id, mime) {
@@ -408,15 +403,25 @@ Singleton {
         for (let i = 0; i < items.length; i++) {
             if (items[i].id === id) {
                 const binaryPath = items[i].binaryPath;
-                if (binaryPath && binaryPath.length > 0)
-                    enqueue(loadImageProcess, {itemId: id, mimeType: mime, command: ["base64", "-w", "0", binaryPath]});
+                if (binaryPath && binaryPath.length > 0) {
+                    const next = Object.assign({}, root.imageDataById);
+                    next[id] = _toFileUrl(binaryPath);
+                    root.imageDataById = next;
+                    root.revision++;
+                }
                 break;
             }
         }
     }
 
     function getImageData(id) {
-        return imageDataById[id] || "";
+        if (imageDataById[id])
+            return imageDataById[id];
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].id === id && items[i].binaryPath)
+                return _toFileUrl(items[i].binaryPath);
+        }
+        return "";
     }
 
     function fetchLinkPreview(url, itemId) {
@@ -425,6 +430,10 @@ Singleton {
             Qt.callLater(() => root.linkPreviewFetched(url, root.linkPreviewCache[url], itemId));
             return;
         }
+        if (_inFlightPreviews[url]) return;
+        const next = Object.assign({}, _inFlightPreviews);
+        next[url] = true;
+        _inFlightPreviews = next;
         enqueue(linkPreviewProcess, {requestUrl: url, requestItemId: itemId, command: ["python3", root.linkPreviewScriptPath, url, "5"]});
     }
 

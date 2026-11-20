@@ -69,21 +69,63 @@ Scope {
 
     Process {
         id: windowsProcess
-        stdout: StdioCollector { id: windowsOutput; waitForEnd: true }
-        onExited: code => {
+        property bool exited: false
+        property int exitCode: -1
+        property bool streamDone: false
+        property string outputText: ""
+
+        function finishIfReady() {
+            if (!exited || !streamDone) return;
             if (root.currentGeneration === root.generation)
-                root.windows = code === 0 ? root.parseWindows(windowsOutput.text) : [];
+                root.windows = exitCode === 0 ? root.parseWindows(outputText) : [];
             root.finish();
+        }
+
+        onStarted: { exited = false; streamDone = false; outputText = ""; }
+        stdout: StdioCollector {
+            id: windowsOutput
+            waitForEnd: true
+            onStreamFinished: {
+                windowsProcess.outputText = text;
+                windowsProcess.streamDone = true;
+                windowsProcess.finishIfReady();
+            }
+        }
+        onExited: code => {
+            windowsProcess.exitCode = code;
+            windowsProcess.exited = true;
+            windowsProcess.finishIfReady();
         }
     }
 
     Process {
         id: panesProcess
-        stdout: StdioCollector { id: panesOutput; waitForEnd: true }
-        onExited: code => {
+        property bool exited: false
+        property int exitCode: -1
+        property bool streamDone: false
+        property string outputText: ""
+
+        function finishIfReady() {
+            if (!exited || !streamDone) return;
             if (root.currentGeneration === root.generation)
-                root.panes = code === 0 ? root.parsePanes(panesOutput.text) : [];
+                root.panes = exitCode === 0 ? root.parsePanes(outputText) : [];
             root.finish();
+        }
+
+        onStarted: { exited = false; streamDone = false; outputText = ""; }
+        stdout: StdioCollector {
+            id: panesOutput
+            waitForEnd: true
+            onStreamFinished: {
+                panesProcess.outputText = text;
+                panesProcess.streamDone = true;
+                panesProcess.finishIfReady();
+            }
+        }
+        onExited: code => {
+            panesProcess.exitCode = code;
+            panesProcess.exited = true;
+            panesProcess.finishIfReady();
         }
     }
 }

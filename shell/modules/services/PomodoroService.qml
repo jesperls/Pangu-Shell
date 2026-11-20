@@ -165,6 +165,8 @@ Singleton {
         alarmSound.loops = Config.system.pomodoro.autoStart ? 2 : SoundEffect.Infinite;
         if (finishedWork || !(Config.system.pomodoro.syncSpotify && root.spotifyPlayer)) {
             alarmSound.play();
+            if (Config.system.pomodoro.autoStart)
+                alarmFallbackTimer.restart();
         } else if (Config.system.pomodoro.autoStart) {
             root.alarmActive = false;
         }
@@ -192,6 +194,7 @@ Singleton {
     }
 
     function stopAlarm() {
+        alarmFallbackTimer.stop();
         alarmSound.stop();
         root.alarmActive = false;
         root.blinkPhase = false;
@@ -215,18 +218,33 @@ Singleton {
             if (!playing && root.alarmActive && Config.system.pomodoro.autoStart)
                 root.stopAlarm();
         }
+        onStatusChanged: {
+            if (status === SoundEffect.Error && root.alarmActive && Config.system.pomodoro.autoStart)
+                root.stopAlarm();
+        }
     }
 
     Timer {
-        interval: 250
+        id: alarmFallbackTimer
+        interval: 5000
+        repeat: false
+        onTriggered: if (root.alarmActive && Config.system.pomodoro.autoStart) root.stopAlarm()
+    }
+
+    Timer {
+        id: countdownTimer
+        interval: 1000
         running: root.isRunning
         repeat: true
         onTriggered: {
-            const remaining = Math.max(0, Math.ceil((root._deadlineMs - Date.now()) / 1000));
+            const remainingMs = Math.max(0, root._deadlineMs - Date.now());
+            const remaining = Math.ceil(remainingMs / 1000);
             if (remaining !== root.timeLeft)
                 root.timeLeft = remaining;
             if (remaining <= 0)
                 root.startAlarm();
+            else
+                countdownTimer.interval = Math.max(50, remainingMs % 1000 || 1000);
         }
     }
 

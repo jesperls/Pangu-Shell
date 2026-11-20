@@ -278,6 +278,7 @@ Singleton {
             stepTimer.restart();
         } else {
             const token = root.runToken;
+            root.currentStepIndex = 0;
             Qt.callLater(() => {
                 if (token === root.runToken)
                     root._runStep();
@@ -987,11 +988,14 @@ Singleton {
             property string samplePath: ""
             property bool isImport: false
             property string outputBuffer: ""
-            stdout: StdioCollector {
-                onStreamFinished: inspectProc.outputBuffer = text.trim()
-            }
-            onExited: code => {
-                if (code === 0 && inspectProc.outputBuffer.length > 0) {
+            property bool exited: false
+            property int exitCode: -1
+            property bool streamDone: false
+
+            function finishIfReady() {
+                if (!exited || !streamDone)
+                    return;
+                if (exitCode === 0 && inspectProc.outputBuffer.length > 0) {
                     try {
                         const meta = JSON.parse(inspectProc.outputBuffer);
                         if (inspectProc.isImport)
@@ -1001,6 +1005,19 @@ Singleton {
                     } catch (e) {}
                 }
                 inspectProc.destroy();
+            }
+
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    inspectProc.outputBuffer = text.trim();
+                    inspectProc.streamDone = true;
+                    inspectProc.finishIfReady();
+                }
+            }
+            onExited: code => {
+                inspectProc.exitCode = code;
+                inspectProc.exited = true;
+                inspectProc.finishIfReady();
             }
         }
     }
@@ -1245,12 +1262,15 @@ Singleton {
 
             Process {
                 id: shotProc
-                stdout: StdioCollector {
-                    onStreamFinished: shotJob.outputBuffer = text.trim()
-                }
-                onExited: code => {
+                property bool exited: false
+                property int exitCode: -1
+                property bool streamDone: false
+
+                function finishIfReady() {
+                    if (!exited || !streamDone)
+                        return;
                     root._activeScreenTasks = Math.max(0, root._activeScreenTasks - 1);
-                    if (code === 0 && shotJob.outputBuffer.length > 0) {
+                    if (exitCode === 0 && shotJob.outputBuffer.length > 0) {
                         try {
                             const parsed = JSON.parse(shotJob.outputBuffer);
                             if (shotJob.kind === "snapshot")
@@ -1260,6 +1280,19 @@ Singleton {
                         } catch (e) {}
                     }
                     shotJob.destroy();
+                }
+
+                stdout: StdioCollector {
+                    onStreamFinished: {
+                        shotJob.outputBuffer = text.trim();
+                        shotProc.streamDone = true;
+                        shotProc.finishIfReady();
+                    }
+                }
+                onExited: code => {
+                    shotProc.exitCode = code;
+                    shotProc.exited = true;
+                    shotProc.finishIfReady();
                 }
             }
         }
@@ -1440,6 +1473,8 @@ Singleton {
                 root.soundDaemonRetried = false;
                 soundMonitorProc.running = false;
             }
+        }
+        function on_SinkSettledChanged() {
             if (!Audio._sinkSettled || !Audio.sink)
                 return;
             const label = Audio.friendlyDeviceName(Audio.sink);
@@ -1464,6 +1499,7 @@ Singleton {
                 root._runStartup();
                 soundConfigDebounce.restart();
                 pixelConfigDebounce.restart();
+                bindDebounce.restart();
             }
         }
     }
@@ -1479,10 +1515,13 @@ Singleton {
     Timer {
         id: bindDebounce
         interval: 300
-        onTriggered: bindsFile.write(root.bindsText)
+        onTriggered: {
+            if (Config.initialLoadComplete)
+                bindsFile.write(root.bindsText);
+        }
     }
 
-    onBindsTextChanged: bindDebounce.restart()
+    onBindsTextChanged: if (Config.initialLoadComplete) bindDebounce.restart()
 
     Component.onCompleted: {
         if (Config.initialLoadComplete) {
@@ -1497,7 +1536,7 @@ Singleton {
             root._runStartup();
             soundConfigDebounce.restart();
             pixelConfigDebounce.restart();
+            bindDebounce.restart();
         }
-        bindDebounce.restart();
     }
 }

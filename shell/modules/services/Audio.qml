@@ -81,11 +81,6 @@ Singleton {
                 root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
             }
         }
-        function onVolumesChanged() {
-            if (root._sinkSettled && root.sink?.ready && SuspendManager.wakeReady && Number.isFinite(root.sink.audio.volume)) {
-                root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
-            }
-        }
         function onMutedChanged() {
             if (root._sinkSettled && root.sink?.ready && SuspendManager.wakeReady && Number.isFinite(root.sink.audio.volume)) {
                 root.volumeChanged(root.sink.audio.volume, root.sink.audio.muted, root.sink);
@@ -97,11 +92,6 @@ Singleton {
         target: root.source?.audio ?? null
         ignoreUnknownSignals: true
         function onVolumeChanged() {
-            if (root._sourceSettled && root.source?.ready && SuspendManager.wakeReady && Number.isFinite(root.source.audio.volume)) {
-                root.micVolumeChanged(root.source.audio.volume, root.source.audio.muted, root.source);
-            }
-        }
-        function onVolumesChanged() {
             if (root._sourceSettled && root.source?.ready && SuspendManager.wakeReady && Number.isFinite(root.source.audio.volume)) {
                 root.micVolumeChanged(root.source.audio.volume, root.source.audio.muted, root.source);
             }

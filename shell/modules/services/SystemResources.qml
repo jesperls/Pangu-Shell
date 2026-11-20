@@ -40,6 +40,7 @@ Singleton {
 
     property int updateInterval: 2000
     property bool restarting: false
+    property int restartFailures: 0
     readonly property bool monitorWanted: GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2
         && Config.dashboard.showMetrics !== false && root.validDisks.length > 0
         && !SuspendManager.isSuspending && SuspendManager.wakeReady
@@ -53,7 +54,8 @@ Singleton {
             return cmd.concat(root.validDisks);
         }
 
-        onExited: if (root.monitorWanted) root.restartMonitor()
+        onStarted: healthyTimer.restart()
+        onExited: if (root.monitorWanted) root.restartMonitor(true)
         
         stdout: SplitParser {
             onRead: data => {
@@ -107,12 +109,27 @@ Singleton {
     property bool configReady: Config.initialLoadComplete
     onConfigReadyChanged: if (configReady) validateDisks()
 
-    onValidDisksChanged: if (monitorProcess.running) restartMonitor()
-    onUpdateIntervalChanged: if (monitorProcess.running) restartMonitor()
+    onValidDisksChanged: if (monitorProcess.running) restartMonitor(false)
+    onUpdateIntervalChanged: if (monitorProcess.running) restartMonitor(false)
 
-    function restartMonitor() {
+    function restartMonitor(isCrash) {
+        if (isCrash) {
+            root.restartFailures++;
+            restartTimer.interval = Math.min(30000, 1000 * Math.pow(2, Math.min(5, root.restartFailures - 1)));
+        } else {
+            root.restartFailures = 0;
+            restartTimer.interval = 250;
+        }
         root.restarting = true;
         restartTimer.restart();
+    }
+
+    Timer {
+        id: healthyTimer
+        interval: 10000
+        running: false
+        repeat: false
+        onTriggered: root.restartFailures = 0
     }
 
     Timer {

@@ -48,11 +48,12 @@ Singleton {
         const roundedPercentage = Math.floor(percentage);
         const threshold = roundedPercentage <= 10 ? 10 : (roundedPercentage <= 20 ? 20 : 0);
         if (threshold === 0) {
-            lastBatteryAlertThreshold = 0;
+            if (roundedPercentage > 25)
+                lastBatteryAlertThreshold = 0;
             return;
         }
 
-        if (threshold === lastBatteryAlertThreshold) {
+        if (lastBatteryAlertThreshold !== 0 && threshold >= lastBatteryAlertThreshold) {
             return;
         }
 

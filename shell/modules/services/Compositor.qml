@@ -247,14 +247,33 @@ end`, reply => {
 
             required property string payload
             required property var handler
+            property string outputText: ""
+            property bool exited: false
+            property int exitCode: -1
+            property bool streamDone: false
+
+            function finishIfReady() {
+                if (!exited || !streamDone)
+                    return;
+                if (exitCode !== 0)
+                    console.warn("Compositor request failed:", payload, exitCode);
+                else
+                    proc.handler(outputText);
+                proc.destroy();
+            }
 
             command: ["sh", "-c", 'printf %s "$1" | socat -T 3 - "UNIX-CONNECT:$2"', "sh", payload, Hyprland.requestSocketPath]
             stdout: StdioCollector {
-                onStreamFinished: proc.handler(text)
+                onStreamFinished: {
+                    proc.outputText = text;
+                    proc.streamDone = true;
+                    proc.finishIfReady();
+                }
             }
             onExited: code => {
-                if (code !== 0) console.warn("Compositor request failed:", payload, code);
-                proc.destroy();
+                proc.exitCode = code;
+                proc.exited = true;
+                proc.finishIfReady();
             }
         }
     }

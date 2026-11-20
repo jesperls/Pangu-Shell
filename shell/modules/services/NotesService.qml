@@ -96,7 +96,7 @@ Singleton {
     }
 
     function remove(id) {
-        queueSave(id);
+        pending = pending.filter(job => job.id !== id || job.action !== "save");
         enqueue({action: "delete", id: id});
     }
 
@@ -133,6 +133,7 @@ Singleton {
                 noteChanged(job.id, "");
             }
         } else {
+            error = "";
             if (result.notes) {
                 ready = true;
                 notes = result.notes;
@@ -169,18 +170,42 @@ Singleton {
         id: worker
         command: ["python3", Paths.script("notes.py"), Paths.notesDir]
         stdinEnabled: true
+        property bool exited: false
+        property int exitCode: -1
+        property bool streamDone: false
+        property string responseText: ""
+
+        function finishIfReady() {
+            if (!exited || !streamDone)
+                return;
+            let result;
+            try { result = JSON.parse(responseText); }
+            catch (_) { result = {ok: false, error: "Notes operation failed (exit " + exitCode + ")"}; }
+            stdinEnabled = true;
+            root.finish(result);
+        }
+
         onStarted: {
+            exited = false;
+            streamDone = false;
+            responseText = "";
             write(JSON.stringify(root.currentJob));
             stdinEnabled = false;
         }
-        stdout: StdioCollector { id: response; waitForEnd: true }
+        stdout: StdioCollector {
+            id: response
+            waitForEnd: true
+            onStreamFinished: {
+                worker.responseText = text;
+                worker.streamDone = true;
+                worker.finishIfReady();
+            }
+        }
         stderr: StdioCollector { waitForEnd: true }
         onExited: code => {
-            let result;
-            try { result = JSON.parse(response.text); }
-            catch (_) { result = {ok: false, error: "Notes operation failed (exit " + code + ")"}; }
-            stdinEnabled = true;
-            root.finish(result);
+            worker.exitCode = code;
+            worker.exited = true;
+            worker.finishIfReady();
         }
     }
 
