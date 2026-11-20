@@ -663,11 +663,18 @@ Item {
     }
 
     Timer {
-        interval: 1000
+        id: clockTimer
+        interval: root.showSeconds ? 1000 : Math.max(1000, 60000 - (new Date().getSeconds() * 1000 + new Date().getMilliseconds()))
         running: root.visible && root.bar.reveal
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.updateTime()
+        onTriggered: {
+            root.updateTime();
+            if (!root.showSeconds) {
+                const now = new Date();
+                clockTimer.interval = Math.max(1000, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
+            }
+        }
     }
 
     Timer {

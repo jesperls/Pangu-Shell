@@ -91,7 +91,7 @@ Item {
     }
 
     Timer {
-        running: compactPlayer.isPlaying && compactPlayer.visible
+        running: compactPlayer.isPlaying && compactPlayer.visible && !GlobalStates.lockscreenVisible
         interval: 1000
         repeat: true
         onTriggered: compactPlayer.player?.positionChanged()
@@ -198,7 +198,7 @@ Item {
                 anchors.leftMargin: 12
                 anchors.rightMargin: 12
                 height: 14
-                active: Config.performance.audioVisualizer && compactPlayer.isPlaying
+                active: Config.performance.audioVisualizer && compactPlayer.isPlaying && compactPlayer.visible && !GlobalStates.lockscreenVisible
                 opacity: active ? ((compactPlayer.notchHovered && compactPlayer.player) ? 0.25 : 0.5) : 0.0
                 Behavior on opacity {
                     enabled: Styling.animDuration > 0

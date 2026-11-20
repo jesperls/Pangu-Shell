@@ -289,7 +289,7 @@ Item {
 
             property real transitionBlur: 0.0
 
-            layer.enabled: transitionBlur > 0.0
+            layer.enabled: Config.performance.blurTransition && transitionBlur > 0.0
             layer.effect: MultiEffect {
                 blurEnabled: Config.performance.blurTransition
                 blurMax: 64
@@ -317,7 +317,7 @@ Item {
                 }
 
                 onBusyChanged: {
-                    if (busy) {
+                    if (busy && Config.performance.blurTransition) {
                         stackContainer.transitionBlur = 1.0;
                         blurTransitionAnimation.start();
                     }
@@ -538,6 +538,12 @@ Item {
         }
         Connections {
             target: notchRect
+            function onTopLeftRadiusChanged() {
+                outlineCanvas.requestPaint();
+            }
+            function onTopRightRadiusChanged() {
+                outlineCanvas.requestPaint();
+            }
             function onBottomLeftRadiusChanged() {
                 outlineCanvas.requestPaint();
             }

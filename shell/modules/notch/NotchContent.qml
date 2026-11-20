@@ -185,6 +185,8 @@ Item {
 
     Item {
         id: notchRegionContainer
+        layer.enabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
+        layer.effect: Shadow {}
         
         width: Math.max(notchAnimationContainer.width, notificationPopupContainer.visible ? notificationPopupContainer.width : 0)
         height: notchAnimationContainer.height + (notificationPopupContainer.visible ? notificationPopupContainer.height + notificationPopupContainer.anchors.topMargin : 0)

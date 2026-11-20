@@ -61,6 +61,8 @@ PanelWindow {
         function onImageSaved(path) {
             if (Screenshot.savedScreenName === root.targetScreen.name) {
                 root.imagePath = path;
+                if (!mouseAreaHover.containsMouse)
+                    hideTimer.restart();
             }
         }
     }
@@ -77,22 +79,22 @@ PanelWindow {
 
             property real maxWidth: 250
             property real maxHeight: 250
-            property real imgRatio: img.sourceSize.width / img.sourceSize.height
+            property real imgRatio: img.implicitHeight > 0 ? (img.implicitWidth / img.implicitHeight) : 1
             property real boxRatio: maxWidth / maxHeight
 
             width: {
-                if (img.sourceSize.width <= 0)
+                if (img.implicitWidth <= 0 || img.implicitHeight <= 0)
                     return 0;
                 if (imgRatio > boxRatio)
                     return maxWidth;
-                return Math.min(maxWidth, img.sourceSize.width * (maxHeight / img.sourceSize.height));
+                return Math.min(maxWidth, img.implicitWidth * (maxHeight / img.implicitHeight));
             }
 
             height: {
-                if (img.sourceSize.height <= 0)
+                if (img.implicitWidth <= 0 || img.implicitHeight <= 0)
                     return 0;
                 if (imgRatio > boxRatio)
-                    return Math.min(maxHeight, img.sourceSize.height * (maxWidth / img.sourceSize.width));
+                    return Math.min(maxHeight, img.implicitHeight * (maxWidth / img.implicitWidth));
                 return maxHeight;
             }
 
@@ -105,7 +107,8 @@ PanelWindow {
                 mipmap: true
                 id: img
                 anchors.fill: parent
-                source: root.imagePath !== "" ? "file://" + root.imagePath : ""
+                source: root.imagePath !== "" ? "file://" + encodeURI(root.imagePath).replace(/#/g, "%23").replace(/\?/g, "%3F") : ""
+                sourceSize.width: 500
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
 

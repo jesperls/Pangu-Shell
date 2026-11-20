@@ -107,41 +107,95 @@ Item {
     
     property real innerRadius: targetInnerRadius
 
+    readonly property bool splitTop: root.splitActive && root.barPos === "top"
+    readonly property bool splitBottom: root.splitActive && root.barPos === "bottom"
+
     StyledRect {
-        id: frameFill
-        anchors.fill: parent
+        id: frameTopEdge
         variant: "bg"
         radius: 0
         enableBorder: false
-        visible: root.frameEnabled
-        layer.enabled: root.frameEnabled
-        layer.effect: MultiEffect {
-            maskEnabled: true
-            maskSource: frameMask
-            maskInverted: true
-            maskThresholdMin: 0.5
-            maskSpreadAtMin: 1.0
-        }
+        visible: root.frameEnabled && !root.splitTop && root.topThickness > 0
+        x: 0
+        y: 0
+        width: parent.width
+        height: root.topThickness
     }
 
-    Item {
-        id: frameMask
-        anchors.fill: parent
-        visible: false
-        layer.enabled: root.frameEnabled
+    StyledRect {
+        id: frameBottomEdge
+        variant: "bg"
+        radius: 0
+        enableBorder: false
+        visible: root.frameEnabled && !root.splitBottom && root.bottomThickness > 0
+        x: 0
+        y: parent.height - height
+        width: parent.width
+        height: root.bottomThickness
+    }
 
-        readonly property real topInset: root.splitActive && root.barPos === "top" ? -root.innerRadius : root.topThickness
-        readonly property real bottomInset: root.splitActive && root.barPos === "bottom" ? -root.innerRadius : root.bottomThickness
+    StyledRect {
+        id: frameLeftEdge
+        variant: "bg"
+        radius: 0
+        enableBorder: false
+        visible: root.frameEnabled && root.leftThickness > 0
+        x: 0
+        y: root.splitTop ? root.stripSize : root.topThickness
+        width: root.leftThickness
+        height: Math.max(0, parent.height - y - (root.splitBottom ? root.stripSize : root.bottomThickness))
+    }
 
-        Rectangle {
-            id: maskRect
-            x: root.leftThickness
-            y: frameMask.topInset
-            width: Math.max(0, parent.width - (root.leftThickness + root.rightThickness))
-            height: Math.max(0, parent.height - (frameMask.topInset + frameMask.bottomInset))
-            radius: root.innerRadius
-            color: "white"
-        }
+    StyledRect {
+        id: frameRightEdge
+        variant: "bg"
+        radius: 0
+        enableBorder: false
+        visible: root.frameEnabled && root.rightThickness > 0
+        x: parent.width - width
+        y: root.splitTop ? root.stripSize : root.topThickness
+        width: root.rightThickness
+        height: Math.max(0, parent.height - y - (root.splitBottom ? root.stripSize : root.bottomThickness))
+    }
+
+    RoundCorner {
+        visible: root.frameEnabled && !root.splitTop && root.innerRadius > 0
+        size: Math.max(1, root.innerRadius)
+        x: root.leftThickness
+        y: root.topThickness
+        corner: RoundCorner.CornerEnum.TopLeft
+        color: root.stripColor
+        opacity: Config.theme.srBg.opacity
+    }
+
+    RoundCorner {
+        visible: root.frameEnabled && !root.splitTop && root.innerRadius > 0
+        size: Math.max(1, root.innerRadius)
+        x: parent.width - root.rightThickness - size
+        y: root.topThickness
+        corner: RoundCorner.CornerEnum.TopRight
+        color: root.stripColor
+        opacity: Config.theme.srBg.opacity
+    }
+
+    RoundCorner {
+        visible: root.frameEnabled && !root.splitBottom && root.innerRadius > 0
+        size: Math.max(1, root.innerRadius)
+        x: root.leftThickness
+        y: parent.height - root.bottomThickness - size
+        corner: RoundCorner.CornerEnum.BottomLeft
+        color: root.stripColor
+        opacity: Config.theme.srBg.opacity
+    }
+
+    RoundCorner {
+        visible: root.frameEnabled && !root.splitBottom && root.innerRadius > 0
+        size: Math.max(1, root.innerRadius)
+        x: parent.width - root.rightThickness - size
+        y: parent.height - root.bottomThickness - size
+        corner: RoundCorner.CornerEnum.BottomRight
+        color: root.stripColor
+        opacity: Config.theme.srBg.opacity
     }
 
     StyledRect {

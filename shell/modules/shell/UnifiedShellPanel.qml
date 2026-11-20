@@ -128,6 +128,11 @@ PanelWindow {
         }
     }
 
+    IdleInhibitor {
+        enabled: CaffeineService.inhibit
+        window: unifiedPanel
+    }
+
     MouseArea {
         id: backdropArea
         anchors.fill: parent
@@ -142,9 +147,6 @@ PanelWindow {
     Item {
         id: visualContent
         anchors.fill: parent
-
-        layer.enabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
-        layer.effect: Shadow {}
 
         ScreenFrameContent {
             id: frameContent

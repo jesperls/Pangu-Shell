@@ -78,5 +78,5 @@ void main() {
         color = mix(color, getStopColor(i), localT);
     }
 
-    fragColor = color * ubuf.qt_Opacity;
+    fragColor = vec4(color.rgb * color.a, color.a) * ubuf.qt_Opacity;
 }

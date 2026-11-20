@@ -1849,8 +1849,9 @@ Item {
                             lastCursorPos = cursorPosition;
                         }
 
-                        Keys.onEscapePressed: {
+                        Keys.onEscapePressed: event => {
                             searchInput.focusInput();
+                            event.accepted = true;
                         }
 
                         Keys.onPressed: event => {
@@ -2404,8 +2405,9 @@ Item {
                                 }
                             }
 
-                            Keys.onEscapePressed: {
+                            Keys.onEscapePressed: event => {
                                 searchInput.focusInput();
+                                event.accepted = true;
                             }
 
                             Keys.onPressed: event => {
@@ -2486,13 +2488,26 @@ Item {
                             }
                         }
 
+                        Timer {
+                            id: mdPreviewDebounce
+                            interval: 100
+                            repeat: false
+                            onTriggered: mdPreviewText.text = mdEditor.text
+                        }
+
+                        Connections {
+                            target: mdEditor
+                            function onTextChanged() { mdPreviewDebounce.restart(); }
+                        }
+
                         TextEdit {
                             id: mdPreviewText
                             width: mdPreviewFlickable.width - 16
                             x: 8
                             y: 8
                             textFormat: TextEdit.MarkdownText
-                            text: mdEditor.text
+                            Component.onCompleted: text = mdEditor.text
+                            onVisibleChanged: if (visible) text = mdEditor.text
                             font.family: Config.theme.font
                             font.pixelSize: Config.theme.fontSize
                             color: Colors.overSurface

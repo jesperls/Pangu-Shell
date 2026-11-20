@@ -51,7 +51,16 @@ Item {
         visible: false
         smooth: false
         recursive: false
-        live: root.tintEnabled
+        live: false
+        Component.onCompleted: if (sourceItem) Qt.callLater(scheduleUpdate)
+        onSourceItemChanged: if (sourceItem) Qt.callLater(scheduleUpdate)
+    }
+
+    Connections {
+        target: Colors
+        function onFileChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
+        function onBackgroundChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
+        function onPrimaryChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
     }
 
     Item {

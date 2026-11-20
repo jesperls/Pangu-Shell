@@ -50,7 +50,7 @@ Item {
     readonly property real cycleLength: baseDashLength + targetSpacing
 
     NumberAnimation on phase {
-        running: (root.dashedActive || root.wavy) && Styling.animDuration > 0 && root.visible && root.Window.window !== null && root.Window.window.visible
+        running: root.dashedActive && Styling.animDuration > 0 && root.visible && root.Window.window !== null && root.Window.window.visible
         from: 0
         to: -root.cycleLength
         duration: 1000

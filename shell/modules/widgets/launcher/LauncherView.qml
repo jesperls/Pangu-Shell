@@ -182,7 +182,7 @@ Rectangle {
                 categories: [],
                 runInTerminal: false,
                 isAction: true,
-                execute: () => Quickshell.execDetached(["wl-copy", result])
+                execute: () => Quickshell.execDetached(["wl-copy", "--", result])
             };
         }
 
@@ -191,7 +191,7 @@ Rectangle {
             interval: 150
             onTriggered: {
                 calcProcess.running = false;
-                calcProcess.command = ["qalc", "-t", appLauncher.calcExpr];
+                calcProcess.command = ["qalc", "-t", "--", appLauncher.calcExpr];
                 calcProcess.running = true;
             }
         }
@@ -781,6 +781,8 @@ Rectangle {
                                 anchors.fill: parent
                                 visible: !parent.isFontIcon
                                 source: parent.isFontIcon ? "" : "image://icon/" + appIcon
+                                sourceSize: Qt.size(64, 64)
+                                asynchronous: true
                                 fillMode: Image.PreserveAspectFit
 
                                 onStatusChanged: {

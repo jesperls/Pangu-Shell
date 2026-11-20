@@ -192,6 +192,8 @@ Item {
 
         Item {
             id: dockContainer
+            layer.enabled: Config.showBackground && (Config.theme?.shadowOpacity ?? 0) > 0
+            layer.effect: Shadow {}
 
             readonly property int cornerSize: root.isDefault && Config.roundness > 0 ? Config.roundness + 4 : 0
 

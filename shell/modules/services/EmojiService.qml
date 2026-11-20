@@ -19,9 +19,13 @@ Singleton {
         for (const [emoji, info] of Object.entries(value)) {
             if (!info || typeof info.name !== "string") continue;
             const slug = typeof info.slug === "string" ? info.slug : "";
+            const group = typeof info.group === "string" ? info.group : "";
+            const search = info.name + " " + slug;
             result.push({emoji: emoji, name: info.name, slug: slug,
-                group: typeof info.group === "string" ? info.group : "",
-                search: info.name + " " + slug, skin_tone_support: info.skin_tone_support === true});
+                group: group,
+                search: search,
+                _searchLower: (search + " " + group).toLowerCase(),
+                skin_tone_support: info.skin_tone_support === true});
         }
         return result;
     }

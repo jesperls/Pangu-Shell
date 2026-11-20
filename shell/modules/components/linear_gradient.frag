@@ -56,22 +56,11 @@ void main() {
     float angleRad = radians(ubuf.angle);
     vec2 dir = vec2(sin(angleRad), cos(angleRad));
 
-    vec2 corners[4];
-    corners[0] = vec2(0, 0) - center;
-    corners[1] = vec2(size.x, 0) - center;
-    corners[2] = vec2(0, size.y) - center;
-    corners[3] = vec2(size.x, size.y) - center;
-
-    float minProj = dot(corners[0], dir);
-    float maxProj = minProj;
-    for (int i = 1; i < 4; i++) {
-        float p = dot(corners[i], dir);
-        minProj = min(minProj, p);
-        maxProj = max(maxProj, p);
-    }
+    float maxProj = abs(center.x * dir.x) + abs(center.y * dir.y);
+    float minProj = -maxProj;
 
     float proj = dot(relPos, dir);
-    float t = clamp((proj - minProj) / (maxProj - minProj), 0.0, 1.0);
+    float t = clamp((proj - minProj) / max(maxProj - minProj, 0.001), 0.0, 1.0);
 
     // Procedural gradient: interpolate between stops
     vec4 color = getStopColor(0);
@@ -84,5 +73,5 @@ void main() {
         color = mix(color, getStopColor(i), localT);
     }
 
-    fragColor = color * ubuf.qt_Opacity;
+    fragColor = vec4(color.rgb * color.a, color.a) * ubuf.qt_Opacity;
 }

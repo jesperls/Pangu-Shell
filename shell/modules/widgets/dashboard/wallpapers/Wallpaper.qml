@@ -360,19 +360,28 @@ PanelWindow {
                     visible: false
                     smooth: false
                     recursive: false
-                    live: staticImageRoot.tint
+                    live: false
+                    Component.onCompleted: if (sourceItem) Qt.callLater(scheduleUpdate)
+                    onSourceItemChanged: if (sourceItem) Qt.callLater(scheduleUpdate)
+                }
+
+                Connections {
+                    target: Colors
+                    function onFileChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
+                    function onBackgroundChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
+                    function onPrimaryChanged() { if (paletteTextureSource.sourceItem) Qt.callLater(paletteTextureSource.scheduleUpdate); }
                 }
 
                 Image {
                     mipmap: true
                     id: rawImage
                     anchors.fill: parent
-                    source: parent.sourceFile ? "file://" + parent.sourceFile : ""
+                    source: parent.sourceFile ? "file://" + encodeURI(parent.sourceFile).replace(/#/g, "%23").replace(/\?/g, "%3F") : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     smooth: true
-                    sourceSize.width: wallpaper.width
-                    sourceSize.height: wallpaper.height
+                    sourceSize.width: Math.round(wallpaper.width * (wallpaper.screen?.devicePixelRatio ?? 1))
+                    sourceSize.height: Math.round(wallpaper.height * (wallpaper.screen?.devicePixelRatio ?? 1))
                     layer.enabled: parent.tint
                     layer.effect: ShaderEffect {
                         property var paletteTexture: paletteTextureSource

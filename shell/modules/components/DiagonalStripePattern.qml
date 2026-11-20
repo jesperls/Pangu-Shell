@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Window
 import Quickshell.Widgets
 import qs.modules.theme
 
@@ -20,7 +21,7 @@ ClippingRectangle {
         to: root.stripeSpacing
         duration: root.animationDuration
         loops: Animation.Infinite
-        running: root.animationRunning && root.visible && Styling.animDuration > 0
+        running: root.animationRunning && root.visible && Styling.animDuration > 0 && root.Window.window !== null && root.Window.window.visible
     }
 
     Repeater {

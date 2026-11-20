@@ -301,10 +301,16 @@ WlSessionLockSurface {
         }
 
         Timer {
-            interval: 1000
+            id: lockClockTimer
+            interval: Math.max(1000, 60000 - (new Date().getSeconds() * 1000 + new Date().getMilliseconds()))
             running: GlobalStates.lockscreenVisible
             repeat: true
-            onTriggered: clockContainer.currentTime = new Date()
+            triggeredOnStart: true
+            onTriggered: {
+                const now = new Date();
+                clockContainer.currentTime = now;
+                lockClockTimer.interval = Math.max(1000, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
+            }
         }
     }
 
@@ -324,7 +330,7 @@ WlSessionLockSurface {
             bottomMargin: !isTopPosition ? 32 : 0
         }
         width: 350
-        height: playerContent.height
+        height: playerLoader.item ? playerLoader.item.height : 0
 
         opacity: startAnim ? 1 : 0
 
@@ -344,9 +350,13 @@ WlSessionLockSurface {
             }
         }
 
-        LockPlayer {
-            id: playerContent
+        Loader {
+            id: playerLoader
+            active: playerContainer.visible && GlobalStates.lockscreenVisible
             width: parent.width
+            sourceComponent: LockPlayer {
+                width: playerLoader.width
+            }
         }
     }
 
@@ -627,6 +637,11 @@ WlSessionLockSurface {
 
     Connections {
         target: LockscreenService
+        function onLocked() {
+            unlockTimer.stop();
+            root.startAnim = true;
+            passwordInput.forceActiveFocus();
+        }
         function onUnlocked() {
             root.startAnim = false;
             unlockTimer.start();

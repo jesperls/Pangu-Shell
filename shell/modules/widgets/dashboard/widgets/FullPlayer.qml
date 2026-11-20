@@ -139,6 +139,7 @@ StyledRect {
         id: backgroundArtFull
         anchors.fill: parent
         source: (MprisController.activePlayer?.trackArtUrl ?? "") !== "" ? MprisController.activePlayer.trackArtUrl : player.wallpaperPath
+        sourceSize: Qt.size(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)))
         fillMode: Image.PreserveAspectCrop
         visible: false
         asynchronous: true

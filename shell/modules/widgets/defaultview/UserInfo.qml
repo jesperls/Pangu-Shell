@@ -51,6 +51,8 @@ Item {
                         id: avatarImage
                         anchors.fill: parent
                         source: GlobalStates.hasAvatar ? "file://" + Paths.avatar + (GlobalStates.avatarCacheBuster ? "?t=" + GlobalStates.avatarCacheBuster : "") : ""
+                        sourceSize: Qt.size(48, 48)
+                        asynchronous: true
                         fillMode: Image.PreserveAspectCrop
                         visible: status === Image.Ready
                     }

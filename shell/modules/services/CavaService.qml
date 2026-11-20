@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 import qs.modules.components
+import qs.modules.globals
 import qs.modules.services
 
 Singleton {
@@ -17,7 +18,7 @@ Singleton {
     property bool available: true
     property bool retried: false
 
-    readonly property bool shouldRun: Config.performance.audioVisualizer && refCount > 0 && MprisController.isPlaying && !SuspendManager.isSuspending
+    readonly property bool shouldRun: Config.performance.audioVisualizer && refCount > 0 && MprisController.isPlaying && !SuspendManager.isSuspending && !GlobalStates.lockscreenVisible
 
     function acquire() {
         refCount++;

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import qs.modules.components
 import qs.modules.theme
 import qs.modules.services
@@ -45,7 +46,7 @@ Item {
             property int pulseDuration: root.recording ? 800 : 2000
 
             SequentialAnimation on opacity {
-                running: root.visible && Styling.animDuration > 0
+                running: root.visible && Styling.animDuration > 0 && root.Window.window !== null && root.Window.window.visible
                 loops: Animation.Infinite
                 NumberAnimation {
                     from: 1

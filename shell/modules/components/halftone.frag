@@ -45,20 +45,8 @@ void main() {
     // angle=0 -> vertical (top to bottom), angle=90 -> horizontal (left to right)
     vec2 gradientDir = vec2(sin(angleRad), cos(angleRad));
     
-    // Project the canvas corners onto the gradient axis to get its full range.
-    vec2 corners[4];
-    corners[0] = vec2(0.0, 0.0) - center;
-    corners[1] = vec2(ubuf.canvasWidth, 0.0) - center;
-    corners[2] = vec2(0.0, ubuf.canvasHeight) - center;
-    corners[3] = vec2(ubuf.canvasWidth, ubuf.canvasHeight) - center;
-    
-    float minProj = dot(corners[0], gradientDir);
-    float maxProj = minProj;
-    for (int i = 1; i < 4; i++) {
-        float proj = dot(corners[i], gradientDir);
-        minProj = min(minProj, proj);
-        maxProj = max(maxProj, proj);
-    }
+    float maxProj = abs(center.x * gradientDir.x) + abs(center.y * gradientDir.y);
+    float minProj = -maxProj;
     
     float totalRange = maxProj - minProj;
     

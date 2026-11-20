@@ -1863,6 +1863,8 @@ Item {
                         anchors.fill: parent
                         fillMode: Image.PreserveAspectFit
                         visible: previewPanel.currentItem && (previewPanel.currentItem.isImage || isImageFile) && !isGifImage
+                        sourceSize.width: Math.max(1, Math.round(width * Screen.devicePixelRatio))
+                        sourceSize.height: Math.max(1, Math.round(height * Screen.devicePixelRatio))
                         source: {
                             if (previewPanel.currentItem) {
                                 if (previewPanel.currentItem.isImage && !isGifImage) {
@@ -1871,7 +1873,7 @@ Item {
                                 } else if (isImageFile && !isGifImage) {
                                     var content = root.safeCurrentContent;
                                     var filePath = root.getFilePathFromUri(content);
-                                    return filePath ? "file://" + filePath : "";
+                                    return filePath ? "file://" + encodeURI(filePath).replace(/#/g, "%23").replace(/\?/g, "%3F") : "";
                                 }
                             }
                             return "";
@@ -1926,7 +1928,7 @@ Item {
                         clip: true
                         cache: false
                         asynchronous: true
-                        playing: true
+                        playing: visible && root.visible
 
                         property bool isImageFile: {
                             if (!previewPanel.currentItem || !previewPanel.currentItem.isFile)

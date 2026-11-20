@@ -256,6 +256,8 @@ Item {
 
         Item {
             id: bar
+            layer.enabled: root.shadowsEnabled && (Config.theme?.shadowOpacity ?? 0) > 0
+            layer.effect: Shadow {}
 
             anchors {
                 top: (root.barPosition === "top" || root.orientation === "vertical") ? parent.top : undefined
@@ -589,14 +591,19 @@ Item {
                             endRadius: root.innerRadius
                         }
 
-                        Clock {
+                        Loader {
                             id: clockComponent
-                            bar: root
-                            layerEnabled: root.shadowsEnabled
-                            flatStyle: root.flatButtons
-                            visible: root.clockPosition !== "center"
-                            startRadius: root.innerRadius
-                            endRadius: root.innerRadius
+                            active: root.clockPosition !== "center"
+                            visible: active
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: item ? item.implicitWidth : 0
+                            sourceComponent: Clock {
+                                bar: root
+                                layerEnabled: root.shadowsEnabled
+                                flatStyle: root.flatButtons
+                                startRadius: root.innerRadius
+                                endRadius: root.innerRadius
+                            }
                         }
 
                         PowerButton {
@@ -851,15 +858,18 @@ Item {
                 }
             }
 
-            Clock {
+            Loader {
                 id: clockComponentCenter
-                visible: root.orientation === "horizontal" && root.clockPosition === "center"
-                bar: root
-                flatStyle: root.flatButtons
-                layerEnabled: root.shadowsEnabled
+                active: root.orientation === "horizontal" && root.clockPosition === "center"
+                visible: active
                 anchors.centerIn: parent
-                startRadius: root.innerRadius
-                endRadius: root.innerRadius
+                sourceComponent: Clock {
+                    bar: root
+                    flatStyle: root.flatButtons
+                    layerEnabled: root.shadowsEnabled
+                    startRadius: root.innerRadius
+                    endRadius: root.innerRadius
+                }
             }
         }
     }

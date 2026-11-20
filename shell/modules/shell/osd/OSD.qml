@@ -243,6 +243,8 @@ PanelWindow {
     property real percentPulse: 1.0
 
     onOsdValueChanged: {
+        if (!root.visible)
+            return;
         percentPulse = 1.25;
         percentPulseAnim.restart();
     }

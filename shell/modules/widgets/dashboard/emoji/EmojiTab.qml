@@ -101,7 +101,12 @@ Rectangle {
 
     onSearchTextChanged: {
         recentContentX = 0;
-        performSearch();
+        if (searchText.length === 0) {
+            emojiSearchDebounce.stop();
+            performSearch();
+        } else {
+            emojiSearchDebounce.restart();
+        }
     }
 
     function clearSearch() {
@@ -134,6 +139,13 @@ Rectangle {
         clearButtonConfirmState = false;
     }
 
+    Timer {
+        id: emojiSearchDebounce
+        interval: 50
+        repeat: false
+        onTriggered: root.performSearch()
+    }
+
     function performSearch() {
         expandedItemIndex = -1;
         selectedOptionIndex = 0;
@@ -154,7 +166,8 @@ Rectangle {
         if (searchText.length > 0) {
             for (var i = 0; i < emojiData.length; i++) {
                 var emoji = emojiData[i];
-                if (emoji.emoji.includes(searchText) || emoji.search.toLowerCase().includes(searchLower) || emoji.name.toLowerCase().includes(searchLower) || emoji.slug.toLowerCase().includes(searchLower) || emoji.group.toLowerCase().includes(searchLower)) {
+                var haystack = emoji._searchLower;
+                if (emoji.emoji.includes(searchText) || (haystack ? haystack.includes(searchLower) : (emoji.search.toLowerCase().includes(searchLower) || emoji.name.toLowerCase().includes(searchLower) || emoji.slug.toLowerCase().includes(searchLower) || emoji.group.toLowerCase().includes(searchLower)))) {
                     filtered.push(emoji);
                 }
             }
