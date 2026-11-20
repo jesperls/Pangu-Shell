@@ -110,4 +110,11 @@ FloatingWindow {
     }
 
     onClosed: GlobalStates.settingsWindowVisible = false
+
+    Component.onDestruction: {
+        placementTimer.stop();
+        GlobalStates.discardThemeChanges();
+        GlobalStates.discardShellChanges();
+        GlobalStates.discardCompositorChanges();
+    }
 }

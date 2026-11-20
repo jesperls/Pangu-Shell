@@ -253,8 +253,10 @@ Singleton {
         try {
             const data = JSON.parse(notifFileView.text());
             if (!Array.isArray(data)) throw new Error("Expected a notification list");
-            const loaded = data.slice(-200).map(jsonToNotif);
-            const live = root.list.filter(n => n && !n.isFromFile);
+            const live = root.list.filter(n => n && !n.isCached);
+            const liveIds = {};
+            live.forEach(notif => { liveIds[notif.id] = true; });
+            const loaded = data.slice(-200).filter(entry => entry && !liveIds[entry.id]).map(jsonToNotif);
             let maxId = 0;
             loaded.forEach(notif => {
                 if (notif.id > maxId)
@@ -431,17 +433,22 @@ Singleton {
 
     function discardNotification(id) {
         const index = root.list.findIndex(notif => notif.id === id);
-        const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
+        let tracked = null;
         if (index !== -1) {
             const removed = root.list[index];
+            tracked = removed.notification || null;
             root.list.splice(index, 1);
             root.unreadCount = Math.min(root.unreadCount, root.list.length);
             triggerListChange();
             saveNotifications();
             root.scheduleDestroy(removed);
         }
-        if (notifServerIndex !== -1) {
-            notifServer.trackedNotifications.values[notifServerIndex].dismiss();
+        if (tracked && typeof tracked.dismiss === "function") {
+            tracked.dismiss();
+        } else if (typeof notifServer !== "undefined" && notifServer?.trackedNotifications?.values) {
+            const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
+            if (notifServerIndex !== -1)
+                notifServer.trackedNotifications.values[notifServerIndex].dismiss();
         }
         root.discard(id);
     }
@@ -457,6 +464,7 @@ Singleton {
 
         const newList = root.list.filter(notif => !idsMap[notif.id]);
         const removedCount = root.list.length - newList.length;
+        const dismissedTracked = [];
 
         if (removedCount > 0) {
             const removed = root.list.filter(notif => idsMap[notif.id]);
@@ -464,13 +472,20 @@ Singleton {
             root.unreadCount = Math.min(root.unreadCount, root.list.length);
             triggerListChange();
             saveNotifications();
-            removed.forEach(notif => root.scheduleDestroy(notif));
+            removed.forEach(notif => {
+                if (notif.notification && typeof notif.notification.dismiss === "function") {
+                    notif.notification.dismiss();
+                    dismissedTracked.push(notif.id);
+                }
+                root.scheduleDestroy(notif);
+            });
         }
 
         ids.forEach(id => {
-            const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
-            if (notifServerIndex !== -1) {
-                notifServer.trackedNotifications.values[notifServerIndex].dismiss();
+            if (dismissedTracked.indexOf(id) === -1 && typeof notifServer !== "undefined" && notifServer?.trackedNotifications?.values) {
+                const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
+                if (notifServerIndex !== -1)
+                    notifServer.trackedNotifications.values[notifServerIndex].dismiss();
             }
             root.discard(id);
         });
@@ -524,8 +539,11 @@ Singleton {
             localHandler(id);
             invoked = true;
         } else {
-            const notification = notifServer.trackedNotifications.values.find(notif => notif.id + root.idOffset === id);
-            const action = notification?.actions.find(action => action.identifier === notifIdentifier);
+            const notification = entry.notification
+                || (typeof notifServer !== "undefined" && notifServer?.trackedNotifications?.values
+                    ? notifServer.trackedNotifications.values.find(notif => notif.id + root.idOffset === id)
+                    : null);
+            const action = notification?.actions?.find(action => action.identifier === notifIdentifier);
             if (action) {
                 action.invoke();
                 invoked = true;

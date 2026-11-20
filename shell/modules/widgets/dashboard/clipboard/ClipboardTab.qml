@@ -138,9 +138,23 @@ Item {
     }
 
     function getFilePathFromUri(content) {
-        if (!content || !content.startsWith("file://"))
+        if (!content)
             return "";
-        return decodeURIComponent(content.substring(7).trim());
+        const lines = String(content).split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line || line.startsWith("#"))
+                continue;
+            if (!line.startsWith("file://"))
+                return "";
+            const raw = line.substring(7);
+            try {
+                return decodeURIComponent(raw);
+            } catch (e) {
+                return raw;
+            }
+        }
+        return "";
     }
 
     function isImageFile(filePath) {

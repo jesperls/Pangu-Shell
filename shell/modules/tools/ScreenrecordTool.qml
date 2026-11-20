@@ -125,12 +125,19 @@ PanelWindow {
 
         Screenshot.fetchWindows();
 
-        selectionRect = Qt.rect(0, 0, 0, 0);
-        selecting = false;
+        selectionRect.x = 0;
+        selectionRect.y = 0;
+        selectionRect.width = 0;
+        selectionRect.height = 0;
+        regionArea.selecting = false;
         screenrecordPopup.state = "active";
 
         if (modeGrid)
             modeGrid.forceActiveFocus();
+    }
+
+    function activeScreenMonitor() {
+        return screenrecordPopup.screen ? Compositor.monitorFor(screenrecordPopup.screen) : screenrecordPopup.focusedMonitor;
     }
 
     function startCapture(mode, regionStr) {
@@ -143,8 +150,11 @@ PanelWindow {
     }
 
     function close() {
-        selectionRect = Qt.rect(0, 0, 0, 0);
-        selecting = false;
+        selectionRect.x = 0;
+        selectionRect.y = 0;
+        selectionRect.width = 0;
+        selectionRect.height = 0;
+        regionArea.selecting = false;
         screenrecordPopup.state = "idle";
         GlobalStates.screenRecordToolVisible = false;
     }
@@ -156,7 +166,7 @@ PanelWindow {
             if (selectionRect.width > 0) {
                 var w = Math.round(selectionRect.width);
                 var h = Math.round(selectionRect.height);
-                var mon = screenrecordPopup.screen ? Compositor.monitorFor(screenrecordPopup.screen) : screenrecordPopup.focusedMonitor;
+                var mon = activeScreenMonitor();
                 var x = Math.round(selectionRect.x) + (mon?.x ?? screenrecordPopup.screen?.x ?? 0);
                 var y = Math.round(selectionRect.y) + (mon?.y ?? screenrecordPopup.screen?.y ?? 0);
 
@@ -197,6 +207,7 @@ PanelWindow {
         id: focusGrab
         windows: [screenrecordPopup]
         active: screenrecordPopup.visible
+        onCleared: screenrecordPopup.close()
     }
 
     FocusScope {
@@ -304,8 +315,9 @@ PanelWindow {
                 if (selectionRect.width > 5 && selectionRect.height > 5) {
                     var w = Math.round(selectionRect.width);
                     var h = Math.round(selectionRect.height);
-                    var x = Math.round(selectionRect.x) + (screenrecordPopup.focusedMonitor?.x ?? screenrecordPopup.screen?.x ?? 0);
-                    var y = Math.round(selectionRect.y) + (screenrecordPopup.focusedMonitor?.y ?? screenrecordPopup.screen?.y ?? 0);
+                    var mon = screenrecordPopup.activeScreenMonitor();
+                    var x = Math.round(selectionRect.x) + (mon?.x ?? screenrecordPopup.screen?.x ?? 0);
+                    var y = Math.round(selectionRect.y) + (mon?.y ?? screenrecordPopup.screen?.y ?? 0);
 
                     screenrecordPopup.startCapture("region", w + "x" + h + "+" + x + "+" + y);
                 }

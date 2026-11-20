@@ -249,7 +249,7 @@ FocusScope {
                 text: searchText
                 placeholderText: "Search wallpapers..."
                 iconText: ""
-                clearOnEscape: false
+                clearOnEscape: true
                 handleTabNavigation: true
                 disableCursorNavigation: true
                 radius: Styling.radius(4)
@@ -696,7 +696,7 @@ FocusScope {
 
                 var thumbnailPath = GlobalStates.wallpaperManager.getThumbnailPath(parent.sourceFile);
                 var version = GlobalStates.wallpaperManager.thumbnailsVersion;
-                return "file://" + thumbnailPath + "?v=" + version;
+                return thumbnailPath ? Paths.toFileUrl(thumbnailPath) + "?v=" + version : "";
             }
             fillMode: Image.PreserveAspectCrop
             asynchronous: true

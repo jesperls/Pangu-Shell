@@ -116,6 +116,6 @@ QtObject {
 
     property ThemeReloader reloader: ThemeReloader {
         files: [kittyFile]
-        command: ["pkill", "-USR1", "-x", "kitty"]
+        command: ["sh", "-c", "pkill -USR1 -x kitty 2>/dev/null; pkill -USR1 -x .kitty-wrapped 2>/dev/null; true"] // NixOS wraps kitty as .kitty-wrapped
     }
 }

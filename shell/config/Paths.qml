@@ -34,7 +34,13 @@ Singleton {
     }
 
     function assetUrl(relative) {
-        return "file://" + assetsDir + "/" + relative;
+        return toFileUrl(assetsDir + "/" + relative);
+    }
+
+    function toFileUrl(path) {
+        if (!path)
+            return "";
+        return "file://" + encodeURI(String(path)).replace(/#/g, "%23").replace(/\?/g, "%3F");
     }
 
     function script(relative) {

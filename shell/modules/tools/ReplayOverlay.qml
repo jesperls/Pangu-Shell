@@ -119,7 +119,7 @@ PanelWindow {
 
     Process {
         id: copyUriProcess
-        command: ["bash", "-c", "printf 'file://%s\\r\\n' \"$1\" | wl-copy --type text/uri-list", "pangu-replay-copy", root.clipPath]
+        command: ["bash", "-c", "printf '%s\\r\\n' \"$1\" | wl-copy --type text/uri-list", "pangu-replay-copy", Paths.toFileUrl(root.clipPath)]
         running: false
         onExited: code => {
             if (code === 0)
@@ -214,7 +214,7 @@ PanelWindow {
                 Image {
                     id: posterImg
                     anchors.fill: parent
-                    source: root.posterPath !== "" ? "file://" + root.posterPath : ""
+                    source: Paths.toFileUrl(root.posterPath)
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     mipmap: true
@@ -225,7 +225,7 @@ PanelWindow {
                         Drag.dragType: Drag.Automatic
                         Drag.supportedActions: Qt.CopyAction
                         Drag.mimeData: ({
-                            "text/uri-list": "file://" + root.clipPath + "\r\n"
+                            "text/uri-list": Paths.toFileUrl(root.clipPath) + "\r\n"
                         })
                         Drag.imageSource: posterImg.source
                     }

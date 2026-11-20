@@ -96,15 +96,67 @@ class SystemMonitor:
                     pass
         return gpus
 
+    @staticmethod
+    def _mount_source_from_mountinfo(mount, lines):
+        target = os.path.realpath(mount)
+        best_len = -1
+        best_source = None
+        for line in lines:
+            parts = line.split(" - ", 1)
+            if len(parts) != 2:
+                continue
+            left = parts[0].split()
+            right = parts[1].split()
+            if len(left) < 5 or len(right) < 2:
+                continue
+            mp = left[4].replace("\\040", " ").replace("\\011", "\t").replace("\\012", "\n").replace("\\134", "\\")
+            if target == mp or (mp == "/" or target.startswith(mp + "/")):
+                if len(mp) > best_len:
+                    best_len = len(mp)
+                    best_source = right[1]
+        return best_source
+
+    @staticmethod
+    def _sysfs_block_for_source(source):
+        if not source or not source.startswith("/dev/"):
+            return None
+        try:
+            st = os.stat(source)
+            block = os.path.realpath(f"/sys/dev/block/{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}")
+            seen = set()
+            while block not in seen:
+                seen.add(block)
+                if os.path.exists(os.path.join(block, "partition")):
+                    block = os.path.dirname(block)
+                slaves_dir = os.path.join(block, "slaves")
+                if os.path.isdir(slaves_dir):
+                    slaves = sorted(os.listdir(slaves_dir))
+                    if slaves:
+                        block = os.path.realpath(os.path.join(slaves_dir, slaves[0]))
+                        continue
+                break
+            return block
+        except OSError:
+            return None
+
     def _detect_disk_types(self, disks):
         types = {}
+        mountinfo_lines = []
+        try:
+            with open("/proc/self/mountinfo", "r") as f:
+                mountinfo_lines = f.read().splitlines()
+        except OSError:
+            pass
         for mount in disks:
             types[mount] = "unknown"
             try:
-                device = os.stat(mount).st_dev
-                block = os.path.realpath(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}")
-                if os.path.exists(os.path.join(block, "partition")):
-                    block = os.path.dirname(block)
+                source = self._mount_source_from_mountinfo(mount, mountinfo_lines)
+                block = self._sysfs_block_for_source(source)
+                if not block:
+                    device = os.stat(mount).st_dev
+                    block = os.path.realpath(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}")
+                    if os.path.exists(os.path.join(block, "partition")):
+                        block = os.path.dirname(block)
                 with open(os.path.join(block, "queue", "rotational")) as file:
                     types[mount] = "hdd" if file.read().strip() == "1" else "ssd"
             except OSError:

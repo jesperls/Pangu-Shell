@@ -210,6 +210,14 @@ FloatingWindow {
         root.syncPreviewDraft();
     }
 
+    Component.onDestruction: {
+        placementTimer.stop();
+        if (MacroService.recordingMacroId !== "")
+            MacroService.stopSoundRecord();
+        MacroService.stopSoundPreview();
+        MacroService.previewDraft = null;
+    }
+
     StyledRect {
         id: windowRoot
         anchors.fill: parent

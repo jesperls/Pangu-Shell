@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
+import qs.config
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
@@ -107,7 +108,7 @@ PanelWindow {
                 mipmap: true
                 id: img
                 anchors.fill: parent
-                source: root.imagePath !== "" ? "file://" + encodeURI(root.imagePath).replace(/#/g, "%23").replace(/\?/g, "%3F") : ""
+                source: Paths.toFileUrl(root.imagePath)
                 sourceSize.width: 500
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
@@ -118,7 +119,7 @@ PanelWindow {
                     Drag.dragType: Drag.Automatic
                     Drag.supportedActions: Qt.CopyAction
                     Drag.mimeData: {
-                        "text/uri-list": "file://" + root.imagePath
+                        "text/uri-list": Paths.toFileUrl(root.imagePath)
                     }
                     Drag.imageSource: img.source
                 }
@@ -138,7 +139,7 @@ PanelWindow {
                             Quickshell.execDetached(["rm", "--", root.imagePath]);
                             root.imagePath = "";
                         } else {
-                            Qt.openUrlExternally("file://" + root.imagePath);
+                            Qt.openUrlExternally(Paths.toFileUrl(root.imagePath));
                         }
                     }
                 }

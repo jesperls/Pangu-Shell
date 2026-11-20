@@ -116,7 +116,8 @@ case "${1:-}" in
 	;;
 run)
 	[ -n "${2:-}" ] || die "run needs a target"
-	ipc pangu run "$2"
+	shift
+	ipc pangu run "$*"
 	;;
 lock)
 	ipc pangu run lockscreen
