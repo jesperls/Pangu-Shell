@@ -163,6 +163,12 @@ Rectangle {
             isIcon: true
         },
         {
+            icon: Icons.edit,
+            label: "Tablet",
+            section: "tablet",
+            isIcon: true
+        },
+        {
             icon: Icons.paintBrush,
             label: "Theme",
             section: "theme",
@@ -456,6 +462,11 @@ Rectangle {
                 {
                     component: "EasyEffectsPanel.qml",
                     section: "effects"
+                },
+                {
+                    component: "TabletPanel.qml",
+                    section: "tablet",
+                    configPrefixes: ["tablet"]
                 },
                 {
                     component: "ThemePanel.qml",

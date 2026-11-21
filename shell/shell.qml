@@ -276,6 +276,19 @@ ShellRoot {
         }
     }
 
+    Variants {
+        model: Quickshell.screens
+
+        Loader {
+            id: tabletPickLoader
+            active: SuspendManager.wakeReady && GlobalStates.tabletPickActive
+            required property ShellScreen modelData
+            sourceComponent: TabletTargetOverlay {
+                targetScreen: tabletPickLoader.modelData
+            }
+        }
+    }
+
     Connections {
         target: Compositor
         function onLayoutModeChanged(screenName, layoutName) {
@@ -314,6 +327,7 @@ ShellRoot {
         void MediaGrabberService.clipboardMediaUrl;
         void MacroService.enabled;
         void PomodoroService.isRunning;
+        void TabletService.enabled;
     })
 
     function overviewEnabledFor(screenName) {

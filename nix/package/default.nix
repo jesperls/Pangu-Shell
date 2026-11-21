@@ -1,6 +1,8 @@
 {
   lib,
   buildEnv,
+  pkgsCross,
+  runCommand,
   stdenvNoCC,
   writeShellApplication,
 
@@ -9,6 +11,7 @@
   kdePackages,
   qt6,
 
+  android-tools,
   aria2,
   bash,
   bluez,
@@ -96,7 +99,21 @@ let
     ];
   };
 
-  pythonEnv = python3.withPackages (ps: [ ps.numpy ]);
+  pythonEnv = python3.withPackages (ps: [
+    ps.numpy
+    ps.evdev
+  ]);
+
+  tabletGrabAarch64 =
+    runCommand "pangu-tablet-grab-aarch64"
+      {
+        nativeBuildInputs = [ pkgsCross.aarch64-multiplatform-musl.stdenv.cc ];
+      }
+      ''
+        mkdir -p "$out/bin"
+        aarch64-unknown-linux-musl-gcc -static -Os -Wall -Wextra \
+          -o "$out/bin/tablet-grab" ${./tablet_grab.c}
+      '';
 
   src = stdenvNoCC.mkDerivation {
     name = "pangu-shell";
@@ -173,6 +190,7 @@ let
   runtimeInputs = [
     quickshell
 
+    android-tools
     aria2
     bash
     bluez
@@ -256,6 +274,7 @@ writeShellApplication {
     export PATH="${lib.makeBinPath runtimeInputs}''${PATH:+:$PATH}"
 
     shellRoot="''${PANGU_SHELL_DIR:-${src}}"
+    export PANGU_TABLET_GRAB_AARCH64="${tabletGrabAarch64}/bin/tablet-grab"
     version=${lib.escapeShellArg version}
     export PANGU_VERSION="$version"
 

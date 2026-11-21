@@ -1533,3 +1533,172 @@ serviceFunctions('../widgets/dashboard/clipboard/ClipboardTab.qml', ['getFilePat
 assert.equal(clipUriCtx.getFilePathFromUri('# comment\nfile:///tmp/hello%20world.png\n'), '/tmp/hello world.png');
 assert.equal(clipUriCtx.getFilePathFromUri('file:///tmp/bad%ZZname.png'), '/tmp/bad%ZZname.png', 'Malformed percent-encoding falls back without throwing');
 console.log('Skin tone ZWJ, launcher confirmation, recorder FPS/codec, Paths.toFileUrl and clipboard URI tests passed');
+
+assert.match(configSource, /name: "tablet"/, 'Tablet settings must persist through a ConfigFile adapter');
+const tabletSource = fs.readFileSync(path.join(__dirname, '../modules/services/tablet_utils.js'), 'utf8')
+    .replace(/^\.pragma library\n/, '');
+const tabletContext = vm.createContext({module: {exports: {}}, console});
+vm.runInContext(tabletSource
+    + '\nmodule.exports = {asList, pairOf, findTrackedWindow, effectiveTabletAspect, resolveTargetRegion, buildHyprlandLua, buildHyprlandTouchpadLua, computeActiveRect, evaluatePressure};',
+    tabletContext, {filename: 'tablet_utils.js'});
+const tabletUtils = tabletContext.module.exports;
+const testMonitors = [
+    {name: 'DP-2', x: 0, y: 0, logicalWidth: 5120, logicalHeight: 1440},
+    {name: 'DP-3', x: 1280, y: -1440, logicalWidth: 2560, logicalHeight: 1440}
+];
+// Simulate QML QVariantList pairs where Array.isArray() is false.
+const qmlPair = (a, b) => ({0: a, 1: b, length: 2});
+const testClients = [
+    {address: '0xabc', class: 'krita', title: 'Krita Canvas', mapped: true, hidden: false, is_focused: true, at: qmlPair(1400, 100), size: qmlPair(2200, 1200)}
+];
+const centeredRegion = tabletUtils.resolveTargetRegion(
+    {targetMode: 'centered', monitor: 'DP-2', centeredWidth: 2560, centeredHeight: 1440, aspectMode: 'fit-tablet'},
+    testMonitors, testClients, testMonitors[0], {}, 4 / 3
+);
+assert.equal(centeredRegion.output, 'DP-2');
+assert.equal(centeredRegion.absolutePosition, false);
+assert.equal(centeredRegion.regionX, 1280);
+assert.equal(centeredRegion.regionY, 0);
+assert.equal(centeredRegion.regionWidth, 2560);
+assert.equal(centeredRegion.regionHeight, 1440);
+const layoutCentered = tabletUtils.resolveTargetRegion(
+    {targetMode: 'centered', monitor: 'DP-2', centeredMatchLayout: true, aspectMode: 'fit-tablet'},
+    testMonitors, testClients, testMonitors[0], {'DP-2': {x: 1300, width: 2520, square: false}}, 4 / 3
+);
+assert.equal(layoutCentered.regionX, 1300);
+assert.equal(layoutCentered.regionWidth, 2520);
+const fitScreenRegion = tabletUtils.resolveTargetRegion(
+    {targetMode: 'centered', monitor: 'DP-2', centeredWidth: 2560, centeredHeight: 1440, aspectMode: 'fit-screen'},
+    testMonitors, testClients, testMonitors[0], {}, 4 / 3
+);
+assert.equal(fitScreenRegion.regionWidth, 1920);
+assert.equal(fitScreenRegion.regionX, 1600);
+const windowRegion = tabletUtils.resolveTargetRegion(
+    {targetMode: 'window', windowAddress: '0xabc', followWindow: true, aspectMode: 'stretch'},
+    testMonitors, testClients, testMonitors[0], {}, 4 / 3
+);
+assert.equal(windowRegion.windowFound, true);
+assert.equal(windowRegion.output, 'DP-2');
+assert.equal(windowRegion.regionX, 1400);
+assert.equal(windowRegion.regionY, 100);
+assert.equal(windowRegion.regionWidth, 2200);
+const focusedWinRegion = tabletUtils.resolveTargetRegion(
+    {targetMode: 'window', windowAddress: '', windowClass: '', aspectMode: 'stretch'},
+    testMonitors, testClients, testMonitors[0], {}, 4 / 3, testClients[0]
+);
+assert.equal(focusedWinRegion.windowFound, true);
+assert.equal(focusedWinRegion.regionWidth, 2200);
+const spanningRegion = tabletUtils.resolveTargetRegion(
+    {targetMode: 'area', areaX: 1280, areaY: -400, areaWidth: 2560, areaHeight: 1000, aspectMode: 'stretch'},
+    testMonitors, testClients, testMonitors[0], {}, 4 / 3
+);
+assert.equal(spanningRegion.output, '');
+assert.equal(spanningRegion.absolutePosition, true);
+const tabletLua = tabletUtils.buildHyprlandLua(centeredRegion, false);
+assert.ok(tabletLua.includes('output = "DP-2"'));
+assert.ok(tabletLua.includes('region_position = { 1280, 0 }'));
+assert.ok(tabletLua.includes('region_size = { 2560, 1440 }'));
+const touchpadLua = tabletUtils.buildHyprlandTouchpadLua({
+    touchpadAccelProfile: 'adaptive',
+    touchpadNaturalScroll: true,
+    touchpadTapToClick: true,
+    touchpadTapAndDrag: false,
+    touchpadScrollFactor: 1.5,
+    touchpadDrag3fg: 1,
+    touchpadDisableWhileTyping: false
+});
+assert.ok(touchpadLua.includes('hl.device('));
+assert.ok(touchpadLua.includes('name = "pangu-android-tablet-touchpad"'));
+assert.ok(touchpadLua.includes('accel_profile = "adaptive"'));
+assert.ok(touchpadLua.includes('natural_scroll = true'));
+assert.ok(touchpadLua.includes('tap_to_click = true'));
+assert.ok(touchpadLua.includes('tap_and_drag = false'));
+assert.ok(touchpadLua.includes('scroll_factor = 1.50'));
+assert.ok(touchpadLua.includes('drag_3fg = 1'));
+assert.ok(touchpadLua.includes('disable_while_typing = false'));
+assert.ok(tabletUtils.buildHyprlandTouchpadLua({touchpadAccelProfile: 'flat'}).includes('accel_profile = "flat"'));
+const activeBox = tabletUtils.computeActiveRect(4 / 3, 1.0, 0, 0, 'fit-tablet', 16 / 9);
+assert.ok(Math.abs(activeBox.height - 0.75) < 1e-6);
+assert.equal(tabletUtils.evaluatePressure(0.05, true, 1.0, 0.1, 1.0), 0);
+assert.ok(tabletUtils.evaluatePressure(0.5, true, 0.5, 0.0, 1.0) > tabletUtils.evaluatePressure(0.5, true, 2.0, 0.0, 1.0));
+
+// Regression: areaX/areaY === 0 must not fall back to a non-zero monitor origin when a tracked window closes.
+const closedWinAtOrigin = tabletUtils.resolveTargetRegion(
+    {targetMode: 'window', monitor: 'DP-3', windowAddress: '0xmissing', areaX: 0, areaY: 0, areaWidth: 800, areaHeight: 600, aspectMode: 'stretch'},
+    testMonitors, testClients, testMonitors[1], {}, 4 / 3
+);
+assert.equal(closedWinAtOrigin.globalX, 0);
+assert.equal(closedWinAtOrigin.globalY, 0);
+assert.equal(closedWinAtOrigin.output, 'DP-2');
+
+// Regression: TabletService.batchUpdate must pair beginEdit/endEdit with the same group name,
+// and wireless connect/disconnect must manage _manualWifiDisconnect and pinned USB serials.
+const tabletEditLog = [];
+const tabletPausedGroups = new Set();
+const tabletRuntimeWrites = [];
+const tabletServiceCtx = {
+    root: {
+        enabled: true,
+        connected: true,
+        transport: 'wifi',
+        deviceSerial: '192.168.50.182:5555',
+        wirelessBusy: false,
+        wirelessError: false,
+        wirelessFeedback: '',
+        _manualWifiDisconnect: false,
+        runtimeConfigJson: '{"wirelessAutoConnect":false}',
+        refreshDevices() {}
+    },
+    Config: {
+        initialLoadComplete: true,
+        tablet: {
+            enabled: false,
+            deviceSerial: '4e982bb5',
+            wirelessAddress: '192.168.50.182:5555',
+            areaX: 0, areaY: 0, areaWidth: 100, areaHeight: 100,
+            targetMode: 'centered'
+        },
+        beginEdit(group, files) {
+            tabletEditLog.push(['begin', group, files]);
+            tabletPausedGroups.add(group);
+        },
+        save(file) {
+            tabletEditLog.push(['save', file]);
+        },
+        endEdit(group) {
+            tabletEditLog.push(['end', group]);
+            tabletPausedGroups.delete(group);
+        }
+    },
+    Paths: {script: name => '/scripts/' + name},
+    runtimeFile: {write: text => tabletRuntimeWrites.push(text)},
+    wirelessProcess: {running: false}
+};
+serviceFunctions('TabletService.qml', [
+    'batchUpdate', 'selectArea', '_runWirelessAction',
+    'disconnectWireless', 'connectWireless', 'enableWireless', 'toggleWireless'
+], tabletServiceCtx);
+tabletServiceCtx.selectArea(100, 200, 1200, 800);
+assert.equal(tabletPausedGroups.size, 0, 'batchUpdate must release the exact edit group it acquired');
+assert.equal(tabletEditLog[0][0], 'begin');
+assert.equal(tabletEditLog[1][0], 'save');
+assert.equal(tabletEditLog[2][0], 'end');
+assert.equal(tabletEditLog[0][1], tabletEditLog[2][1], 'beginEdit and endEdit group names must match');
+assert.equal(tabletServiceCtx.Config.tablet.areaX, 100);
+assert.equal(tabletServiceCtx.Config.tablet.targetMode, 'area');
+
+tabletServiceCtx.toggleWireless();
+assert.equal(tabletServiceCtx.root._manualWifiDisconnect, true, 'Manual Wi-Fi disconnect must suppress auto-reconnect');
+assert.equal(tabletRuntimeWrites.length, 1, 'Manual Wi-Fi disconnect must flush runtime config immediately');
+assert.deepEqual(Array.from(tabletServiceCtx.wirelessProcess.command), ['python3', '/scripts/tablet_bridge.py', '--disconnect', '192.168.50.182:5555']);
+
+tabletServiceCtx.wirelessProcess.running = false;
+tabletServiceCtx.root.wirelessBusy = false;
+tabletServiceCtx.root.transport = '';
+tabletServiceCtx.connectWireless('192.168.50.182:5555');
+assert.equal(tabletServiceCtx.root._manualWifiDisconnect, false);
+tabletServiceCtx.wirelessProcess.onSuccessCallback({ok: true, address: '192.168.50.182:5555'});
+assert.equal(tabletServiceCtx.Config.tablet.enabled, true, 'Connecting wireless should auto-enable tablet bridge');
+assert.equal(tabletServiceCtx.Config.tablet.deviceSerial, '', 'Connecting wireless should clear a conflicting pinned USB serial');
+assert.equal(tabletPausedGroups.size, 0);
+console.log('Tablet region mapping, Hyprland Lua generation, active area, pressure curve and service tests passed');

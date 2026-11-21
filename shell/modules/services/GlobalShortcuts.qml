@@ -66,6 +66,16 @@ QtObject {
             case "cheatsheet": GlobalStates.cheatsheetVisible = !GlobalStates.cheatsheetVisible; break;
             case "macros": toggleMacros(); break;
             case "macros-stop": MacroService.stop(); break;
+            case "tablet":
+                Visibilities.setActiveModule("");
+                GlobalStates.openSettingsSection("tablet", "");
+                break;
+            case "tablet-toggle": TabletService.toggle(); break;
+            case "tablet-mode": TabletService.cycleInputMode(); break;
+            case "tablet-touchpad": TabletService.toggleTouchpadMode(); break;
+            case "tablet-pick-area": GlobalStates.beginTabletPick("area", false); break;
+            case "tablet-pick-window": GlobalStates.beginTabletPick("window", false); break;
+            case "tablet-pick-screen": GlobalStates.beginTabletPick("screen", false); break;
             case "pomodoro": PomodoroService.toggleTimer(); break;
             case "volume-up":
                 Audio.setVolume(Audio.value + 0.05);

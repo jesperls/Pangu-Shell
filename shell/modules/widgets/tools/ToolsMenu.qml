@@ -42,6 +42,16 @@ ActionGrid {
         property string type: "button"
     }
 
+    QtObject {
+        id: tabletAction
+        property string name: "tablet"
+        property string icon: Icons.edit
+        property string tooltip: TabletService.connected ? ("Drawing Tablet (" + (TabletService.deviceModel || "Connected") + ")") : (TabletService.enabled ? "Drawing Tablet (Waiting)" : "Drawing Tablet Settings")
+        property string command: ""
+        property string variant: TabletService.connected ? "tertiary" : (TabletService.enabled ? "secondary" : "primary")
+        property string type: "button"
+    }
+
     layout: "row"
     buttonSize: 48
     iconSize: 20
@@ -111,6 +121,7 @@ ActionGrid {
             tooltip: "Macros & Hotkeys",
             command: ""
         },
+        tabletAction,
         {
             name: "vpets",
             icon: Icons.pawPrint,
@@ -174,6 +185,9 @@ ActionGrid {
             break;
         case "macros":
             GlobalShortcuts.toggleMacros();
+            break;
+        case "tablet":
+            GlobalStates.openSettingsSection("tablet", "");
             break;
         case "vpets":
             ApplicationLauncher.launchCommand(["qs-vpets", "pen"]);

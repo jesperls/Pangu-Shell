@@ -64,10 +64,11 @@ Singleton {
         osd: osdFile,
         dashboard: dashboardFile,
         launcher: launcherFile,
-        macros: macrosFile
+        macros: macrosFile,
+        tablet: tabletFile
     })
 
-    readonly property bool initialLoadComplete: themeFile.ready && barFile.ready && workspacesFile.ready && overviewFile.ready && notchFile.ready && compositorFile.ready && performanceFile.ready && weatherFile.ready && lockscreenFile.ready && prefixFile.ready && systemFile.ready && dockFile.ready && pinnedAppsFile.ready && osdFile.ready && dashboardFile.ready && launcherFile.ready && macrosFile.ready
+    readonly property bool initialLoadComplete: themeFile.ready && barFile.ready && workspacesFile.ready && overviewFile.ready && notchFile.ready && compositorFile.ready && performanceFile.ready && weatherFile.ready && lockscreenFile.ready && prefixFile.ready && systemFile.ready && dockFile.ready && pinnedAppsFile.ready && osdFile.ready && dashboardFile.ready && launcherFile.ready && macrosFile.ready && tabletFile.ready
 
     readonly property bool barReady: barFile.ready
     readonly property bool dockReady: dockFile.ready
@@ -843,6 +844,61 @@ Singleton {
         }
     }
 
+    ConfigFile {
+        id: tabletFile
+        name: "tablet"
+
+        adapter: JsonAdapter {
+            property bool enabled: false
+            property string deviceSerial: ""
+            property string wirelessAddress: ""
+            property bool wirelessAutoConnect: true
+            property string inputMode: "pen"
+            property string targetMode: "centered"
+            property string monitor: ""
+            property int centeredWidth: 2560
+            property int centeredHeight: 1440
+            property bool centeredMatchLayout: false
+            property int areaX: 1280
+            property int areaY: 0
+            property int areaWidth: 2560
+            property int areaHeight: 1440
+            property string windowAddress: ""
+            property string windowClass: ""
+            property string windowTitle: ""
+            property bool followWindow: true
+            property string aspectMode: "fit-tablet"
+            property real areaScale: 1.0
+            property real areaOffsetX: 0.0
+            property real areaOffsetY: 0.0
+            property int rotation: 0
+            property bool flipX: false
+            property bool flipY: false
+            property bool relativeMode: false
+            property bool pressureEnabled: true
+            property real pressureGamma: 1.0
+            property real pressureMin: 0.0
+            property real pressureMax: 1.0
+            property bool tiltEnabled: true
+            property int smoothing: 0
+            property bool eraserEnabled: true
+            property bool swapStylusButtons: false
+            property bool suppressPen: true
+            property bool suppressTouch: true
+            property bool keepAwake: true
+            property real touchpadSpeed: 1.0
+            property string touchpadAccelProfile: "adaptive"
+            property real touchpadScrollFactor: 1.0
+            property bool touchpadNaturalScroll: true
+            property bool touchpadTapToClick: true
+            property bool touchpadTapAndDrag: true
+            property int touchpadDrag3fg: 0
+            property bool touchpadDisableWhileTyping: false
+            property int touchpadPalmRejectMs: 350
+            property string touchpadRotation: "auto"
+        }
+    }
+
     readonly property QtObject theme: themeFile.adapter
     readonly property QtObject bar: barFile.adapter
     readonly property QtObject workspaces: workspacesFile.adapter
@@ -860,6 +916,7 @@ Singleton {
     readonly property QtObject dashboard: dashboardFile.adapter
     readonly property QtObject launcher: launcherFile.adapter
     readonly property QtObject macros: macrosFile.adapter
+    readonly property QtObject tablet: tabletFile.adapter
 
     readonly property bool lightMode: theme.lightMode
     readonly property bool oledMode: lightMode ? false : theme.oledMode

@@ -187,9 +187,12 @@ integration installs backlight udev rules, enables I2C access and grants listed
 `users` the `video` and `i2c` groups when `brightness.enable` is true.
 
 The NixOS module has independent `fonts.enable`, `recording.enable`,
-`inputAutomation.enable`, `powerProfiles.enable`, `upower.enable` and
+`inputAutomation.enable`, `tablet.enable`, `powerProfiles.enable`, `upower.enable` and
 `brightness.enable` switches. They default to true when `programs.pangu.enable`
 is enabled. Set a switch to false when you provide that integration differently.
+`tablet.enable` enables `hardware.uinput` and grants listed `users` access to the
+`uinput` group so Android stylus tablets connected over ADB can act as virtual
+graphics tablets.
 
 `programs.pangu.package` selects the package used for dependency alignment;
 the Home Manager module has its own package option. Use the same package in

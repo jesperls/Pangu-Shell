@@ -213,11 +213,14 @@ in
       && nixos.services.upower.enable;
     assert nixos.hardware.i2c.enable;
     assert builtins.elem pkgs.brightnessctl nixos.services.udev.packages;
+    assert nixos.hardware.uinput.enable;
     assert builtins.elem "i2c" nixos.users.users.pangu-test.extraGroups;
+    assert builtins.elem "uinput" nixos.users.users.pangu-test.extraGroups;
     assert builtins.elem nixos.programs.ydotool.group nixos.users.users.pangu-test.extraGroups;
     assert nixos.environment.sessionVariables.YDOTOOL_SOCKET == "/run/ydotoold/socket";
     assert !nixosDisabled.programs.gpu-screen-recorder.enable;
     assert !nixosDisabled.programs.ydotool.enable;
+    assert !nixosDisabled.hardware.uinput.enable;
     assert !(nixosDisabled.environment.sessionVariables ? YDOTOOL_SOCKET);
     assert !nixosDisabled.services.upower.enable;
     pkgs.runCommand "pangu-nixos-check" { } ''touch "$out"'';

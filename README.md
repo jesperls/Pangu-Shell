@@ -17,7 +17,7 @@ place, with settings you can change from the shell itself.
   slideshows, color schemes and palettes for GTK, Qt, Kitty, Firefox, Spicetify and Discord.
 - **Capture:** screenshots, OCR and QR scanning with a shared frozen-screen
   selector, screen recording and replay capture with inline clip trimming and compression.
-- **Utilities:** clipboard history, notes, macros, lockscreen and power menu.
+- **Utilities:** clipboard history, notes, macros, Android ADB drawing tablet bridge, lockscreen and power menu.
 
 ## Requirements
 

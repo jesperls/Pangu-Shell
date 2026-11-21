@@ -31,6 +31,7 @@ in
     fonts.enable = feature "Install Pangu's default fonts system-wide.";
     recording.enable = feature "Enable the privileged GPU recording helper.";
     inputAutomation.enable = feature "Enable ydotool input automation.";
+    tablet.enable = feature "Enable uinput access for Android ADB drawing tablets.";
     powerProfiles.enable = feature "Enable the power profile service.";
     upower.enable = feature "Enable UPower device battery reporting.";
     brightness.enable = feature "Enable I2C access for external-monitor brightness.";
@@ -52,6 +53,9 @@ in
           lib.mkDefault "/run/ydotoold/socket" # programs.ydotool only sets login-shell variables
         );
       })
+      (lib.mkIf cfg.tablet.enable {
+        hardware.uinput.enable = lib.mkDefault true;
+      })
       (lib.mkIf cfg.powerProfiles.enable { services.power-profiles-daemon.enable = lib.mkDefault true; })
       (lib.mkIf cfg.upower.enable { services.upower.enable = lib.mkDefault true; })
       (lib.mkIf cfg.brightness.enable {
@@ -65,7 +69,8 @@ in
               "video"
               "i2c"
             ]
-            ++ lib.optional cfg.inputAutomation.enable config.programs.ydotool.group;
+            ++ lib.optional cfg.inputAutomation.enable config.programs.ydotool.group
+            ++ lib.optional cfg.tablet.enable "uinput";
         });
       }
     ]

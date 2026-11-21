@@ -240,6 +240,31 @@ Singleton {
         mousePickActive = false;
     }
 
+    property bool tabletPickActive: false
+    property string tabletPickMode: "area"
+    property bool tabletPickReturnToSettings: false
+
+    function beginTabletPick(mode, returnToSettings) {
+        tabletPickMode = (mode === "window" || mode === "screen") ? mode : "area";
+        tabletPickReturnToSettings = Boolean(returnToSettings);
+        if (tabletPickReturnToSettings)
+            settingsWindowVisible = false;
+        Visibilities.setActiveModule("");
+        tabletPickActive = true;
+    }
+
+    function finishTabletPick() {
+        const reopen = tabletPickReturnToSettings;
+        tabletPickReturnToSettings = false;
+        tabletPickActive = false;
+        if (reopen)
+            openSettingsSection("tablet", "");
+    }
+
+    function cancelTabletPick() {
+        finishTabletPick();
+    }
+
     property bool settingsWindowVisible: false
     property int settingsTargetWorkspaceId: 0
     property string settingsTargetScreenName: ""

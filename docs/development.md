@@ -45,6 +45,12 @@ streams for spectral-whitened template or tonal-band matches.
 samples distinct colors or reference baselines, and monitors color-match or
 visual-change macro rules with perceptual distance and hold/edge gating.
 
+`scripts/tablet_bridge.py` discovers stylus-capable Android tablets over ADB,
+streams raw kernel pen events into a virtual `uinput` tablet device, and hot-reloads
+active area, orientation, pressure curve, tilt, smoothing, and `EVIOCGRAB` tablet
+input suppression (via the statically cross-compiled `nix/package/tablet_grab.c`
+helper) from `$XDG_RUNTIME_DIR/pangu/tablet.json`.
+
 ## Verification
 
 ```sh
