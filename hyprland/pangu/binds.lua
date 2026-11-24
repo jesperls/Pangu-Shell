@@ -236,6 +236,51 @@ end
 bind_exec("", "XF86MonBrightnessUp", "pangu brightness +5", "Media: brightness up", { repeating = true, locked = true })
 bind_exec("", "XF86MonBrightnessDown", "pangu brightness -5", "Media: brightness down", { repeating = true, locked = true })
 
+local gestures = state.gestures or {}
+local swipe_fingers = gestures.workspace_swipe_fingers or 3
+if gestures.workspace_swipe == true then
+  hl.gesture({
+    fingers = swipe_fingers,
+    direction = gestures.workspace_swipe_direction or "horizontal",
+    action = "workspace",
+  })
+end
+if gestures.overview_swipe == true or gestures.scratchpad_swipe == true then
+  local function is_overview_open()
+    local layers = hl.get_layers({ namespace = "pangu:overview" })
+    return layers ~= nil and #layers > 0
+  end
+
+  local function is_scratchpad_open()
+    local special = hl.get_active_special_workspace()
+    return special ~= nil and special.name == "special:scratchpad"
+  end
+
+  hl.gesture({
+    fingers = swipe_fingers,
+    direction = "up",
+    action = function()
+      if is_scratchpad_open() then
+        popout.toggle_special("scratchpad")
+      elseif gestures.overview_swipe == true and not is_overview_open() then
+        hl.exec_cmd("pangu run overview")
+      end
+    end,
+  })
+
+  hl.gesture({
+    fingers = swipe_fingers,
+    direction = "down",
+    action = function()
+      if is_overview_open() then
+        hl.exec_cmd("pangu run overview")
+      elseif gestures.scratchpad_swipe == true and not is_scratchpad_open() then
+        popout.toggle_special("scratchpad")
+      end
+    end,
+  })
+end
+
 local dataHome = os.getenv("XDG_DATA_HOME") or ((os.getenv("HOME") or "/nonexistent") .. "/.local/share")
 local macroChunk = loadfile(dataHome .. "/pangu/macros.lua")
 if macroChunk then

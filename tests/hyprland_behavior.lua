@@ -310,4 +310,125 @@ assert(primary_cached.monitor({ name = "DP-2" }))
 monitors_list = { { name = "DP-3" }, { name = "DP-2" } }
 assert(primary_cached.monitor({ name = "DP-2" }) and not primary_cached.monitor({ name = "DP-3" }), "primary monitor must stay cached across DPMS reorder")
 
-print("Hyprland popout, scratchpad, fullscreen, PiP and primary-monitor behavior tests passed")
+-- 4. Laptop touchpad, horizontal workspace animation and trackpad gestures
+reset_modules()
+package.loaded["pangu.settings"] = nil
+package.loaded["pangu.binds"] = nil
+package.loaded["pangu.layouts"] = nil
+package.loaded["pangu.layout_modes"] = nil
+package.preload["pangu.generated"] = function()
+  return {
+    apps = { terminal = "kitty", browser = "firefox", file_manager = "thunar", editor = "nvim" },
+    keyboard_layout = "se",
+    input = {
+      repeat_rate = 40,
+      repeat_delay = 300,
+      numlock = false,
+      touchpad = {
+        natural_scroll = true,
+        tap_to_click = true,
+        tap_and_drag = true,
+        disable_while_typing = true,
+        clickfinger_behavior = true,
+        scroll_factor = 0.6,
+      },
+    },
+    gestures = {
+      workspace_swipe = true,
+      workspace_swipe_direction = "horizontal",
+      workspace_swipe_fingers = 3,
+      workspace_swipe_distance = 500,
+      overview_swipe = true,
+      scratchpad_swipe = true,
+    },
+    layouts = { default = "dwindle", centered = { height_resize_step = 0.15 } },
+    render = { direct_scanout = 2 },
+    tearing = { enable = false },
+    theme = { animations = { enabled = true, speed = 2.0, workspace_style = "slide" }, font_family = "Inter" },
+  }
+end
+package.preload["pangu.fullscreen"] = function()
+  return { dispatch_real = function() end }
+end
+package.preload["pangu.layouts"] = function()
+  return { start_drag = function() end, end_drag = function() end, master_focused = function() return false end }
+end
+package.preload["pangu.layout_modes"] = function()
+  return { toggle = function() end, set = function() end }
+end
+local overview_open = false
+local scratchpad_open = false
+package.preload["pangu.popout"] = function()
+  return {
+    toggle = function() end,
+    toggle_special = function(name)
+      if name == "scratchpad" then
+        scratchpad_open = not scratchpad_open
+      end
+    end,
+    toggle_scratchpad = function() end,
+    toggle_app_scratchpad = function() end,
+  }
+end
+
+local captured_cfg
+local captured_anims = {}
+local captured_gestures = {}
+hl = {
+  config = function(c) captured_cfg = c end,
+  curve = function() end,
+  animation = function(a) captured_anims[a.leaf] = a end,
+  bind = function() end,
+  gesture = function(g) captured_gestures[#captured_gestures + 1] = g end,
+  get_layers = function(filter)
+    if filter and filter.namespace == "pangu:overview" and overview_open then
+      return { { namespace = "pangu:overview" } }
+    end
+    return {}
+  end,
+  get_active_special_workspace = function()
+    return scratchpad_open and { name = "special:scratchpad" } or nil
+  end,
+  exec_cmd = function(cmd)
+    execs[#execs + 1] = { cmd = cmd }
+    if cmd == "pangu run overview" then
+      overview_open = not overview_open
+    end
+  end,
+  dsp = setmetatable({
+    exec_cmd = function(c) return c end,
+    layout = function(m) return m end,
+    focus = function(a) return a end,
+    window = setmetatable({}, { __index = function() return function(a) return a end end }),
+  }, { __index = function() return function(a) return a end end }),
+}
+dofile(source .. "/settings.lua")
+assert(captured_anims.workspaces and captured_anims.workspaces.style == "slide", "workspace_style must override slidevert")
+assert(captured_cfg.input.touchpad.clickfinger_behavior == true, "touchpad clickfinger_behavior must propagate")
+assert(captured_cfg.input.touchpad.scroll_factor == 0.6, "touchpad scroll_factor must propagate")
+assert(captured_cfg.gestures and captured_cfg.gestures.workspace_swipe_distance == 500, "gestures config must apply when workspace_swipe is enabled")
+assert(captured_cfg.gestures.workspace_swipe_forever == false, "workspace_swipe_forever must default to false")
+
+dofile(source .. "/binds.lua")
+assert(#captured_gestures == 3, "workspace, overview, and scratchpad gestures must register")
+assert(captured_gestures[1].fingers == 3 and captured_gestures[1].direction == "horizontal" and captured_gestures[1].action == "workspace")
+assert(captured_gestures[2].fingers == 3 and captured_gestures[2].direction == "up" and type(captured_gestures[2].action) == "function")
+assert(captured_gestures[3].fingers == 3 and captured_gestures[3].direction == "down" and type(captured_gestures[3].action) == "function")
+
+-- Stateful vertical gestures: scratchpad <-> normal <-> overview
+local swipe_up = captured_gestures[2].action
+local swipe_down = captured_gestures[3].action
+swipe_down()
+assert(scratchpad_open and not overview_open, "swipe down from normal must open scratchpad")
+swipe_down()
+assert(scratchpad_open and not overview_open, "swipe down while scratchpad open must stay in scratchpad")
+swipe_up()
+assert(not scratchpad_open and not overview_open, "swipe up from scratchpad must return to normal, not open overview")
+swipe_up()
+assert(overview_open and not scratchpad_open, "swipe up from normal must open overview")
+swipe_up()
+assert(overview_open and not scratchpad_open, "swipe up while overview open must stay in overview")
+swipe_down()
+assert(not overview_open and not scratchpad_open, "swipe down from overview must return to normal, not open scratchpad")
+
+print("Hyprland popout, scratchpad, fullscreen, PiP, primary-monitor and gesture behavior tests passed")

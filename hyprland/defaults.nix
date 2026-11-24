@@ -10,6 +10,27 @@
     repeat_rate = 40;
     repeat_delay = 300;
     numlock = true;
+    touchpad = {
+      natural_scroll = true;
+      tap_to_click = true;
+      tap_and_drag = true;
+      disable_while_typing = true;
+      clickfinger_behavior = false;
+      scroll_factor = 1.0;
+    };
+  };
+  gestures = {
+    workspace_swipe = false;
+    workspace_swipe_direction = "horizontal";
+    workspace_swipe_fingers = 3;
+    workspace_swipe_distance = 500;
+    workspace_swipe_invert = true;
+    workspace_swipe_cancel_ratio = 0.45;
+    workspace_swipe_forever = false;
+    workspace_swipe_create_new = true;
+    workspace_swipe_min_speed_to_force = 30;
+    overview_swipe = false;
+    scratchpad_swipe = false;
   };
   binds = {
     mouse_side_buttons = false;
@@ -55,6 +76,7 @@
     animations = {
       enabled = true;
       speed = 1.0;
+      workspace_style = "slidevert";
     };
     translucent_opacity = 1.0;
     translucent_apps = [ ];

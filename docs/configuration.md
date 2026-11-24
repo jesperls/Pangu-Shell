@@ -102,7 +102,13 @@ accept optional `mods` (default `SUPER`), `class`, `width`, `height` and
 their named special workspace thereafter. Additional `apps.shortcuts` entries
 accept `mods` (default `SUPER`), `key`, `command` and `description`. Set
 `binds.mouse_side_buttons = true` when mouse buttons `275`/`276`/`277` should
-drag, resize and close windows instead of navigating back and forward.
+drag, resize and close windows instead of navigating back and forward. For
+laptops, set `theme.animations.workspace_style = "slide"` for horizontal
+workspace transitions, tune `input.touchpad` (`clickfinger_behavior`,
+`scroll_factor`, `tap_to_click`, `tap_and_drag`, `disable_while_typing`,
+`natural_scroll`), and opt into trackpad swipes via `gestures`
+(`workspace_swipe`, `workspace_swipe_direction`, `workspace_swipe_fingers`,
+`overview_swipe`, `scratchpad_swipe`).
 
 ## Persistent settings
 
